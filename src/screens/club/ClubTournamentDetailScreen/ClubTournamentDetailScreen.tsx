@@ -1,0 +1,1087 @@
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, useParams } from "react-router-dom";
+import { Trash2 } from "lucide-react";
+import type { Match, MatchResultInput, MatchRules, TournamentPair } from "@core-api";
+import { createId, isMatchResultComplete } from "@core-api";
+import Api from "@/api/Api";
+import CuadroBoard from "./components/CuadroBoard";
+import GroupZonesPanel from "./components/GroupZonesPanel";
+import PairFormModal from "./components/PairFormModal";
+import MatchCard from "@/components/tournaments/MatchCard";
+import MatchResultModal from "./components/MatchResultModal";
+import StatusBadge from "@/components/tournaments/StatusBadge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import WarningDialog from "@/components/ui/warning-dialog";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import TournamentForm, {
+  defaultTournamentFormValues,
+} from "@/screens/club/components/TournamentForm";
+import {
+  buildMatchRulesFromForm,
+  type TournamentFormValues,
+} from "@/modules/tournaments/types";
+import { ROUTES } from "@/router/routes";
+import { resolveMatchPlayStatus } from "@/lib/matchPlayStatus";
+import { sidePreferenceLabel } from "@/lib/tournamentLabels";
+
+const FALLBACK_MATCH_RULES: MatchRules = {
+  setFormat: "best_of_3",
+  setsToWin: 2,
+  gamesPerSet: 6,
+  advantageType: "goldenPoint",
+  goldenPoint: true,
+  tiebreakEnabled: true,
+  tiebreakPoints: 7,
+  tiebreakWinByTwo: true,
+  superTiebreakEnabled: true,
+  superTiebreakPoints: 10,
+  superTiebreakWinByTwo: true,
+};
+
+function structureChanged(
+  prev: Pick<TournamentFormValues, "pairsPerGroup" | "qualifyPerGroup">,
+  next: TournamentFormValues,
+): boolean {
+  return (
+    prev.pairsPerGroup !== next.pairsPerGroup ||
+    prev.qualifyPerGroup !== next.qualifyPerGroup
+  );
+}
+
+export default function ClubTournamentDetailScreen() {
+  const { tournamentId = "" } = useParams();
+  const qc = useQueryClient();
+  const [message, setMessage] = useState<string | null>(null);
+  const [resultMatchId, setResultMatchId] = useState<string | null>(null);
+  const [pendingStructureValues, setPendingStructureValues] =
+    useState<TournamentFormValues | null>(null);
+  const [dqRegistrationId, setDqRegistrationId] = useState<string | null>(null);
+  const [dqNote, setDqNote] = useState("");
+  const [removeRegistrationId, setRemoveRegistrationId] = useState<string | null>(
+    null,
+  );
+  const [removeNote, setRemoveNote] = useState("");
+  const [pairModalOpen, setPairModalOpen] = useState(false);
+  const [editingPair, setEditingPair] = useState<TournamentPair | null>(null);
+  const [confirmAddStartedOpen, setConfirmAddStartedOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("grupos");
+
+  const { data: tournament } = useQuery({
+    queryKey: ["tournament", tournamentId],
+    queryFn: () => Api.TournamentService().getById(tournamentId),
+  });
+  const { data: categories = [] } = useQuery({
+    queryKey: ["categories", tournamentId],
+    queryFn: () => Api.TournamentOpsService().listCategories(tournamentId),
+    enabled: Boolean(tournamentId),
+  });
+  const categoryId = categories[0]?.id ?? "";
+  const category = categories[0];
+
+  const { data: pairs = [] } = useQuery({
+    queryKey: ["pairs", categoryId],
+    queryFn: () => Api.TournamentOpsService().listPairs(categoryId),
+    enabled: Boolean(categoryId),
+  });
+  const { data: registrations = [] } = useQuery({
+    queryKey: ["registrations", categoryId],
+    queryFn: () => Api.TournamentOpsService().listRegistrations(categoryId),
+    enabled: Boolean(categoryId),
+  });
+  const { data: groups = [] } = useQuery({
+    queryKey: ["groups", categoryId],
+    queryFn: () => Api.TournamentOpsService().listGroups(categoryId),
+    enabled: Boolean(categoryId),
+  });
+  const { data: matches = [] } = useQuery({
+    queryKey: ["matches", categoryId],
+    queryFn: () => Api.TournamentOpsService().listMatches(categoryId),
+    enabled: Boolean(categoryId),
+  });
+  const { data: players = [] } = useQuery({
+    queryKey: ["players"],
+    queryFn: () => Api.TournamentOpsService().listPlayers(),
+  });
+  const { data: ruleset } = useQuery({
+    queryKey: ["ruleset", categoryId],
+    queryFn: () => Api.TournamentOpsService().getRuleset(categoryId),
+    enabled: Boolean(categoryId),
+  });
+
+  const {
+    data: zonesBoard,
+    refetch: refetchZonesBoard,
+  } = useQuery({
+    queryKey: ["zones-board", categoryId],
+    queryFn: () => Api.TournamentOpsService().getZonesBoard(categoryId),
+    enabled: Boolean(categoryId) && activeTab === "grupos",
+    refetchOnMount: "always",
+  });
+  const {
+    data: participantsBoard,
+    refetch: refetchParticipantsBoard,
+  } = useQuery({
+    queryKey: ["participants-board", categoryId],
+    queryFn: () => Api.TournamentOpsService().getParticipantsBoard(categoryId),
+    enabled: Boolean(categoryId) && activeTab === "participantes",
+    refetchOnMount: "always",
+  });
+  const {
+    data: cuadroBoard,
+    isFetching: cuadroFetching,
+    refetch: refetchCuadro,
+  } = useQuery({
+    queryKey: ["cuadro", categoryId],
+    queryFn: () => Api.TournamentOpsService().getCuadroBoard(categoryId),
+    enabled: Boolean(categoryId) && activeTab === "cuadro",
+    refetchOnMount: "always",
+  });
+  const {
+    data: matchesBoard,
+    refetch: refetchMatchesBoard,
+  } = useQuery({
+    queryKey: ["matches-board", categoryId],
+    queryFn: () => Api.TournamentOpsService().getMatchesBoard(categoryId),
+    enabled: Boolean(categoryId) && activeTab === "partidos",
+    refetchOnMount: "always",
+  });
+  const {
+    data: configBoard,
+    refetch: refetchConfigBoard,
+  } = useQuery({
+    queryKey: ["config-board", categoryId],
+    queryFn: () => Api.TournamentOpsService().getConfigBoard(categoryId),
+    enabled: Boolean(categoryId) && activeTab === "config",
+    refetchOnMount: "always",
+  });
+
+  const invalidateOps = async () => {
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ["groups", categoryId] }),
+      qc.invalidateQueries({ queryKey: ["matches", categoryId] }),
+      qc.invalidateQueries({ queryKey: ["zones-board", categoryId] }),
+      qc.invalidateQueries({ queryKey: ["participants-board", categoryId] }),
+      qc.invalidateQueries({ queryKey: ["cuadro", categoryId] }),
+      qc.invalidateQueries({ queryKey: ["matches-board", categoryId] }),
+      qc.invalidateQueries({ queryKey: ["config-board", categoryId] }),
+      qc.invalidateQueries({ queryKey: ["ruleset", categoryId] }),
+      qc.invalidateQueries({ queryKey: ["pairs", categoryId] }),
+      qc.invalidateQueries({ queryKey: ["registrations", categoryId] }),
+      qc.invalidateQueries({ queryKey: ["players"] }),
+      qc.invalidateQueries({ queryKey: ["tournament", tournamentId] }),
+      qc.invalidateQueries({ queryKey: ["categories", tournamentId] }),
+      qc.invalidateQueries({ queryKey: ["dashboard"] }),
+    ]);
+  };
+
+  const syncMutation = useMutation({
+    mutationFn: () => Api.TournamentOpsService().syncCategoryStructure(categoryId),
+    onSuccess: async (result) => {
+      setMessage(result.message);
+      await invalidateOps();
+    },
+  });
+
+  const savePairMutation = useMutation({
+    mutationFn: async (input: {
+      mode: "create" | "edit";
+      pairId?: string;
+      player1Id: string;
+      player2Id: string | null;
+      sidePreference: import("@core-api").PairSidePreference | null;
+    }) => {
+      if (input.mode === "edit" && input.pairId) {
+        return Api.TournamentOpsService().updatePairPlayers(input.pairId, {
+          player1Id: input.player1Id,
+          player2Id: input.player2Id,
+          sidePreference: input.sidePreference,
+        });
+      }
+      return Api.TournamentOpsService().registerPair({
+        tournamentCategoryId: categoryId,
+        player1Id: input.player1Id,
+        player2Id: input.player2Id,
+        sidePreference: input.sidePreference,
+      });
+    },
+    onSuccess: async (_data, vars) => {
+      setMessage(vars.mode === "edit" ? "✓ Pareja actualizada" : "✓ Pareja agregada");
+      await invalidateOps();
+      const shouldSyncStructure =
+        vars.mode === "create" || (vars.mode === "edit" && Boolean(vars.player2Id));
+      if (shouldSyncStructure) {
+        const result =
+          await Api.TournamentOpsService().syncCategoryStructure(categoryId);
+        if (result.message) setMessage(result.message);
+        await invalidateOps();
+      }
+    },
+  });
+
+  useEffect(() => {
+    if (!categoryId) return;
+    void Api.TournamentOpsService()
+      .syncCategoryStructure(categoryId)
+      .then(async (result) => {
+        setMessage(result.message);
+        await invalidateOps();
+      });
+    // Sync once when category is ready / registrations already seeded.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoryId, registrations.length]);
+
+  const localPairLabels = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const pair of pairs) {
+      const p1 = players.find((p) => p.id === pair.player1Id)?.displayName ?? "?";
+      if (!pair.player2Id) {
+        map[pair.id] = `${p1} / Buscando pareja (${sidePreferenceLabel(pair.sidePreference)})`;
+      } else {
+        const p2 = players.find((p) => p.id === pair.player2Id)?.displayName ?? "?";
+        map[pair.id] = `${p1} / ${p2}`;
+      }
+    }
+    return map;
+  }, [pairs, players]);
+
+  const localPairPlayerNames = useMemo(() => {
+    const map: Record<string, [string, string]> = {};
+    for (const pair of pairs) {
+      const p1 = players.find((p) => p.id === pair.player1Id)?.displayName ?? "?";
+      const p2 = pair.player2Id
+        ? (players.find((p) => p.id === pair.player2Id)?.displayName ?? "?")
+        : `Buscando (${sidePreferenceLabel(pair.sidePreference)})`;
+      map[pair.id] = [p1, p2];
+    }
+    return map;
+  }, [pairs, players]);
+
+  const pairLabels =
+    zonesBoard?.pairLabels ??
+    matchesBoard?.pairLabels ??
+    cuadroBoard?.pairLabels ??
+    localPairLabels;
+
+  const pairPlayerNames =
+    zonesBoard?.pairPlayerNames ??
+    cuadroBoard?.pairPlayerNames ??
+    participantsBoard?.rows.reduce<Record<string, [string, string]>>((acc, row) => {
+      acc[row.pair.id] = row.playerNames;
+      return acc;
+    }, {}) ??
+    localPairPlayerNames;
+
+  const playersById = useMemo(() => {
+    const map: Record<string, (typeof players)[number]> = {};
+    for (const p of players) map[p.id] = p;
+    return map;
+  }, [players]);
+
+  const submitResult = useMutation({
+    mutationFn: (input: { matchId: string; result: MatchResultInput }) =>
+      Api.TournamentOpsService().submitMatchResult(input.matchId, input.result),
+    onSuccess: async () => {
+      setMessage("✓ Resultado cargado");
+      await invalidateOps();
+      await Api.TournamentOpsService().syncCategoryStructure(categoryId);
+      await invalidateOps();
+    },
+  });
+
+  const setLive = useMutation({
+    mutationFn: (input: { matchId: string; status: "inProgress" | "scheduled" }) =>
+      Api.TournamentOpsService().setMatchStatus(input.matchId, input.status),
+    onSuccess: async (_data, variables) => {
+      setMessage(
+        variables.status === "inProgress"
+          ? "● Partido en juego"
+          : "Partido vuelto a programado",
+      );
+      await invalidateOps();
+    },
+    onError: (err: Error) => {
+      setMessage(err.message || "No se pudo actualizar el estado del partido");
+    },
+  });
+
+  const saveSchedule = useMutation({
+    mutationFn: (input: {
+      matchId: string;
+      scheduledAt: string | null;
+      courtId: string | null;
+      force?: boolean;
+    }) =>
+      Api.TournamentOpsService().updateMatchSchedule(
+        input.matchId,
+        {
+          scheduledAt: input.scheduledAt,
+          courtId: input.courtId,
+        },
+        { force: input.force, pairLabels },
+      ),
+    onSuccess: async () => {
+      setMessage("✓ Agenda actualizada");
+      await invalidateOps();
+    },
+    onError: (err: Error) => {
+      setMessage(err.message || "No se pudo guardar la agenda");
+    },
+  });
+
+  const configRuleset = configBoard?.ruleset ?? ruleset;
+
+  const saveConfig = useMutation({
+    mutationFn: async (input: {
+      values: TournamentFormValues;
+      preserveResults?: boolean;
+    }) => {
+      const { values, preserveResults } = input;
+      const cfgTournament = configBoard?.tournament ?? tournament;
+      const cfgCategory = configBoard?.category ?? category;
+      if (!cfgTournament || !cfgCategory) throw new Error("Sin torneo");
+      await Api.TournamentService().update(cfgTournament.id, {
+        name: values.name,
+        description: values.description || null,
+        startDate: values.startDate,
+        endDate: values.endDate,
+        dailyStartTime: values.dailyStartTime,
+        dailyEndTime: values.dailyEndTime,
+        format: values.format,
+        status: cfgTournament.status,
+        updatedAt: new Date().toISOString(),
+      });
+      await Api.TournamentOpsService().updateCategory(cfgCategory.id, {
+        name: values.categoryName,
+        gender: values.categoryGender,
+        kind: values.categoryKind,
+        level: values.categoryKind === "level" ? values.categoryLevel : null,
+        sumaTarget: values.categoryKind === "suma" ? values.sumaTarget : null,
+        maxPairs: values.maxPairs,
+        status: cfgCategory.status,
+      });
+      await Api.TournamentOpsService().upsertRuleset({
+        id: configRuleset?.id ?? createId("rules"),
+        tournamentCategoryId: cfgCategory.id,
+        preset: values.matchPlayType,
+        matchRules: buildMatchRulesFromForm(values),
+        tieBreakers: configRuleset?.tieBreakers ?? [
+          "SET_DIFFERENCE",
+          "POINTS",
+          "HEAD_TO_HEAD",
+          "GAME_DIFFERENCE",
+        ],
+        qualifyPerGroup: values.qualifyPerGroup,
+        pairsPerGroup: values.pairsPerGroup,
+        groupCount: null,
+      });
+      return Api.TournamentOpsService().syncCategoryStructure(cfgCategory.id, {
+        preserveResults,
+      });
+    },
+    onSuccess: async (result) => {
+      setMessage(result.message);
+      setPendingStructureValues(null);
+      await invalidateOps();
+    },
+  });
+
+  const disqualifyMutation = useMutation({
+    mutationFn: (input: { registrationId: string; note: string }) =>
+      Api.TournamentOpsService().disqualifyRegistration(
+        input.registrationId,
+        input.note,
+      ),
+    onSuccess: async () => {
+      setMessage("✓ Pareja desclasificada");
+      setDqRegistrationId(null);
+      setDqNote("");
+      await invalidateOps();
+    },
+    onError: (err: Error) => {
+      setMessage(err.message || "No se pudo desclasificar");
+    },
+  });
+
+  const removePairMutation = useMutation({
+    mutationFn: (input: { registrationId: string; note: string }) =>
+      Api.TournamentOpsService().removeRegistration(
+        input.registrationId,
+        input.note,
+      ),
+    onSuccess: async () => {
+      setMessage("✓ Pareja eliminada");
+      setRemoveRegistrationId(null);
+      setRemoveNote("");
+      await invalidateOps();
+      if (categoryId) {
+        await Api.TournamentOpsService().syncCategoryStructure(categoryId);
+        await invalidateOps();
+      }
+    },
+    onError: (err: Error) => {
+      setMessage(err.message || "No se pudo eliminar la pareja");
+    },
+  });
+
+  if (!tournament) {
+    return <p className="text-muted-foreground">Cargando torneo…</p>;
+  }
+
+  const confirmed = registrations.filter((r) => r.status === "CONFIRMED").length;
+  const matchRules =
+    zonesBoard?.matchRules ??
+    matchesBoard?.matchRules ??
+    cuadroBoard?.matchRules ??
+    ruleset?.matchRules ??
+    FALLBACK_MATCH_RULES;
+  const liveCount = matches.filter(
+    (m) => resolveMatchPlayStatus(m, matchRules) === "started",
+  ).length;
+  const finishedCount = matches.filter((m) => isMatchResultComplete(m, matchRules)).length;
+  const structureLocked =
+    configBoard?.structureLocked ??
+    matches.some(
+      (m) =>
+        m.phase === "GROUP" &&
+        (m.status === "finished" || m.status === "walkover" || m.status === "inProgress"),
+    );
+  const tournamentStarted =
+    participantsBoard?.tournamentStarted ??
+    (tournament.status === "inProgress" ||
+      tournament.status === "finished" ||
+      structureLocked);
+  const resultMatch = resultMatchId
+    ? (matches.find((m) => m.id === resultMatchId) ??
+        zonesBoard?.allMatches.find((m) => m.id === resultMatchId) ??
+        matchesBoard?.groupMatches.find((m) => m.id === resultMatchId) ??
+        matchesBoard?.elimMatches.find((m) => m.id === resultMatchId) ??
+        cuadroBoard?.elimMatches.find((m) => m.id === resultMatchId) ??
+        null)
+    : null;
+
+  const openAddPair = () => {
+    setEditingPair(null);
+    if (tournamentStarted) {
+      setConfirmAddStartedOpen(true);
+      return;
+    }
+    setPairModalOpen(true);
+  };
+
+  const refreshTab = async (tab: string) => {
+    if (
+      categoryId &&
+      (tab === "grupos" || tab === "cuadro" || tab === "partidos")
+    ) {
+      const result = await Api.TournamentOpsService().syncCategoryStructure(categoryId);
+      if (result.message) setMessage(result.message);
+    }
+    await invalidateOps();
+    if (tab === "grupos") await refetchZonesBoard();
+    if (tab === "participantes") await refetchParticipantsBoard();
+    if (tab === "cuadro") await refetchCuadro();
+    if (tab === "partidos") await refetchMatchesBoard();
+    if (tab === "config") await refetchConfigBoard();
+  };
+
+  const openResult = (match: Match) => {
+    if (!match.pairAId || !match.pairBId) return;
+    setResultMatchId(match.id);
+  };
+
+  const formSource = configBoard
+    ? {
+        tournament: configBoard.tournament,
+        category: configBoard.category,
+        ruleset: configBoard.ruleset,
+        pairsPerGroup: configBoard.pairsPerGroup,
+        qualifyPerGroup: configBoard.qualifyPerGroup,
+      }
+    : {
+        tournament,
+        category,
+        ruleset,
+        pairsPerGroup: ruleset?.pairsPerGroup ?? 4,
+        qualifyPerGroup: ruleset?.qualifyPerGroup ?? 2,
+      };
+
+  const formInitial = defaultTournamentFormValues({
+    name: formSource.tournament.name,
+    description: formSource.tournament.description ?? "",
+    startDate: formSource.tournament.startDate,
+    endDate: formSource.tournament.endDate ?? formSource.tournament.startDate,
+    dailyStartTime: formSource.tournament.dailyStartTime ?? "10:00",
+    dailyEndTime: formSource.tournament.dailyEndTime ?? "22:00",
+    format:
+      formSource.tournament.format === "QUALITY"
+        ? "GROUPS_ELIMINATION"
+        : formSource.tournament.format,
+    matchPlayType:
+      formSource.ruleset?.preset === "QUALITY" ||
+      formSource.ruleset?.preset === "CUSTOM" ||
+      formSource.ruleset?.preset === "STANDARD"
+        ? formSource.ruleset.preset
+        : "STANDARD",
+    equalsResolution: formSource.ruleset?.matchRules.goldenPoint
+      ? "goldenPoint"
+      : "advantage",
+    setsToWin: formSource.ruleset?.matchRules.setsToWin ?? 2,
+    tiebreakPoints: formSource.ruleset?.matchRules.tiebreakPoints ?? 7,
+    categoryKind: formSource.category?.kind ?? "level",
+    categoryLevel: formSource.category?.level ?? "6ta",
+    categoryGender: formSource.category?.gender ?? "male",
+    sumaTarget: formSource.category?.sumaTarget ?? 12,
+    categoryName: formSource.category?.name ?? "",
+    maxPairs: formSource.category?.maxPairs ?? 16,
+    pairsPerGroup: formSource.pairsPerGroup,
+    qualifyPerGroup: formSource.qualifyPerGroup,
+  });
+
+  const summaryGroups = zonesBoard?.groups ?? groups;
+  const summaryQualify =
+    zonesBoard?.qualifyPerGroup ?? ruleset?.qualifyPerGroup ?? 2;
+
+  return (
+    <div className="space-y-5" data-testid="club-tournament-detail">
+      <div>
+        <Link to={ROUTES.club.tournaments} className="text-sm text-primary hover:underline">
+          ← Volver a torneos
+        </Link>
+        <div className="mt-1 flex flex-wrap items-center gap-2">
+          <h2 className="text-2xl font-semibold tracking-tight">{tournament.name}</h2>
+          <StatusBadge status={tournament.status} />
+          <span className="text-sm text-muted-foreground">{category?.name}</span>
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" data-testid="tournament-summary-cards">
+        <SummaryCard label="Inscriptos" value={`${confirmed} parejas`} />
+        <SummaryCard
+          label="Zonas"
+          value={
+            summaryGroups.length
+              ? `${summaryGroups.length} · clasifican ${summaryQualify * summaryGroups.length}`
+              : "Pendiente de cupo"
+          }
+        />
+        <SummaryCard label="En juego" value={String(liveCount)} />
+        <SummaryCard label="Finalizados" value={String(finishedCount)} />
+      </div>
+
+      {message ? (
+        <p
+          className="text-sm rounded-lg border border-border bg-muted/40 px-3 py-2"
+          data-testid="ops-message"
+        >
+          {message}
+        </p>
+      ) : null}
+
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => {
+          const next = String(value);
+          setActiveTab(next);
+          void refreshTab(next);
+        }}
+      >
+        <TabsList className="flex flex-wrap h-auto gap-1">
+          <TabsTrigger value="grupos">Zonas</TabsTrigger>
+          <TabsTrigger value="participantes">Participantes</TabsTrigger>
+          <TabsTrigger value="cuadro">Cuadro</TabsTrigger>
+          <TabsTrigger value="partidos">Partidos</TabsTrigger>
+          <TabsTrigger value="config">Configuración</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="participantes" className="pt-4 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm text-muted-foreground">
+              Inscripciones de la categoría. Podés cargar parejas completas o un
+              jugador solo.
+            </p>
+            <Button type="button" size="sm" onClick={openAddPair}>
+              Agregar pareja
+            </Button>
+          </div>
+          {participantsBoard?.notice ? (
+            <p className="text-sm text-muted-foreground">{participantsBoard.notice}</p>
+          ) : null}
+          <ul className="divide-y divide-border rounded-xl border border-border bg-card">
+            {(participantsBoard?.rows ?? []).map((row) => {
+              const { pair, registration: reg } = row;
+              return (
+                <li
+                  key={pair.id}
+                  className="px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between text-sm"
+                >
+                  <div className="min-w-0 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium">{row.label}</span>
+                      {reg ? <StatusBadge status={reg.status} /> : null}
+                      {row.disqualified ? <StatusBadge status="disqualified" /> : null}
+                      {row.incomplete ? (
+                        <span className="rounded-md border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                          Incompleta
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Seed {pair.seed ?? "—"}
+                      {pair.user1Id || pair.user2Id
+                        ? " · equipo vinculado a usuario(s) del torneo"
+                        : " · sin usuarios vinculados"}
+                      {row.incomplete
+                        ? ` · preferencia ${sidePreferenceLabel(pair.sidePreference)}`
+                        : ""}
+                    </p>
+                    {reg?.statusNote ? (
+                      <p className="text-xs text-destructive/90">Nota: {reg.statusNote}</p>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {!row.disqualified && reg?.status !== "CANCELLED" ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setEditingPair(pair);
+                          setPairModalOpen(true);
+                        }}
+                      >
+                        Editar
+                      </Button>
+                    ) : null}
+                    {!row.disqualified && reg?.status === "CONFIRMED" ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setDqRegistrationId(reg.id);
+                          setDqNote("");
+                        }}
+                      >
+                        Desclasificar
+                      </Button>
+                    ) : null}
+                    {reg && reg.status !== "CANCELLED" && !row.disqualified ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => {
+                          setRemoveRegistrationId(reg.id);
+                          setRemoveNote("");
+                        }}
+                      >
+                        <Trash2 />
+                        Eliminar
+                      </Button>
+                    ) : null}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="text-xs text-muted-foreground">
+            Las parejas incompletas no entran al armado de zonas hasta tener dos
+            jugadores. La desclasificación queda en la inscripción (con nota).
+          </p>
+          <Button
+            className="mt-1"
+            variant="outline"
+            size="sm"
+            disabled={syncMutation.isPending}
+            onClick={() => syncMutation.mutate()}
+          >
+            Sincronizar estructura
+          </Button>
+        </TabsContent>
+
+        <TabsContent value="grupos" className="space-y-4 pt-4">
+          {zonesBoard?.notice ? (
+            <p className="text-sm text-muted-foreground">{zonesBoard.notice}</p>
+          ) : null}
+          {zonesBoard ? (
+            <GroupZonesPanel
+              groups={zonesBoard.groups}
+              matches={zonesBoard.groupMatches}
+              standings={zonesBoard.standings}
+              pairLabels={zonesBoard.pairLabels}
+              pairPlayerNames={zonesBoard.pairPlayerNames}
+              matchRules={zonesBoard.matchRules}
+              courts={zonesBoard.courts}
+              allMatches={zonesBoard.allMatches}
+              scheduleSavingMatchId={
+                saveSchedule.isPending
+                  ? (saveSchedule.variables?.matchId ?? null)
+                  : null
+              }
+              onSaveSchedule={async (input) => {
+                await saveSchedule.mutateAsync(input);
+              }}
+              onOpenResult={openResult}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">Cargando zonas…</p>
+          )}
+        </TabsContent>
+
+        <TabsContent value="cuadro" className="space-y-4 pt-4">
+          {cuadroBoard ? (
+            <CuadroBoard
+              board={cuadroBoard}
+              isLoading={cuadroFetching}
+              onOpenResult={openResult}
+              onSyncStructure={() => syncMutation.mutate()}
+              syncPending={syncMutation.isPending}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              {cuadroFetching ? "Cargando cuadro…" : "Sin datos de cuadro."}
+            </p>
+          )}
+        </TabsContent>
+
+        <TabsContent value="partidos" className="space-y-3 pt-4">
+          {matchesBoard?.notice ? (
+            <p className="text-sm text-muted-foreground">{matchesBoard.notice}</p>
+          ) : null}
+          <div className="grid gap-3 md:grid-cols-2">
+            {(matchesBoard?.groupMatches ?? []).map((match) => (
+              <div key={match.id} className="space-y-2">
+                <button
+                  type="button"
+                  className="w-full text-left"
+                  onClick={() => openResult(match)}
+                  disabled={!match.pairAId || !match.pairBId}
+                >
+                  <MatchCard
+                    match={match}
+                    pairALabel={
+                      (matchesBoard?.pairLabels ?? pairLabels)[match.pairAId ?? ""] ??
+                      "A"
+                    }
+                    pairBLabel={
+                      (matchesBoard?.pairLabels ?? pairLabels)[match.pairBId ?? ""] ??
+                      "B"
+                    }
+                    phaseLabel="Zonas"
+                    courtLabel={
+                      match.courtId
+                        ? (matchesBoard?.courtLabels[match.courtId] ?? null)
+                        : null
+                    }
+                  />
+                </button>
+                {match.status === "scheduled" && match.pairAId && match.pairBId ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={setLive.isPending}
+                    onClick={() =>
+                      setLive.mutate({ matchId: match.id, status: "inProgress" })
+                    }
+                  >
+                    Marcar en juego
+                  </Button>
+                ) : null}
+                {match.status === "inProgress" ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={setLive.isPending}
+                    onClick={() =>
+                      setLive.mutate({ matchId: match.id, status: "scheduled" })
+                    }
+                  >
+                    Volver a programado
+                  </Button>
+                ) : null}
+              </div>
+            ))}
+          </div>
+          {!matchesBoard ? (
+            <p className="text-sm text-muted-foreground">Cargando partidos…</p>
+          ) : matchesBoard.groupMatches.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Sin partidos de zonas todavía.</p>
+          ) : null}
+        </TabsContent>
+
+        <TabsContent value="config" className="pt-4 space-y-3">
+          {configBoard?.notice ? (
+            <p className="text-sm text-muted-foreground">{configBoard.notice}</p>
+          ) : null}
+          {configBoard ? (
+            <TournamentForm
+              key={`${configBoard.generatedAt}-${configBoard.ruleset?.id ?? "rules"}`}
+              initialValues={formInitial}
+              submitLabel="Guardar configuración"
+              isSubmitting={saveConfig.isPending}
+              onSubmit={async (values) => {
+                const structureTouched = structureChanged(formInitial, values);
+                if (structureTouched && (configBoard.structureLocked || structureLocked)) {
+                  setPendingStructureValues(values);
+                  return;
+                }
+                await saveConfig.mutateAsync({
+                  values,
+                  preserveResults: true,
+                });
+              }}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">Cargando configuración…</p>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      <Dialog
+        open={Boolean(pendingStructureValues)}
+        onOpenChange={(open) => {
+          if (!open) setPendingStructureValues(null);
+        }}
+      >
+        <DialogContent data-testid="structure-change-dialog">
+          <DialogHeader>
+            <DialogTitle>Cambió el cupo de zonas</DialogTitle>
+            <DialogDescription>
+              Al aplicar, se reordenan las zonas según el nuevo cupo de parejas por
+              zona, pero se conservan los VS ya jugados y sus resultados. Solo se
+              redistribuyen los cruces que todavía no se disputaron.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={saveConfig.isPending}
+              onClick={() => setPendingStructureValues(null)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              disabled={saveConfig.isPending || !pendingStructureValues}
+              onClick={() => {
+                if (!pendingStructureValues) return;
+                void saveConfig.mutateAsync({
+                  values: pendingStructureValues,
+                  preserveResults: true,
+                });
+              }}
+            >
+              Aplicar cupo (conservar VS)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(dqRegistrationId)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDqRegistrationId(null);
+            setDqNote("");
+          }
+        }}
+      >
+        <DialogContent data-testid="disqualify-dialog">
+          <DialogHeader>
+            <DialogTitle>Desclasificar pareja</DialogTitle>
+            <DialogDescription>
+              La nota queda asociada a la inscripción. Los partidos pendientes se adjudican al rival
+              (walkover).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="dq-note">Motivo</Label>
+            <textarea
+              id="dq-note"
+              rows={3}
+              value={dqNote}
+              onChange={(e) => setDqNote(e.target.value)}
+              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+              placeholder="Ej. Ausencia / no corresponde a la categoría…"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={disqualifyMutation.isPending}
+              onClick={() => {
+                setDqRegistrationId(null);
+                setDqNote("");
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              disabled={disqualifyMutation.isPending || !dqNote.trim() || !dqRegistrationId}
+              onClick={() => {
+                if (!dqRegistrationId) return;
+                void disqualifyMutation.mutateAsync({
+                  registrationId: dqRegistrationId,
+                  note: dqNote,
+                });
+              }}
+            >
+              {disqualifyMutation.isPending ? "Guardando…" : "Desclasificar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(removeRegistrationId)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRemoveRegistrationId(null);
+            setRemoveNote("");
+          }
+        }}
+      >
+        <DialogContent data-testid="remove-pair-dialog">
+          <DialogHeader>
+            <DialogTitle>Eliminar pareja</DialogTitle>
+            <DialogDescription>
+              Se da de baja la inscripción (con motivo). Los partidos pendientes de esta pareja se
+              cancelan; no se adjudican walkovers.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="remove-pair-note">Motivo</Label>
+            <textarea
+              id="remove-pair-note"
+              rows={3}
+              value={removeNote}
+              onChange={(e) => setRemoveNote(e.target.value)}
+              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+              placeholder="Ej. Se anotaron por error / se bajaron del torneo…"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={removePairMutation.isPending}
+              onClick={() => {
+                setRemoveRegistrationId(null);
+                setRemoveNote("");
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={
+                removePairMutation.isPending ||
+                !removeNote.trim() ||
+                !removeRegistrationId
+              }
+              onClick={() => {
+                if (!removeRegistrationId) return;
+                void removePairMutation.mutateAsync({
+                  registrationId: removeRegistrationId,
+                  note: removeNote,
+                });
+              }}
+            >
+              {removePairMutation.isPending ? "Eliminando…" : "Eliminar pareja"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <WarningDialog
+        open={confirmAddStartedOpen}
+        onOpenChange={setConfirmAddStartedOpen}
+        title="Torneo en curso"
+        description="El torneo ya comenzó, ¿seguro que desea agregar una pareja? Se rearmará la estructura conservando resultados ya jugados cuando sea posible."
+        cancelLabel="No"
+        confirmLabel="Sí"
+        onConfirm={() => {
+          setConfirmAddStartedOpen(false);
+          setEditingPair(null);
+          setPairModalOpen(true);
+        }}
+      />
+
+      <PairFormModal
+        open={pairModalOpen}
+        mode={editingPair ? "edit" : "create"}
+        pair={editingPair}
+        playersById={playersById}
+        isSaving={savePairMutation.isPending}
+        onOpenChange={(open) => {
+          setPairModalOpen(open);
+          if (!open) setEditingPair(null);
+        }}
+        onCreatePlayer={async (draft) => {
+          const player = await Api.TournamentOpsService().createPlayer({
+            firstName: draft.firstName,
+            lastName: draft.lastName,
+            phone: draft.phone || null,
+            email: draft.email || null,
+          });
+          await qc.invalidateQueries({ queryKey: ["players"] });
+          return player;
+        }}
+        onSubmit={async (values) => {
+          await savePairMutation.mutateAsync({
+            mode: editingPair ? "edit" : "create",
+            pairId: editingPair?.id,
+            ...values,
+          });
+        }}
+      />
+
+      <MatchResultModal
+        open={Boolean(resultMatch)}
+        onOpenChange={(open) => {
+          if (!open) setResultMatchId(null);
+        }}
+        match={resultMatch}
+        pairANames={
+          resultMatch?.pairAId
+            ? (pairPlayerNames[resultMatch.pairAId] ?? ["Pareja A", ""])
+            : ["Pareja A", ""]
+        }
+        pairBNames={
+          resultMatch?.pairBId
+            ? (pairPlayerNames[resultMatch.pairBId] ?? ["Pareja B", ""])
+            : ["Pareja B", ""]
+        }
+        matchRules={matchRules}
+        isSubmitting={submitResult.isPending}
+        onSubmit={async (result) => {
+          if (!resultMatch) return;
+          await submitResult.mutateAsync({ matchId: resultMatch.id, result });
+        }}
+      />
+    </div>
+  );
+}
+
+function SummaryCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-lg font-semibold mt-1">{value}</p>
+    </div>
+  );
+}

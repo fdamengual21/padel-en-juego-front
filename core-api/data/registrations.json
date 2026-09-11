@@ -1,0 +1,74 @@
+[
+  {
+    "id": "reg-1",
+    "tournamentCategoryId": "cat-1",
+    "pairId": "pair-1",
+    "status": "CONFIRMED",
+    "registeredAt": "2026-09-08T12:00:00.000Z",
+    "statusNote": null,
+    "statusChangedAt": null
+  },
+  {
+    "id": "reg-2",
+    "tournamentCategoryId": "cat-1",
+    "pairId": "pair-2",
+    "status": "CONFIRMED",
+    "registeredAt": "2026-09-08T12:00:00.000Z",
+    "statusNote": null,
+    "statusChangedAt": null
+  },
+  {
+    "id": "reg-3",
+    "tournamentCategoryId": "cat-1",
+    "pairId": "pair-3",
+    "status": "CONFIRMED",
+    "registeredAt": "2026-09-08T12:00:00.000Z",
+    "statusNote": null,
+    "statusChangedAt": null
+  },
+  {
+    "id": "reg-4",
+    "tournamentCategoryId": "cat-1",
+    "pairId": "pair-4",
+    "status": "CONFIRMED",
+    "registeredAt": "2026-09-08T12:00:00.000Z",
+    "statusNote": null,
+    "statusChangedAt": null
+  },
+  {
+    "id": "reg-5",
+    "tournamentCategoryId": "cat-1",
+    "pairId": "pair-5",
+    "status": "CONFIRMED",
+    "registeredAt": "2026-09-08T12:00:00.000Z",
+    "statusNote": null,
+    "statusChangedAt": null
+  },
+  {
+    "id": "reg-6",
+    "tournamentCategoryId": "cat-1",
+    "pairId": "pair-6",
+    "status": "CONFIRMED",
+    "registeredAt": "2026-09-08T12:00:00.000Z",
+    "statusNote": null,
+    "statusChangedAt": null
+  },
+  {
+    "id": "reg-7",
+    "tournamentCategoryId": "cat-1",
+    "pairId": "pair-7",
+    "status": "CONFIRMED",
+    "registeredAt": "2026-09-08T12:00:00.000Z",
+    "statusNote": null,
+    "statusChangedAt": null
+  },
+  {
+    "id": "reg-8",
+    "tournamentCategoryId": "cat-1",
+    "pairId": "pair-8",
+    "status": "CONFIRMED",
+    "registeredAt": "2026-09-08T12:00:00.000Z",
+    "statusNote": null,
+    "statusChangedAt": null
+  }
+]

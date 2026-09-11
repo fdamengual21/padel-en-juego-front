@@ -1,0 +1,18 @@
+[
+  {
+    "id": "cm-1",
+    "clubId": "club-1",
+    "userId": "user-1",
+    "status": "active",
+    "joinedAt": "2026-09-01T10:00:00.000Z",
+    "role": "CLUB_ADMIN"
+  },
+  {
+    "id": "cm-2",
+    "clubId": "club-1",
+    "userId": "user-2",
+    "status": "active",
+    "joinedAt": "2026-09-02T10:00:00.000Z",
+    "role": "PLAYER"
+  }
+]

@@ -1,0 +1,58 @@
+[
+  {
+    "id": "cav-1-2026-09-20",
+    "courtId": "court-1",
+    "date": "2026-09-20",
+    "startTime": "09:00",
+    "endTime": "23:00"
+  },
+  {
+    "id": "cav-1-2026-09-21",
+    "courtId": "court-1",
+    "date": "2026-09-21",
+    "startTime": "09:00",
+    "endTime": "23:00"
+  },
+  {
+    "id": "cav-2-2026-09-20",
+    "courtId": "court-2",
+    "date": "2026-09-20",
+    "startTime": "09:00",
+    "endTime": "23:00"
+  },
+  {
+    "id": "cav-2-2026-09-21",
+    "courtId": "court-2",
+    "date": "2026-09-21",
+    "startTime": "09:00",
+    "endTime": "23:00"
+  },
+  {
+    "id": "cav-3-2026-09-20",
+    "courtId": "court-3",
+    "date": "2026-09-20",
+    "startTime": "09:00",
+    "endTime": "23:00"
+  },
+  {
+    "id": "cav-3-2026-09-21",
+    "courtId": "court-3",
+    "date": "2026-09-21",
+    "startTime": "09:00",
+    "endTime": "23:00"
+  },
+  {
+    "id": "cav-4-2026-09-20",
+    "courtId": "court-4",
+    "date": "2026-09-20",
+    "startTime": "09:00",
+    "endTime": "23:00"
+  },
+  {
+    "id": "cav-4-2026-09-21",
+    "courtId": "court-4",
+    "date": "2026-09-21",
+    "startTime": "09:00",
+    "endTime": "23:00"
+  }
+]

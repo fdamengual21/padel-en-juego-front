@@ -1,0 +1,16 @@
+[
+  {
+    "id": "tournament-1",
+    "clubId": "club-1",
+    "name": "Open Padel Night",
+    "description": "Torneo nocturno de zonas + eliminación",
+    "startDate": "2026-09-20",
+    "endDate": "2026-09-22",
+    "status": "draft",
+    "format": "GROUPS_ELIMINATION",
+    "createdAt": "2026-09-08T10:00:00.000Z",
+    "updatedAt": "2026-09-08T10:00:00.000Z",
+    "dailyStartTime": "10:00",
+    "dailyEndTime": "22:00"
+  }
+]

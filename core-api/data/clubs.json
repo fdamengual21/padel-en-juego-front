@@ -1,0 +1,20 @@
+[
+  {
+    "id": "club-1",
+    "name": "Padel Club Norte",
+    "status": "active",
+    "createdAt": "2026-09-01T10:00:00.000Z",
+    "updatedAt": "2026-09-01T10:00:00.000Z",
+    "province": "San Luis",
+    "city": "San Luis"
+  },
+  {
+    "id": "club-2",
+    "name": "Arena Sur",
+    "status": "active",
+    "createdAt": "2026-09-05T12:00:00.000Z",
+    "updatedAt": "2026-09-05T12:00:00.000Z",
+    "province": "San Luis",
+    "city": "San Luis"
+  }
+]

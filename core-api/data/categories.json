@@ -1,0 +1,13 @@
+[
+  {
+    "id": "cat-1",
+    "tournamentId": "tournament-1",
+    "name": "6ta Masculino",
+    "gender": "male",
+    "kind": "level",
+    "level": "6ta",
+    "sumaTarget": null,
+    "maxPairs": 16,
+    "status": "active"
+  }
+]

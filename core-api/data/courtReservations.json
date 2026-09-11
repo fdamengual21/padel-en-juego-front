@@ -1,0 +1,42 @@
+[
+  {
+    "id": "reservation-1",
+    "clubId": "club-1",
+    "clientId": "client-1",
+    "courtId": "court-1",
+    "startsAt": "2026-09-12T18:00:00.000Z",
+    "endsAt": "2026-09-12T19:30:00.000Z",
+    "status": "completed",
+    "createdAt": "2026-09-11T10:00:00.000Z"
+  },
+  {
+    "id": "reservation-2",
+    "clubId": "club-1",
+    "clientId": "client-1",
+    "courtId": "court-2",
+    "startsAt": "2026-09-15T19:00:00.000Z",
+    "endsAt": "2026-09-15T20:30:00.000Z",
+    "status": "booked",
+    "createdAt": "2026-09-12T10:00:00.000Z"
+  },
+  {
+    "id": "reservation-3",
+    "clubId": "club-1",
+    "clientId": "client-3",
+    "courtId": "court-1",
+    "startsAt": "2026-09-14T17:00:00.000Z",
+    "endsAt": "2026-09-14T18:30:00.000Z",
+    "status": "booked",
+    "createdAt": "2026-09-13T09:00:00.000Z"
+  },
+  {
+    "id": "reservation-4",
+    "clubId": "club-1",
+    "clientId": "client-17",
+    "courtId": "court-3",
+    "startsAt": "2026-09-16T20:00:00.000Z",
+    "endsAt": "2026-09-16T21:30:00.000Z",
+    "status": "booked",
+    "createdAt": "2026-09-14T11:00:00.000Z"
+  }
+]

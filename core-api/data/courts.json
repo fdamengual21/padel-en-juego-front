@@ -1,0 +1,26 @@
+[
+  {
+    "id": "court-1",
+    "clubId": "club-1",
+    "name": "Cancha 1",
+    "status": "active"
+  },
+  {
+    "id": "court-2",
+    "clubId": "club-1",
+    "name": "Cancha 2",
+    "status": "active"
+  },
+  {
+    "id": "court-3",
+    "clubId": "club-1",
+    "name": "Cancha 3",
+    "status": "active"
+  },
+  {
+    "id": "court-4",
+    "clubId": "club-1",
+    "name": "Cancha 4",
+    "status": "active"
+  }
+]

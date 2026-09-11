@@ -1,0 +1,178 @@
+[
+  {
+    "id": "player-1",
+    "userId": "user-2",
+    "displayName": "Juan Pérez",
+    "firstName": "Juan",
+    "lastName": "Pérez",
+    "phone": "+5491100000001",
+    "createdAt": "2026-09-03T10:00:00.000Z",
+    "categoryLevel": "6ta",
+    "email": null
+  },
+  {
+    "id": "player-2",
+    "userId": null,
+    "displayName": "Pedro Díaz",
+    "firstName": "Pedro",
+    "lastName": "Díaz",
+    "phone": "+5491100000002",
+    "createdAt": "2026-09-03T10:00:00.000Z",
+    "categoryLevel": "6ta",
+    "email": null
+  },
+  {
+    "id": "player-3",
+    "userId": null,
+    "displayName": "Lucas Ruiz",
+    "firstName": "Lucas",
+    "lastName": "Ruiz",
+    "phone": "+5491100000003",
+    "createdAt": "2026-09-03T10:00:00.000Z",
+    "categoryLevel": "6ta",
+    "email": null
+  },
+  {
+    "id": "player-4",
+    "userId": null,
+    "displayName": "Martín Gómez",
+    "firstName": "Martín",
+    "lastName": "Gómez",
+    "phone": "+5491100000004",
+    "createdAt": "2026-09-03T10:00:00.000Z",
+    "categoryLevel": "6ta",
+    "email": null
+  },
+  {
+    "id": "player-5",
+    "userId": null,
+    "displayName": "Diego Nico",
+    "firstName": "Diego",
+    "lastName": "Nico",
+    "phone": "+5491100000005",
+    "createdAt": "2026-09-03T10:00:00.000Z",
+    "categoryLevel": "5ta",
+    "email": null
+  },
+  {
+    "id": "player-6",
+    "userId": null,
+    "displayName": "Pablo Tomás",
+    "firstName": "Pablo",
+    "lastName": "Tomás",
+    "phone": "+5491100000006",
+    "createdAt": "2026-09-03T10:00:00.000Z",
+    "categoryLevel": "7ma",
+    "email": null
+  },
+  {
+    "id": "player-7",
+    "userId": null,
+    "displayName": "Andrés Sosa",
+    "firstName": "Andrés",
+    "lastName": "Sosa",
+    "phone": "+5491100000007",
+    "createdAt": "2026-09-03T10:00:00.000Z",
+    "categoryLevel": "6ta",
+    "email": null
+  },
+  {
+    "id": "player-8",
+    "userId": null,
+    "displayName": "Leo Vargas",
+    "firstName": "Leo",
+    "lastName": "Vargas",
+    "phone": "+5491100000008",
+    "createdAt": "2026-09-03T10:00:00.000Z",
+    "categoryLevel": "6ta",
+    "email": null
+  },
+  {
+    "id": "player-9",
+    "userId": null,
+    "displayName": "Facu Molina",
+    "firstName": "Facu",
+    "lastName": "Molina",
+    "phone": "+5491100000009",
+    "createdAt": "2026-09-03T10:00:00.000Z",
+    "categoryLevel": "6ta",
+    "email": null
+  },
+  {
+    "id": "player-10",
+    "userId": null,
+    "displayName": "Nico Ramos",
+    "firstName": "Nico",
+    "lastName": "Ramos",
+    "phone": "+5491100000010",
+    "createdAt": "2026-09-03T10:00:00.000Z",
+    "categoryLevel": "6ta",
+    "email": null
+  },
+  {
+    "id": "player-11",
+    "userId": null,
+    "displayName": "Tomi Castro",
+    "firstName": "Tomi",
+    "lastName": "Castro",
+    "phone": "+5491100000011",
+    "createdAt": "2026-09-03T10:00:00.000Z",
+    "categoryLevel": "5ta",
+    "email": null
+  },
+  {
+    "id": "player-12",
+    "userId": null,
+    "displayName": "Mateo Ibarra",
+    "firstName": "Mateo",
+    "lastName": "Ibarra",
+    "phone": "+5491100000012",
+    "createdAt": "2026-09-03T10:00:00.000Z",
+    "categoryLevel": "7ma",
+    "email": null
+  },
+  {
+    "id": "player-13",
+    "userId": null,
+    "displayName": "Agus López",
+    "firstName": "Agus",
+    "lastName": "López",
+    "phone": "+5491100000013",
+    "createdAt": "2026-09-03T10:00:00.000Z",
+    "categoryLevel": "6ta",
+    "email": null
+  },
+  {
+    "id": "player-14",
+    "userId": null,
+    "displayName": "Bruno Ferreyra",
+    "firstName": "Bruno",
+    "lastName": "Ferreyra",
+    "phone": "+5491100000014",
+    "createdAt": "2026-09-03T10:00:00.000Z",
+    "categoryLevel": "6ta",
+    "email": null
+  },
+  {
+    "id": "player-15",
+    "userId": null,
+    "displayName": "Dani Quiroga",
+    "firstName": "Dani",
+    "lastName": "Quiroga",
+    "phone": "+5491100000015",
+    "createdAt": "2026-09-03T10:00:00.000Z",
+    "categoryLevel": "8va",
+    "email": null
+  },
+  {
+    "id": "player-16",
+    "userId": null,
+    "displayName": "Eze Benítez",
+    "firstName": "Eze",
+    "lastName": "Benítez",
+    "phone": "+5491100000016",
+    "createdAt": "2026-09-03T10:00:00.000Z",
+    "categoryLevel": "4ta",
+    "email": null
+  }
+]

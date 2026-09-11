@@ -1,0 +1,25 @@
+export const ROUTES = {
+  home: "/",
+  player: {
+    root: "/player",
+    home: "/player",
+    tournaments: "/player/torneos",
+    tournamentDetail: (id: string) => `/player/torneos/${id}`,
+    ranking: "/player/ranking",
+    history: "/player/historial",
+    profile: "/player/perfil",
+    match: (id: string) => `/player/partidos/${id}`,
+  },
+  club: {
+    root: "/club",
+    dashboard: "/club",
+    tournaments: "/club/torneos",
+    tournamentNew: "/club/torneos/nuevo",
+    tournamentDetail: (id: string) => `/club/torneos/${id}`,
+    players: "/club/jugadores",
+    clients: "/club/clientes",
+    clientDetail: (id: string) => `/club/clientes/${id}`,
+    courts: "/club/canchas",
+    schedule: "/club/agenda",
+  },
+} as const;
