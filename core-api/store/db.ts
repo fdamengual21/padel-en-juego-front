@@ -15,6 +15,7 @@ import roundsSeed from "../data/rounds.json";
 import matchesSeed from "../data/matches.json";
 import matchSlotsSeed from "../data/matchSlots.json";
 import courtsSeed from "../data/courts.json";
+import courtPriceRulesSeed from "../data/courtPriceRules.json";
 import courtAvailabilitySeed from "../data/courtAvailability.json";
 import pairAvailabilitySeed from "../data/pairAvailability.json";
 import type {
@@ -24,6 +25,7 @@ import type {
   CoreApiSnapshot,
   Court,
   CourtAvailability,
+  CourtPriceRule,
   CourtReservation,
   GroupStanding,
   Match,
@@ -45,6 +47,16 @@ import {
   loadPersistedSnapshot,
   persistSnapshot,
 } from "./collectionStore";
+import {
+  parseCategoryLevel,
+  type CategoryLevel,
+  type PlayerCategoryHistoryEntry,
+} from "../types/categories";
+
+const DEFAULT_CLUB_OPEN = "08:00";
+const DEFAULT_CLUB_CLOSE = "23:00";
+const DEFAULT_SLOT_MINUTES = 90;
+const DEFAULT_BASE_PRICE = 0;
 
 function seedSnapshot(): CoreApiSnapshot {
   return {
@@ -65,6 +77,7 @@ function seedSnapshot(): CoreApiSnapshot {
     matches: matchesSeed as Match[],
     matchSlots: matchSlotsSeed as MatchSlot[],
     courts: courtsSeed as Court[],
+    courtPriceRules: courtPriceRulesSeed as CourtPriceRule[],
     courtAvailability: courtAvailabilitySeed as CourtAvailability[],
     pairAvailability: pairAvailabilitySeed as PairAvailability[],
   };
@@ -99,26 +112,187 @@ function withLocation<T extends { province?: string | null; city?: string | null
   };
 }
 
+function withClubDefaults(club: Club): Club {
+  const rawDays = Array.isArray(club.openDays) ? club.openDays : [];
+  const openDays = [
+    ...new Set(rawDays.filter((d) => d >= 1 && d <= 7)),
+  ].sort((a, b) => a - b) as import("../types").WeekdayIso[];
+  return {
+    ...withLocation(club),
+    openTime: club.openTime ?? DEFAULT_CLUB_OPEN,
+    closeTime: club.closeTime ?? DEFAULT_CLUB_CLOSE,
+    openDays: openDays.length > 0 ? openDays : [1, 2, 3, 4, 5, 6, 7],
+  };
+}
+
+function withCourtDefaults(court: Court): Court {
+  return {
+    ...court,
+    imageUrl: court.imageUrl ?? null,
+    slotDurationMinutes: court.slotDurationMinutes ?? DEFAULT_SLOT_MINUTES,
+    basePrice: court.basePrice ?? DEFAULT_BASE_PRICE,
+    openTime: court.openTime ?? null,
+    closeTime: court.closeTime ?? null,
+  };
+}
+
+function withReservationDefaults(reservation: CourtReservation): CourtReservation {
+  return {
+    ...reservation,
+    price: reservation.price ?? null,
+  };
+}
+
+function normalizeCategoryLevel(
+  value: unknown,
+  fallback: CategoryLevel = 6,
+): CategoryLevel {
+  return parseCategoryLevel(value) ?? fallback;
+}
+
+function withPlayerDefaults(player: Player): Player {
+  const categoryLevel = normalizeCategoryLevel(
+    (player as Player & { categoryLevel?: unknown }).categoryLevel,
+  );
+  const rawHistory = Array.isArray(player.categoryHistory)
+    ? player.categoryHistory
+    : [];
+  const categoryHistory: PlayerCategoryHistoryEntry[] = rawHistory.map(
+    (entry, index) => {
+      const { note: _legacyNote, ...rest } = entry as PlayerCategoryHistoryEntry & {
+        note?: unknown;
+      };
+      return {
+        ...rest,
+        level: normalizeCategoryLevel(entry.level, categoryLevel),
+        previousLevel:
+          entry.previousLevel == null
+            ? null
+            : normalizeCategoryLevel(entry.previousLevel),
+        id: entry.id || `${player.id}-pch-${index}`,
+      };
+    },
+  );
+  if (categoryHistory.length === 0) {
+    categoryHistory.push({
+      id: `${player.id}-pch-seed`,
+      level: categoryLevel,
+      previousLevel: null,
+      reason: "initial",
+      at: player.createdAt,
+      by: "system",
+    });
+  }
+  return { ...player, categoryLevel, categoryHistory };
+}
+
+function withTournamentDefaults(tournament: Tournament): Tournament {
+  return {
+    ...tournament,
+    registrationFee: Math.max(0, Number(tournament.registrationFee) || 0),
+  };
+}
+
+function withTournamentCategoryDefaults(
+  category: TournamentCategory,
+): TournamentCategory {
+  const withLevel =
+    category.level == null
+      ? category
+      : {
+          ...category,
+          level: normalizeCategoryLevel(category.level),
+        };
+  return {
+    ...withLevel,
+    circuitType: withLevel.circuitType === "CICUPA" ? "CICUPA" : "NONE",
+  };
+}
+
+function withRegistrationDefaults(
+  registration: TournamentRegistration,
+): TournamentRegistration {
+  const legacyStatus = registration.status as string;
+  const status =
+    legacyStatus === "CONFIRMED"
+      ? ("ACCEPTED" as TournamentRegistration["status"])
+      : registration.status;
+  return {
+    ...registration,
+    status,
+    statusNote: registration.statusNote ?? null,
+    statusChangedAt: registration.statusChangedAt ?? null,
+    rankingPointsPlayer1: registration.rankingPointsPlayer1 ?? null,
+    rankingPointsPlayer2: registration.rankingPointsPlayer2 ?? null,
+    tournamentPointsAwarded: registration.tournamentPointsAwarded ?? null,
+  };
+}
+
 function hydrateSnapshot(
   persisted: CoreApiSnapshot | null,
 ): CoreApiSnapshot {
   const seed = seedSnapshot();
-  if (!persisted) return seed;
+  if (!persisted) {
+    return {
+      ...seed,
+      players: seed.players.map(withPlayerDefaults),
+      tournaments: seed.tournaments.map(withTournamentDefaults),
+      categories: seed.categories.map(withTournamentCategoryDefaults),
+      registrations: seed.registrations.map(withRegistrationDefaults),
+    };
+  }
   const partial = persisted as Partial<CoreApiSnapshot>;
   const clients = (Array.isArray(partial.clients) ? partial.clients : seed.clients).map(
     withClientDefaults,
   );
-  const clubs = (partial.clubs ?? seed.clubs).map(withLocation);
+  const clubs = (partial.clubs ?? seed.clubs).map(withClubDefaults);
   const users = (partial.users ?? seed.users).map(withLocation);
+  const players = (partial.players ?? seed.players).map(withPlayerDefaults);
+  const tournaments = (partial.tournaments ?? seed.tournaments).map(
+    withTournamentDefaults,
+  );
+  const categories = (partial.categories ?? seed.categories).map(
+    withTournamentCategoryDefaults,
+  );
+  const registrations = (partial.registrations ?? seed.registrations).map(
+    withRegistrationDefaults,
+  );
+  const courts = (partial.courts ?? seed.courts).map(withCourtDefaults);
+  const courtReservations = (
+    Array.isArray(partial.courtReservations)
+      ? partial.courtReservations
+      : seed.courtReservations
+  ).map(withReservationDefaults);
+  const courtPriceRules = (
+    Array.isArray(partial.courtPriceRules)
+      ? partial.courtPriceRules
+      : seed.courtPriceRules
+  ).map((rule) => {
+    const raw = rule as CourtPriceRule & { priority?: number };
+    return {
+      id: raw.id,
+      courtId: raw.courtId,
+      startTime: raw.startTime,
+      endTime: raw.endTime,
+      daysOfWeek: [...raw.daysOfWeek],
+      price: raw.price,
+      label: raw.label ?? null,
+    } satisfies CourtPriceRule;
+  });
+
   return {
     ...seed,
     ...persisted,
     clubs,
     users,
     clients,
-    courtReservations: Array.isArray(partial.courtReservations)
-      ? partial.courtReservations
-      : seed.courtReservations,
+    players,
+    tournaments,
+    categories,
+    registrations,
+    courts,
+    courtReservations,
+    courtPriceRules,
   };
 }
 
@@ -140,6 +314,7 @@ export class CoreApiDb {
   readonly matches: CollectionStore<Match>;
   readonly matchSlots: CollectionStore<MatchSlot>;
   readonly courts: CollectionStore<Court>;
+  readonly courtPriceRules: CollectionStore<CourtPriceRule>;
   readonly courtAvailability: CollectionStore<CourtAvailability>;
   readonly pairAvailability: CollectionStore<PairAvailability>;
 
@@ -172,6 +347,11 @@ export class CoreApiDb {
     this.matches = new CollectionStore("matches", snapshot.matches, onChange);
     this.matchSlots = new CollectionStore("matchSlots", snapshot.matchSlots, onChange);
     this.courts = new CollectionStore("courts", snapshot.courts, onChange);
+    this.courtPriceRules = new CollectionStore(
+      "courtPriceRules",
+      snapshot.courtPriceRules,
+      onChange,
+    );
     this.courtAvailability = new CollectionStore(
       "courtAvailability",
       snapshot.courtAvailability,
@@ -203,6 +383,7 @@ export class CoreApiDb {
       matches: this.matches.getAll(),
       matchSlots: this.matchSlots.getAll(),
       courts: this.courts.getAll(),
+      courtPriceRules: this.courtPriceRules.getAll(),
       courtAvailability: this.courtAvailability.getAll(),
       pairAvailability: this.pairAvailability.getAll(),
     };
@@ -228,6 +409,7 @@ export class CoreApiDb {
     this.matches.replaceAll(seed.matches);
     this.matchSlots.replaceAll(seed.matchSlots);
     this.courts.replaceAll(seed.courts);
+    this.courtPriceRules.replaceAll(seed.courtPriceRules);
     this.courtAvailability.replaceAll(seed.courtAvailability);
     this.pairAvailability.replaceAll(seed.pairAvailability);
   }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Court, Match } from "@core-api";
+import type { Court, CourtReservation, Match } from "@core-api";
 import { findScheduleConflicts } from "@core-api";
 import { Button } from "@/components/ui/button";
 import {
@@ -43,6 +43,8 @@ async function saveWithConflictCheck(input: {
   courtId: string | null;
   allMatches: Match[];
   courts: Court[];
+  reservations?: CourtReservation[];
+  matchDurationMinutes?: number;
   pairLabels: Record<string, string>;
   confirmConflicts: (
     request: ScheduleConflictConfirmRequest,
@@ -55,7 +57,9 @@ async function saveWithConflictCheck(input: {
     courtId: input.courtId,
     matches: input.allMatches,
     courts: input.courts,
+    reservations: input.reservations,
     pairLabels: input.pairLabels,
+    matchDurationMinutes: input.matchDurationMinutes,
   });
 
   if (conflicts.length > 0) {
@@ -66,6 +70,8 @@ async function saveWithConflictCheck(input: {
       proposedCourtId: input.courtId,
       courts: input.courts,
       matches: input.allMatches,
+      reservations: input.reservations,
+      matchDurationMinutes: input.matchDurationMinutes,
       pairLabels: input.pairLabels,
     });
     if (!result.ok) return false;
@@ -93,6 +99,8 @@ interface MatchScheduleTimeModalProps {
   courts: Court[];
   pairLabels: Record<string, string>;
   allMatches: Match[];
+  reservations?: CourtReservation[];
+  matchDurationMinutes?: number;
   isSaving?: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (input: SaveSchedulePayload) => Promise<void> | void;
@@ -104,6 +112,8 @@ export function MatchScheduleTimeModal({
   courts,
   pairLabels,
   allMatches,
+  reservations,
+  matchDurationMinutes,
   isSaving = false,
   onOpenChange,
   onSave,
@@ -163,6 +173,8 @@ export function MatchScheduleTimeModal({
                     courtId: match.courtId,
                     allMatches,
                     courts,
+                    reservations,
+                    matchDurationMinutes,
                     pairLabels,
                     confirmConflicts,
                     onSave,
@@ -186,6 +198,8 @@ interface MatchCourtSelectProps {
   courts: Court[];
   pairLabels: Record<string, string>;
   allMatches: Match[];
+  reservations?: CourtReservation[];
+  matchDurationMinutes?: number;
   disabled?: boolean;
   isSaving?: boolean;
   onSave: (input: SaveSchedulePayload) => Promise<void> | void;
@@ -197,6 +211,8 @@ export default function MatchCourtSelect({
   courts,
   pairLabels,
   allMatches,
+  reservations,
+  matchDurationMinutes,
   disabled = false,
   isSaving = false,
   onSave,
@@ -232,6 +248,8 @@ export default function MatchCourtSelect({
                 courtId,
                 allMatches,
                 courts,
+                reservations,
+                matchDurationMinutes,
                 pairLabels,
                 confirmConflicts,
                 onSave,
@@ -276,7 +294,7 @@ export function MatchHorarioButton({
         "rounded-md px-1 py-0.5 text-left text-xs whitespace-nowrap transition-colors",
         disabled
           ? "cursor-not-allowed text-muted-foreground"
-          : "text-primary underline-offset-2 hover:bg-muted hover:underline",
+          : "text-sidebar underline-offset-2 hover:bg-muted hover:underline",
       )}
       onClick={(e) => {
         e.stopPropagation();

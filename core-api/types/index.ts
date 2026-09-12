@@ -21,7 +21,8 @@ export type TournamentFormat =
 
 export type RegistrationStatus =
   | "PENDING"
-  | "CONFIRMED"
+  | "ACCEPTED"
+  | "REJECTED"
   | "WAITLIST"
   | "CANCELLED"
   | "DISQUALIFIED";
@@ -66,6 +67,9 @@ export type EqualsResolution = "goldenPoint" | "advantage";
 
 export type AdvantageType = "advantage" | "goldenPoint";
 
+/** Día ISO: 1=lunes … 7=domingo. */
+export type WeekdayIso = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
 /** Ubicación para búsqueda de torneos / clubes (provincia + ciudad). */
 export interface EntityLocation {
   province: string | null;
@@ -78,8 +82,28 @@ export interface Club {
   status: EntityStatus;
   province: string | null;
   city: string | null;
+  /** Horario de apertura del club (HH:mm). */
+  openTime: string;
+  /** Horario de cierre del club (HH:mm). */
+  closeTime: string;
+  /**
+   * Días de apertura del club (ISO: 1=lunes … 7=domingo).
+   * Configurado desde Configuración; las canchas lo heredan.
+   */
+  openDays: WeekdayIso[];
   createdAt: string;
   updatedAt: string;
+}
+
+/** Patch de propiedades/configuración del club. */
+export interface UpdateClubInput {
+  name?: string;
+  status?: EntityStatus;
+  province?: string | null;
+  city?: string | null;
+  openTime?: string;
+  closeTime?: string;
+  openDays?: WeekdayIso[];
 }
 
 export interface User {
@@ -110,19 +134,27 @@ export interface Player {
   lastName: string;
   phone: string | null;
   email: string | null;
-  /** Nivel del jugador para validar categorías suma. */
-  categoryLevel: import("./categories").CategoryLevelCode;
+  /** Nivel oficial vigente del jugador (1–8). */
+  categoryLevel: import("./categories").CategoryLevel;
+  /** Historial de categorías (más reciente al final). */
+  categoryHistory: import("./categories").PlayerCategoryHistoryEntry[];
   createdAt: string;
 }
 
 export type {
   CategoryGender,
   CategoryKind,
-  CategoryLevelCode,
+  CategoryLevel,
+  PlayerCategoryChangeActor,
+  PlayerCategoryChangeReason,
+  PlayerCategoryHistoryEntry,
 } from "./categories";
 export {
   CATEGORY_LEVELS,
-  CATEGORY_LEVEL_VALUE,
+  CATEGORY_LEVEL_SUFFIX,
+  formatCategoryLevel,
+  isCategoryLevel,
+  parseCategoryLevel,
 } from "./categories";
 
 export interface Tournament {
@@ -137,9 +169,17 @@ export interface Tournament {
   dailyEndTime: string;
   status: TournamentStatus;
   format: TournamentFormat;
+  /**
+   * Precio de inscripción del torneo (moneda local).
+   * 0 = sin cargo / a definir.
+   */
+  registrationFee: number;
   createdAt: string;
   updatedAt: string;
 }
+
+/** Circuito de ranking asociado a la categoría (MVP: snapshot manual). */
+export type TournamentCircuitType = "NONE" | "CICUPA";
 
 export interface TournamentCategory {
   id: string;
@@ -148,10 +188,12 @@ export interface TournamentCategory {
   gender: import("./categories").CategoryGender;
   kind: import("./categories").CategoryKind;
   /** Nivel fijo si kind=level; null si kind=suma. */
-  level: import("./categories").CategoryLevelCode | null;
+  level: import("./categories").CategoryLevel | null;
   /** Objetivo de suma (12, 15, …) si kind=suma. */
   sumaTarget: number | null;
   maxPairs: number;
+  /** Circuito de ranking (NONE = sin ranking externo). */
+  circuitType: TournamentCircuitType;
   status: EntityStatus;
 }
 
@@ -181,8 +223,16 @@ export interface CreatePlayerInput {
   lastName: string;
   phone?: string | null;
   email?: string | null;
-  categoryLevel?: import("./categories").CategoryLevelCode;
+  categoryLevel?: import("./categories").CategoryLevel;
   userId?: string | null;
+}
+
+export interface UpdatePlayerInput {
+  firstName?: string;
+  lastName?: string;
+  phone?: string | null;
+  email?: string | null;
+  categoryLevel?: import("./categories").CategoryLevel;
 }
 
 export interface RegisterPairInput {
@@ -190,12 +240,27 @@ export interface RegisterPairInput {
   player1Id: string;
   player2Id?: string | null;
   sidePreference?: PairSidePreference | null;
+  /** Snapshot de puntos de ranking al inscribir (jugador 1). */
+  rankingPointsPlayer1?: number | null;
+  /** Snapshot de puntos de ranking al inscribir (jugador 2). */
+  rankingPointsPlayer2?: number | null;
+  /**
+   * Disponibilidad de la pareja (día + franja).
+   * Obligatoria en torneos no Quality; se ignora en Quality.
+   */
+  availability?: Array<{
+    date: string;
+    startTime: string;
+    endTime: string;
+  }>;
 }
 
 export interface UpdatePairPlayersInput {
   player1Id?: string;
   player2Id?: string | null;
   sidePreference?: PairSidePreference | null;
+  rankingPointsPlayer1?: number | null;
+  rankingPointsPlayer2?: number | null;
 }
 
 export interface TournamentRegistration {
@@ -207,6 +272,18 @@ export interface TournamentRegistration {
   /** Motivo de desclasificación / baja (asociado a la inscripción). */
   statusNote: string | null;
   statusChangedAt: string | null;
+  /**
+   * Puntos de ranking informados al momento de la inscripción (jugador 1).
+   * No es el ranking oficial del circuito; es un snapshot manual.
+   */
+  rankingPointsPlayer1: number | null;
+  /** Idem jugador 2 (null si se anotó solo). */
+  rankingPointsPlayer2: number | null;
+  /**
+   * Puntos que este torneo otorgó según el resultado (cuando se cargue).
+   * Independiente del snapshot de ranking.
+   */
+  tournamentPointsAwarded: number | null;
 }
 
 export interface MatchRules {
@@ -307,6 +384,26 @@ export interface Court {
   clubId: string;
   name: string;
   status: EntityStatus;
+  /** URL/path pública de la imagen (simula storage de API). */
+  imageUrl: string | null;
+  /** Duración del turno en minutos (90 o 120). */
+  slotDurationMinutes: number;
+  /** Precio base del turno (ARS). */
+  basePrice: number;
+  /** Si null, hereda horario del club. */
+  openTime: string | null;
+  closeTime: string | null;
+}
+
+/** Precio especial por franja horaria de una cancha. */
+export interface CourtPriceRule {
+  id: string;
+  courtId: string;
+  startTime: string;
+  endTime: string;
+  daysOfWeek: WeekdayIso[];
+  price: number;
+  label: string | null;
 }
 
 export interface CourtAvailability {
@@ -359,6 +456,8 @@ export interface CourtReservation {
   startsAt: string;
   endsAt: string;
   status: CourtReservationStatus;
+  /** Precio cobrado al reservar (snapshot). */
+  price: number | null;
   createdAt: string;
 }
 
@@ -404,6 +503,8 @@ export interface ClubClientTournamentEntry {
 export interface ClubClientDetail extends ClubClientSummary {
   tournaments: ClubClientTournamentEntry[];
   recentReservations: CourtReservation[];
+  /** Categoría oficial del jugador vinculado, si existe. */
+  categoryLevel: import("./categories").CategoryLevel | null;
 }
 
 export interface CoreApiSnapshot {
@@ -424,6 +525,7 @@ export interface CoreApiSnapshot {
   matches: Match[];
   matchSlots: MatchSlot[];
   courts: Court[];
+  courtPriceRules: CourtPriceRule[];
   courtAvailability: CourtAvailability[];
   pairAvailability: PairAvailability[];
 }
@@ -448,7 +550,7 @@ export interface CuadroBoardView {
   pairLabels: Record<string, string>;
   pairPlayerNames: Record<string, [string, string]>;
   matchRules: MatchRules;
-  /** Parejas confirmadas y completas que aún no están en ninguna zona. */
+  /** Parejas aceptadas y completas que aún no están en ninguna zona. */
   unassignedPairs: Array<{
     pairId: string;
     label: string;
@@ -484,6 +586,10 @@ export interface ParticipantsBoardView {
     registration: TournamentRegistration | null;
     label: string;
     playerNames: [string, string];
+    /** Avatar por jugador (cliente del club); null → iniciales. */
+    playerAvatars: [string | null, string | null];
+    /** Id de cliente del club por jugador; null si no hay ficha. */
+    playerClientIds: [string | null, string | null];
     incomplete: boolean;
     disqualified: boolean;
   }>;
@@ -534,6 +640,123 @@ export interface ScheduleResult {
   pendingCount: number;
 }
 
+export type CourtAgendaEventKind = "reservation" | "tournament_match";
+
+export type CourtAgendaEventStatus =
+  | "booked"
+  | "completed"
+  | "cancelled"
+  | "scheduled"
+  | "inProgress"
+  | "finished";
+
+export interface CourtAgendaEvent {
+  id: string;
+  kind: CourtAgendaEventKind;
+  title: string;
+  subtitle: string | null;
+  startAt: string;
+  endAt: string;
+  allDay: false;
+  status: CourtAgendaEventStatus;
+  courtId: string;
+  reservationId: string | null;
+  matchId: string | null;
+  clientId: string | null;
+  price: number | null;
+  priceLabel: string | null;
+}
+
+export interface CourtDayPriceBand {
+  startTime: string;
+  endTime: string;
+  price: number;
+  label: string | null;
+}
+
+export type CourtLiveStatus = "available" | "occupied" | "closed";
+
+export interface CourtDaySummary {
+  date: string;
+  totalSlots: number;
+  occupiedSlots: number;
+  freeSlots: number;
+  nextFreeAt: string | null;
+  minPrice: number | null;
+  message: string;
+  /** Tarifas del día (rangos horarios). */
+  priceBands: CourtDayPriceBand[];
+  /** Turnos libres del día (chips). */
+  availableSlots: CourtAvailableSlot[];
+  /** Estado en tiempo real: horario de apertura + ocupación actual. */
+  liveStatus: CourtLiveStatus;
+}
+
+export interface CourtAgendaBoardView {
+  clubId: string;
+  courtId: string;
+  generatedAt: string;
+  club: Club;
+  court: Court;
+  courts: Court[];
+  priceRules: CourtPriceRule[];
+  daySummary: CourtDaySummary;
+  events: CourtAgendaEvent[];
+  notice: string | null;
+}
+
+export interface CourtSlotQuote {
+  price: number;
+  label: string | null;
+  endsAt: string;
+}
+
+/** Turno fijo disponible para reservar en una cancha. */
+export interface CourtAvailableSlot {
+  startsAt: string;
+  endsAt: string;
+  /** Ej. "09:00 – 10:30" */
+  label: string;
+}
+
+export interface CreateCourtInput {
+  clubId: string;
+  name: string;
+  slotDurationMinutes?: number;
+  basePrice?: number;
+  openTime?: string | null;
+  closeTime?: string | null;
+  imageUrl?: string | null;
+}
+
+export interface CreateCourtReservationInput {
+  clubId: string;
+  courtId: string;
+  clientId: string;
+  startsAt: string;
+  endsAt?: string;
+  price?: number | null;
+}
+
+export interface UpdateCourtReservationInput {
+  clientId?: string;
+  courtId?: string | null;
+  startsAt?: string;
+  endsAt?: string;
+  status?: CourtReservationStatus;
+  price?: number | null;
+}
+
+export interface CreateClientInput {
+  clubId: string;
+  firstName: string;
+  lastName: string;
+  phone?: string | null;
+  email?: string | null;
+  playerId?: string | null;
+  userId?: string | null;
+}
+
 /** Opciones al sincronizar zonas / partidos / cuadro. */
 export interface SyncCategoryStructureOptions {
   /**
@@ -546,4 +769,16 @@ export interface SyncCategoryStructureOptions {
 export interface DisqualifyRegistrationInput {
   registrationId: string;
   note: string;
+}
+
+/** Aceptar una inscripción pendiente (habilita armado de zonas/partidos). */
+export interface AcceptRegistrationInput {
+  registrationId: string;
+}
+
+/** Rechazar una inscripción pendiente. */
+export interface RejectRegistrationInput {
+  registrationId: string;
+  /** Motivo opcional; queda en statusNote. */
+  note?: string | null;
 }

@@ -1,7 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
+import { formatCategoryLevel } from "@core-api";
 import Api from "@/api/Api";
 import { useMockSession } from "@/app/MockSessionProvider";
+import { FeatureGuard } from "@/components/guards";
 import TournamentCard from "@/components/tournaments/TournamentCard";
 import { buttonVariants } from "@/components/ui/button";
 import { ROUTES } from "@/router/routes";
@@ -35,7 +37,9 @@ export default function EntryScreen() {
             Entrar como club
           </Link>
         </div>
-        <TournamentPreview />
+        <FeatureGuard feature="tournaments">
+          <TournamentPreview />
+        </FeatureGuard>
       </div>
     </div>
   );
@@ -52,7 +56,7 @@ function TournamentPreview() {
   return (
     <TournamentCard
       tournament={first}
-      categoryLabel="6ta Masculino"
+      categoryLabel={`${formatCategoryLevel(6)} Masculino`}
       pairsCount={8}
       to={ROUTES.club.tournamentDetail(first.id)}
     />

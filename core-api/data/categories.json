@@ -5,9 +5,10 @@
     "name": "6ta Masculino",
     "gender": "male",
     "kind": "level",
-    "level": "6ta",
+    "level": 6,
     "sumaTarget": null,
     "maxPairs": 16,
+    "circuitType": "CICUPA",
     "status": "active"
   }
 ]

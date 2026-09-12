@@ -1,1 +1,1 @@
-export type { Club } from '@core-api'
+export type { Club, UpdateClubInput } from '@core-api'

@@ -1,6 +1,32 @@
-import type { Court, Match } from "../types";
+import type {
+  Court,
+  CourtReservation,
+  Match,
+  RulesetPreset,
+} from "../types";
 
-export const DEFAULT_MATCH_DURATION_MINUTES = 90;
+/** Partidos estándar / no Quality: ~1 h. */
+export const NON_QUALITY_MATCH_DURATION_MINUTES = 60;
+
+/** Quality: referencia 2 h 15 (rango 2 h – 2 h 30). */
+export const QUALITY_MATCH_DURATION_MINUTES = 135;
+
+/** Alias histórico; preferir `resolveMatchDurationMinutes`. */
+export const DEFAULT_MATCH_DURATION_MINUTES = NON_QUALITY_MATCH_DURATION_MINUTES;
+
+export function resolveMatchDurationMinutes(
+  preset: RulesetPreset | null | undefined,
+): number {
+  return preset === "QUALITY"
+    ? QUALITY_MATCH_DURATION_MINUTES
+    : NON_QUALITY_MATCH_DURATION_MINUTES;
+}
+
+export function isQualityPreset(
+  preset: RulesetPreset | null | undefined,
+): boolean {
+  return preset === "QUALITY";
+}
 
 export interface ScheduleConflictMatchInfo {
   matchId: string;
@@ -11,13 +37,23 @@ export interface ScheduleConflictMatchInfo {
   pairBId: string | null;
 }
 
+export interface ScheduleConflictReservationInfo {
+  reservationId: string;
+  courtId: string;
+  courtName: string | null;
+  startsAt: string;
+  endsAt: string;
+  clientLabel: string | null;
+}
+
 export interface ScheduleConflict {
-  type: "court" | "capacity";
+  type: "court" | "capacity" | "reservation";
   /** Resumen corto sin listar partidos (para UI). */
   summary: string;
   /** Mensaje completo (logs / errores de API). */
   message: string;
   conflictingMatches: ScheduleConflictMatchInfo[];
+  conflictingReservations: ScheduleConflictReservationInfo[];
 }
 
 export interface FindScheduleConflictsInput {
@@ -26,9 +62,11 @@ export interface FindScheduleConflictsInput {
   courtId: string | null;
   matches: Match[];
   courts: Court[];
+  reservations?: CourtReservation[];
   /** Etiquetas opcionales para armar el mensaje. */
   pairLabels?: Record<string, string>;
   courtNames?: Record<string, string>;
+  clientLabels?: Record<string, string>;
   matchDurationMinutes?: number;
 }
 
@@ -48,6 +86,20 @@ export function matchesOverlap(
   const durationMs = durationMinutes * 60_000;
   const a1 = a0 + durationMs;
   const b1 = b0 + durationMs;
+  return a0 < b1 && b0 < a1;
+}
+
+export function slotOverlapsReservation(
+  startsAt: string,
+  endsAt: string,
+  reservation: Pick<CourtReservation, "startsAt" | "endsAt" | "status">,
+): boolean {
+  if (reservation.status === "cancelled") return false;
+  const a0 = toMs(startsAt);
+  const a1 = toMs(endsAt);
+  const b0 = toMs(reservation.startsAt);
+  const b1 = toMs(reservation.endsAt);
+  if (a0 == null || a1 == null || b0 == null || b1 == null) return false;
   return a0 < b1 && b0 < a1;
 }
 
@@ -89,14 +141,30 @@ function overlappingMatches(
   );
 }
 
+function overlappingReservations(input: {
+  courtId: string | null;
+  startsAt: string;
+  endsAt: string;
+  reservations: CourtReservation[];
+}): CourtReservation[] {
+  const { courtId, startsAt, endsAt, reservations } = input;
+  return reservations.filter((r) => {
+    if (r.status === "cancelled") return false;
+    if (courtId && r.courtId !== courtId) return false;
+    if (!courtId && !r.courtId) return false;
+    return slotOverlapsReservation(startsAt, endsAt, r);
+  });
+}
+
 /**
- * Canchas activas libres en ese horario (sin partido solapado asignado).
+ * Canchas activas libres en ese horario (sin partido ni reserva solapados).
  */
 export function listAvailableCourtsAt(input: {
   matchId: string;
   scheduledAt: string | null;
   matches: Match[];
   courts: Court[];
+  reservations?: CourtReservation[];
   matchDurationMinutes?: number;
 }): Court[] {
   const {
@@ -104,9 +172,14 @@ export function listAvailableCourtsAt(input: {
     scheduledAt,
     matches,
     courts,
+    reservations = [],
     matchDurationMinutes = DEFAULT_MATCH_DURATION_MINUTES,
   } = input;
   if (!scheduledAt) return courts.filter((c) => c.status === "active");
+
+  const endsAt = new Date(
+    new Date(scheduledAt).getTime() + matchDurationMinutes * 60_000,
+  ).toISOString();
 
   const activeCourts = courts.filter((c) => c.status === "active");
   const overlapping = overlappingMatches(
@@ -115,18 +188,28 @@ export function listAvailableCourtsAt(input: {
     matches,
     matchDurationMinutes,
   );
-  const usedCourtIds = new Set(
+  const usedByMatch = new Set(
     overlapping.map((m) => m.courtId).filter((id): id is string => Boolean(id)),
   );
-  return activeCourts.filter((c) => !usedCourtIds.has(c.id));
+  const usedByReservation = new Set(
+    overlappingReservations({
+      courtId: null,
+      startsAt: scheduledAt,
+      endsAt,
+      reservations,
+    })
+      .map((r) => r.courtId)
+      .filter((id): id is string => Boolean(id)),
+  );
+
+  return activeCourts.filter(
+    (c) => !usedByMatch.has(c.id) && !usedByReservation.has(c.id),
+  );
 }
 
 /**
  * Conflictos al asignar horario/cancha.
- * - Sin cancha: no avisa por cancha puntual.
- * - Con cancha: avisa si esa cancha ya tiene partido solapado.
- * - Capacidad: si en ese horario hay tantos partidos como canchas activas (u más),
- *   avisa que no hay canchas disponibles.
+ * Incluye solapes con otros partidos y con reservas de cancha.
  */
 export function findScheduleConflicts(
   input: FindScheduleConflictsInput,
@@ -137,11 +220,17 @@ export function findScheduleConflicts(
     courtId,
     matches,
     courts,
+    reservations = [],
     pairLabels = {},
+    clientLabels = {},
     matchDurationMinutes = DEFAULT_MATCH_DURATION_MINUTES,
   } = input;
 
   if (!scheduledAt) return [];
+
+  const endsAt = new Date(
+    new Date(scheduledAt).getTime() + matchDurationMinutes * 60_000,
+  ).toISOString();
 
   const activeCourts = courts.filter((c) => c.status === "active");
   const courtNameById: Record<string, string> = {
@@ -165,6 +254,17 @@ export function findScheduleConflicts(
     pairBId: m.pairBId,
   });
 
+  const toReservationInfo = (
+    r: CourtReservation,
+  ): ScheduleConflictReservationInfo => ({
+    reservationId: r.id,
+    courtId: r.courtId ?? "",
+    courtName: r.courtId ? courtNameById[r.courtId] ?? r.courtId : null,
+    startsAt: r.startsAt,
+    endsAt: r.endsAt,
+    clientLabel: clientLabels[r.clientId] ?? null,
+  });
+
   const conflicts: ScheduleConflict[] = [];
 
   if (courtId) {
@@ -181,20 +281,88 @@ export function findScheduleConflicts(
         summary,
         message: summary,
         conflictingMatches: infos,
+        conflictingReservations: [],
+      });
+    }
+
+    const reserved = overlappingReservations({
+      courtId,
+      startsAt: scheduledAt,
+      endsAt,
+      reservations,
+    });
+    if (reserved.length > 0) {
+      const infos = reserved.map(toReservationInfo);
+      const courtName = courtNameById[courtId] ?? "La cancha";
+      const labels = infos
+        .map((i) => i.clientLabel ?? "una reserva")
+        .join("; ");
+      const summary = `Hay una reserva de cancha en ${courtName} (${labels}).`;
+      conflicts.push({
+        type: "reservation",
+        summary,
+        message: summary,
+        conflictingMatches: [],
+        conflictingReservations: infos,
       });
     }
   }
 
-  const occupiedSlots = overlapping.length + 1;
-  if (activeCourts.length > 0 && occupiedSlots > activeCourts.length) {
+  const courtsBusyByReservation = new Set(
+    overlappingReservations({
+      courtId: null,
+      startsAt: scheduledAt,
+      endsAt,
+      reservations,
+    })
+      .map((r) => r.courtId)
+      .filter((id): id is string => Boolean(id)),
+  );
+  const courtsBusyByMatch = new Set(
+    overlapping
+      .map((m) => m.courtId)
+      .filter((id): id is string => Boolean(id)),
+  );
+  const freeCourts = activeCourts.filter(
+    (c) => !courtsBusyByMatch.has(c.id) && !courtsBusyByReservation.has(c.id),
+  );
+  const proposedStillFree =
+    !courtId ||
+    (freeCourts.some((c) => c.id === courtId) &&
+      !conflicts.some((c) => c.type === "court" || c.type === "reservation"));
+
+  if (
+    activeCourts.length > 0 &&
+    freeCourts.length === 0 &&
+    !proposedStillFree
+  ) {
     const infos = overlapping.map(toInfo);
-    const summary = "No hay canchas disponibles a esa hora.";
+    const summary = "No hay canchas disponibles a esa hora (partidos o reservas).";
     conflicts.push({
       type: "capacity",
       summary,
       message: summary,
       conflictingMatches: infos,
+      conflictingReservations: overlappingReservations({
+        courtId: null,
+        startsAt: scheduledAt,
+        endsAt,
+        reservations,
+      }).map(toReservationInfo),
     });
+  } else if (activeCourts.length > 0) {
+    const occupiedSlots = overlapping.length + 1;
+    if (occupiedSlots > activeCourts.length) {
+      const infos = overlapping.map(toInfo);
+      const summary = "No hay canchas disponibles a esa hora.";
+      conflicts.push({
+        type: "capacity",
+        summary,
+        message: summary,
+        conflictingMatches: infos,
+        conflictingReservations: [],
+      });
+    }
   }
 
   return conflicts;

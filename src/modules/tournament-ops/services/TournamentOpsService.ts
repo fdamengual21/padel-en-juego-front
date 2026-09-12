@@ -88,6 +88,92 @@ export class TournamentOpsService {
     return this.repository.listCourts(clubId);
   }
 
+  createCourt(...args: Parameters<ITournamentOpsRepository["createCourt"]>) {
+    return this.repository.createCourt(...args);
+  }
+
+  updateClub(...args: Parameters<ITournamentOpsRepository["updateClub"]>) {
+    return this.repository.updateClub(...args);
+  }
+
+  updateCourt(...args: Parameters<ITournamentOpsRepository["updateCourt"]>) {
+    return this.repository.updateCourt(...args);
+  }
+
+  listCourtPriceRules(courtId: string) {
+    return this.repository.listCourtPriceRules(courtId);
+  }
+
+  upsertCourtPriceRule(
+    ...args: Parameters<ITournamentOpsRepository["upsertCourtPriceRule"]>
+  ) {
+    return this.repository.upsertCourtPriceRule(...args);
+  }
+
+  deleteCourtPriceRule(id: string) {
+    return this.repository.deleteCourtPriceRule(id);
+  }
+
+  listCourtReservations(
+    ...args: Parameters<ITournamentOpsRepository["listCourtReservations"]>
+  ) {
+    return this.repository.listCourtReservations(...args);
+  }
+
+  listPairAvailability(pairId: string) {
+    return this.repository.listPairAvailability(pairId);
+  }
+
+  setPairAvailability(
+    ...args: Parameters<ITournamentOpsRepository["setPairAvailability"]>
+  ) {
+    return this.repository.setPairAvailability(...args);
+  }
+
+  createCourtReservation(
+    ...args: Parameters<ITournamentOpsRepository["createCourtReservation"]>
+  ) {
+    return this.repository.createCourtReservation(...args);
+  }
+
+  updateCourtReservation(
+    ...args: Parameters<ITournamentOpsRepository["updateCourtReservation"]>
+  ) {
+    return this.repository.updateCourtReservation(...args);
+  }
+
+  cancelCourtReservation(id: string) {
+    return this.repository.cancelCourtReservation(id);
+  }
+
+  getCourtAgendaBoard(
+    ...args: Parameters<ITournamentOpsRepository["getCourtAgendaBoard"]>
+  ) {
+    return this.repository.getCourtAgendaBoard(...args);
+  }
+
+  quoteCourtSlot(courtId: string, startsAt: string) {
+    return this.repository.quoteCourtSlot(courtId, startsAt);
+  }
+
+  listAvailableCourtSlots(
+    courtId: string,
+    dateIso: string,
+    options?: { ignoreReservationId?: string },
+  ) {
+    return this.repository.listAvailableCourtSlots(courtId, dateIso, options);
+  }
+
+  searchClubClients(
+    ...args: Parameters<ITournamentOpsRepository["searchClubClients"]>
+  ) {
+    return this.repository.searchClubClients(...args);
+  }
+
+  createClient(...args: Parameters<ITournamentOpsRepository["createClient"]>) {
+    return this.repository.createClient(...args);
+  }
+
   getDashboard(clubId: string) {
     return this.repository.getDashboard(clubId);
   }
@@ -120,6 +206,13 @@ export class TournamentOpsService {
     return this.repository.createPlayer(input);
   }
 
+  updatePlayer(
+    playerId: string,
+    input: import("@core-api").UpdatePlayerInput,
+  ) {
+    return this.repository.updatePlayer(playerId, input);
+  }
+
   registerPair(input: import("@core-api").RegisterPairInput) {
     return this.repository.registerPair(input);
   }
@@ -136,6 +229,14 @@ export class TournamentOpsService {
     options?: import("@core-api").SyncCategoryStructureOptions,
   ) {
     return this.repository.syncCategoryStructure(categoryId, options);
+  }
+
+  acceptRegistration(registrationId: string) {
+    return this.repository.acceptRegistration(registrationId);
+  }
+
+  rejectRegistration(registrationId: string, note?: string | null) {
+    return this.repository.rejectRegistration(registrationId, note);
   }
 
   disqualifyRegistration(registrationId: string, note: string) {

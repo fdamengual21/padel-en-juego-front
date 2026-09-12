@@ -2,10 +2,16 @@ import type {
   EqualsResolution,
   MatchRules,
   RulesetPreset,
+  TournamentCircuitType,
   TournamentFormat,
 } from "@core-api";
 
-export type { Tournament, TournamentFormat, TournamentStatus } from "@core-api";
+export type {
+  Tournament,
+  TournamentCircuitType,
+  TournamentFormat,
+  TournamentStatus,
+} from "@core-api";
 
 export interface CreateTournamentRequest {
   clubId: string;
@@ -17,6 +23,7 @@ export interface CreateTournamentRequest {
   dailyEndTime: string;
   status: import("@core-api").TournamentStatus;
   format: TournamentFormat;
+  registrationFee: number;
 }
 
 export interface TournamentFormValues {
@@ -26,6 +33,8 @@ export interface TournamentFormValues {
   endDate: string;
   dailyStartTime: string;
   dailyEndTime: string;
+  /** Precio de inscripción del torneo. */
+  registrationFee: number;
   /** Estructura del cuadro (grupos, eliminación, etc.). */
   format: TournamentFormat;
   /** Tipo de partido: Quality / Estándar / Personalizado. */
@@ -37,11 +46,13 @@ export interface TournamentFormValues {
   /** Puntos del tie-break (Personalizado; default 7). */
   tiebreakPoints: number;
   categoryKind: import("@core-api").CategoryKind;
-  categoryLevel: import("@core-api").CategoryLevelCode | null;
+  categoryLevel: import("@core-api").CategoryLevel | null;
   categoryGender: import("@core-api").CategoryGender;
   sumaTarget: number | null;
   categoryName: string;
   maxPairs: number;
+  /** Circuito de ranking de la categoría. */
+  circuitType: TournamentCircuitType;
   pairsPerGroup: number;
   qualifyPerGroup: number;
 }
@@ -96,5 +107,14 @@ export function tournamentFormatLabel(format: TournamentFormat): string {
       return "Todos contra todos";
     default:
       return "Zonas + eliminación";
+  }
+}
+
+export function circuitTypeLabel(circuit: TournamentCircuitType): string {
+  switch (circuit) {
+    case "CICUPA":
+      return "CICUPA";
+    case "NONE":
+      return "Sin circuito";
   }
 }

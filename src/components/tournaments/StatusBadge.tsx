@@ -11,7 +11,9 @@ const labels: Record<string, string> = {
   registrationOpen: "Inscripciones abiertas",
   draftTournament: "Borrador",
   DISQUALIFIED: "Desclasificado",
-  CONFIRMED: "Confirmado",
+  CONFIRMED: "Aceptado",
+  ACCEPTED: "Aceptado",
+  REJECTED: "Rechazado",
   PENDING: "Pendiente",
   WAITLIST: "Lista de espera",
   CANCELLED: "Cancelado",
@@ -26,8 +28,16 @@ interface StatusBadgeProps {
 }
 
 export default function StatusBadge({ status, className }: StatusBadgeProps) {
+  const isLive = status === "inProgress";
   return (
-    <Badge variant="secondary" className={cn("font-medium", className)}>
+    <Badge
+      variant={isLive ? "default" : "secondary"}
+      className={cn(
+        "font-medium",
+        isLive && "bg-primary text-primary-foreground",
+        className,
+      )}
+    >
       {labels[status] ?? status}
     </Badge>
   );

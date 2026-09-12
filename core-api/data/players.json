@@ -7,8 +7,26 @@
     "lastName": "Pérez",
     "phone": "+5491100000001",
     "createdAt": "2026-09-03T10:00:00.000Z",
-    "categoryLevel": "6ta",
-    "email": null
+    "categoryLevel": 6,
+    "email": null,
+    "categoryHistory": [
+      {
+        "id": "pch-1-1",
+        "level": 7,
+        "previousLevel": null,
+        "reason": "initial",
+        "at": "2025-11-10T12:00:00.000Z",
+        "by": "club"
+      },
+      {
+        "id": "pch-1-2",
+        "level": 6,
+        "previousLevel": 7,
+        "reason": "auto_promotion",
+        "at": "2026-03-15T18:00:00.000Z",
+        "by": "system"
+      }
+    ]
   },
   {
     "id": "player-2",
@@ -18,8 +36,18 @@
     "lastName": "Díaz",
     "phone": "+5491100000002",
     "createdAt": "2026-09-03T10:00:00.000Z",
-    "categoryLevel": "6ta",
-    "email": null
+    "categoryLevel": 6,
+    "email": null,
+    "categoryHistory": [
+      {
+        "id": "pch-2-1",
+        "level": 6,
+        "previousLevel": null,
+        "reason": "initial",
+        "at": "2026-01-20T10:00:00.000Z",
+        "by": "club"
+      }
+    ]
   },
   {
     "id": "player-3",
@@ -29,8 +57,18 @@
     "lastName": "Ruiz",
     "phone": "+5491100000003",
     "createdAt": "2026-09-03T10:00:00.000Z",
-    "categoryLevel": "6ta",
-    "email": null
+    "categoryLevel": 6,
+    "email": null,
+    "categoryHistory": [
+      {
+        "id": "pch-3-1",
+        "level": 6,
+        "previousLevel": null,
+        "reason": "initial",
+        "at": "2026-02-01T10:00:00.000Z",
+        "by": "club"
+      }
+    ]
   },
   {
     "id": "player-4",
@@ -40,8 +78,26 @@
     "lastName": "Gómez",
     "phone": "+5491100000004",
     "createdAt": "2026-09-03T10:00:00.000Z",
-    "categoryLevel": "6ta",
-    "email": null
+    "categoryLevel": 6,
+    "email": null,
+    "categoryHistory": [
+      {
+        "id": "pch-4-1",
+        "level": 5,
+        "previousLevel": null,
+        "reason": "initial",
+        "at": "2025-08-01T10:00:00.000Z",
+        "by": "club"
+      },
+      {
+        "id": "pch-4-2",
+        "level": 6,
+        "previousLevel": 5,
+        "reason": "club_override",
+        "at": "2026-04-02T14:00:00.000Z",
+        "by": "club"
+      }
+    ]
   },
   {
     "id": "player-5",
@@ -51,8 +107,26 @@
     "lastName": "Nico",
     "phone": "+5491100000005",
     "createdAt": "2026-09-03T10:00:00.000Z",
-    "categoryLevel": "5ta",
-    "email": null
+    "categoryLevel": 5,
+    "email": null,
+    "categoryHistory": [
+      {
+        "id": "pch-5-1",
+        "level": 6,
+        "previousLevel": null,
+        "reason": "initial",
+        "at": "2025-06-01T10:00:00.000Z",
+        "by": "club"
+      },
+      {
+        "id": "pch-5-2",
+        "level": 5,
+        "previousLevel": 6,
+        "reason": "auto_promotion",
+        "at": "2026-02-20T20:00:00.000Z",
+        "by": "system"
+      }
+    ]
   },
   {
     "id": "player-6",
@@ -62,8 +136,18 @@
     "lastName": "Tomás",
     "phone": "+5491100000006",
     "createdAt": "2026-09-03T10:00:00.000Z",
-    "categoryLevel": "7ma",
-    "email": null
+    "categoryLevel": 7,
+    "email": null,
+    "categoryHistory": [
+      {
+        "id": "pch-6-1",
+        "level": 7,
+        "previousLevel": null,
+        "reason": "initial",
+        "at": "2026-05-10T10:00:00.000Z",
+        "by": "club"
+      }
+    ]
   },
   {
     "id": "player-7",
@@ -73,8 +157,18 @@
     "lastName": "Sosa",
     "phone": "+5491100000007",
     "createdAt": "2026-09-03T10:00:00.000Z",
-    "categoryLevel": "6ta",
-    "email": null
+    "categoryLevel": 6,
+    "email": null,
+    "categoryHistory": [
+      {
+        "id": "pch-7-1",
+        "level": 6,
+        "previousLevel": null,
+        "reason": "initial",
+        "at": "2026-03-01T10:00:00.000Z",
+        "by": "club"
+      }
+    ]
   },
   {
     "id": "player-8",
@@ -84,8 +178,18 @@
     "lastName": "Vargas",
     "phone": "+5491100000008",
     "createdAt": "2026-09-03T10:00:00.000Z",
-    "categoryLevel": "6ta",
-    "email": null
+    "categoryLevel": 6,
+    "email": null,
+    "categoryHistory": [
+      {
+        "id": "pch-8-1",
+        "level": 6,
+        "previousLevel": null,
+        "reason": "initial",
+        "at": "2026-03-05T10:00:00.000Z",
+        "by": "club"
+      }
+    ]
   },
   {
     "id": "player-9",
@@ -95,8 +199,18 @@
     "lastName": "Molina",
     "phone": "+5491100000009",
     "createdAt": "2026-09-03T10:00:00.000Z",
-    "categoryLevel": "6ta",
-    "email": null
+    "categoryLevel": 6,
+    "email": null,
+    "categoryHistory": [
+      {
+        "id": "pch-9-1",
+        "level": 6,
+        "previousLevel": null,
+        "reason": "initial",
+        "at": "2026-03-08T10:00:00.000Z",
+        "by": "club"
+      }
+    ]
   },
   {
     "id": "player-10",
@@ -106,8 +220,18 @@
     "lastName": "Ramos",
     "phone": "+5491100000010",
     "createdAt": "2026-09-03T10:00:00.000Z",
-    "categoryLevel": "6ta",
-    "email": null
+    "categoryLevel": 6,
+    "email": null,
+    "categoryHistory": [
+      {
+        "id": "pch-10-1",
+        "level": 6,
+        "previousLevel": null,
+        "reason": "initial",
+        "at": "2026-03-12T10:00:00.000Z",
+        "by": "club"
+      }
+    ]
   },
   {
     "id": "player-11",
@@ -117,8 +241,18 @@
     "lastName": "Castro",
     "phone": "+5491100000011",
     "createdAt": "2026-09-03T10:00:00.000Z",
-    "categoryLevel": "5ta",
-    "email": null
+    "categoryLevel": 5,
+    "email": null,
+    "categoryHistory": [
+      {
+        "id": "pch-11-1",
+        "level": 5,
+        "previousLevel": null,
+        "reason": "initial",
+        "at": "2025-09-01T10:00:00.000Z",
+        "by": "club"
+      }
+    ]
   },
   {
     "id": "player-12",
@@ -128,8 +262,26 @@
     "lastName": "Ibarra",
     "phone": "+5491100000012",
     "createdAt": "2026-09-03T10:00:00.000Z",
-    "categoryLevel": "7ma",
-    "email": null
+    "categoryLevel": 7,
+    "email": null,
+    "categoryHistory": [
+      {
+        "id": "pch-12-1",
+        "level": 8,
+        "previousLevel": null,
+        "reason": "initial",
+        "at": "2025-12-01T10:00:00.000Z",
+        "by": "club"
+      },
+      {
+        "id": "pch-12-2",
+        "level": 7,
+        "previousLevel": 8,
+        "reason": "auto_promotion",
+        "at": "2026-06-01T10:00:00.000Z",
+        "by": "system"
+      }
+    ]
   },
   {
     "id": "player-13",
@@ -139,8 +291,18 @@
     "lastName": "López",
     "phone": "+5491100000013",
     "createdAt": "2026-09-03T10:00:00.000Z",
-    "categoryLevel": "6ta",
-    "email": null
+    "categoryLevel": 6,
+    "email": null,
+    "categoryHistory": [
+      {
+        "id": "pch-13-1",
+        "level": 6,
+        "previousLevel": null,
+        "reason": "initial",
+        "at": "2026-04-01T10:00:00.000Z",
+        "by": "club"
+      }
+    ]
   },
   {
     "id": "player-14",
@@ -150,8 +312,18 @@
     "lastName": "Ferreyra",
     "phone": "+5491100000014",
     "createdAt": "2026-09-03T10:00:00.000Z",
-    "categoryLevel": "6ta",
-    "email": null
+    "categoryLevel": 6,
+    "email": null,
+    "categoryHistory": [
+      {
+        "id": "pch-14-1",
+        "level": 6,
+        "previousLevel": null,
+        "reason": "initial",
+        "at": "2026-04-05T10:00:00.000Z",
+        "by": "club"
+      }
+    ]
   },
   {
     "id": "player-15",
@@ -161,8 +333,18 @@
     "lastName": "Quiroga",
     "phone": "+5491100000015",
     "createdAt": "2026-09-03T10:00:00.000Z",
-    "categoryLevel": "8va",
-    "email": null
+    "categoryLevel": 8,
+    "email": null,
+    "categoryHistory": [
+      {
+        "id": "pch-15-1",
+        "level": 8,
+        "previousLevel": null,
+        "reason": "initial",
+        "at": "2026-07-01T10:00:00.000Z",
+        "by": "club"
+      }
+    ]
   },
   {
     "id": "player-16",
@@ -172,7 +354,25 @@
     "lastName": "Benítez",
     "phone": "+5491100000016",
     "createdAt": "2026-09-03T10:00:00.000Z",
-    "categoryLevel": "4ta",
-    "email": null
+    "categoryLevel": 4,
+    "email": null,
+    "categoryHistory": [
+      {
+        "id": "pch-16-1",
+        "level": 5,
+        "previousLevel": null,
+        "reason": "initial",
+        "at": "2025-04-01T10:00:00.000Z",
+        "by": "club"
+      },
+      {
+        "id": "pch-16-2",
+        "level": 4,
+        "previousLevel": 5,
+        "reason": "auto_promotion",
+        "at": "2026-01-10T16:00:00.000Z",
+        "by": "system"
+      }
+    ]
   }
 ]

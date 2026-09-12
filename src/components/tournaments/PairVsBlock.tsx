@@ -35,7 +35,7 @@ export default function PairVsBlock({
         <p className="truncate">{a1}</p>
         {a2 ? <p className="truncate">{a2}</p> : null}
       </div>
-      <span className="self-center text-left text-[10px] font-semibold uppercase tracking-wide text-primary">
+      <span className="self-center text-left text-[10px] font-semibold uppercase tracking-wide text-sidebar">
         VS
       </span>
       <div className="min-w-0 font-bold leading-tight">

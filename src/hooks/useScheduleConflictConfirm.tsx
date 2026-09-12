@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Court, Match, ScheduleConflict } from "@core-api";
+import type { Court, CourtReservation, Match, ScheduleConflict } from "@core-api";
 import {
   listAvailableCourtsAt,
   pairLabelForMatch,
@@ -19,6 +19,8 @@ export interface ScheduleConflictConfirmRequest {
   proposedCourtId: string | null;
   courts: Court[];
   matches: Match[];
+  reservations?: CourtReservation[];
+  matchDurationMinutes?: number;
   pairLabels: Record<string, string>;
 }
 
@@ -28,8 +30,7 @@ interface PendingConflictConfirm extends ScheduleConflictConfirmRequest {
 
 /**
  * Promesa + modal para resolver conflictos de agenda.
- * - Con canchas libres: elegir otra y "Guardar" (sin forzar).
- * - Sin canchas libres: "Guardar de todos modos" (fuerza y libera la cancha a otros).
+ * Incluye avisos por reservas de cancha.
  */
 export function useScheduleConflictConfirm(pairLabels: Record<string, string>) {
   const [pending, setPending] = useState<PendingConflictConfirm | null>(null);
@@ -96,6 +97,8 @@ function ScheduleConflictResolveDialog({
         scheduledAt: request.scheduledAt,
         matches: request.matches,
         courts: request.courts,
+        reservations: request.reservations,
+        matchDurationMinutes: request.matchDurationMinutes,
       }).filter((c) => c.id !== request.proposedCourtId),
     [request],
   );
@@ -110,6 +113,9 @@ function ScheduleConflictResolveDialog({
   }, [availableCourts]);
 
   const courtConflict = request.conflicts.find((c) => c.type === "court");
+  const reservationConflict = request.conflicts.find(
+    (c) => c.type === "reservation",
+  );
   const capacityConflict = request.conflicts.find((c) => c.type === "capacity");
   const hora = formatScheduleShortEs(request.scheduledAt);
 
@@ -122,8 +128,19 @@ function ScheduleConflictResolveDialog({
     .map((m) => pairLabelForMatch(m, request.pairLabels))
     .join("; ");
 
+  const reservationLabels = (reservationConflict?.conflictingReservations ?? [])
+    .map((r) => r.clientLabel ?? "reserva")
+    .join("; ");
+
   let description: string;
-  if (courtConflict && occupantLabels) {
+  if (reservationConflict) {
+    description = `Hay una reserva de cancha en ${proposedCourtName} el ${hora}${
+      reservationLabels ? ` (${reservationLabels})` : ""
+    }.`;
+    if (!hasAlternatives) {
+      description += " Y no hay canchas libres a esa hora.";
+    }
+  } else if (courtConflict && occupantLabels) {
     description = `La cancha seleccionada (${proposedCourtName}) se encuentra ocupada el ${hora} por ${occupantLabels}.`;
     if (!hasAlternatives) {
       description += " Y no hay canchas disponibles.";
@@ -135,6 +152,10 @@ function ScheduleConflictResolveDialog({
       request.conflicts.map((c) => c.summary).filter(Boolean).join(" ") ||
       "Hay un conflicto de horario o cancha.";
   }
+
+  const forceHint = reservationConflict
+    ? "Si guardás de todos modos, el partido quedará en ese horario aunque haya una reserva (la reserva no se cancela)."
+    : "Si guardás de todos modos, se asignará esta cancha y se quitará a los equipos que ya la tenían en ese horario.";
 
   return (
     <WarningDialog
@@ -182,14 +203,11 @@ function ScheduleConflictResolveDialog({
           </select>
           <p className="text-xs text-muted-foreground">
             Elegí otra cancha libre a esa hora para guardar sin desplazar a otros
-            equipos.
+            equipos ni pisar reservas.
           </p>
         </div>
       ) : (
-        <p className="text-xs text-muted-foreground">
-          Si guardás de todos modos, se asignará esta cancha y se quitará a los
-          equipos que ya la tenían en ese horario.
-        </p>
+        <p className="text-xs text-muted-foreground">{forceHint}</p>
       )}
     </WarningDialog>
   );

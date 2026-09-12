@@ -1,4 +1,5 @@
 import type { IClubRepository } from "../repositories/ClubRepository";
+import type { UpdateClubInput } from "../types";
 
 export class ClubService {
   private readonly repository: IClubRepository;
@@ -13,5 +14,9 @@ export class ClubService {
 
   getById(id: string) {
     return this.repository.getById(id);
+  }
+
+  update(id: string, patch: UpdateClubInput) {
+    return this.repository.update(id, patch);
   }
 }

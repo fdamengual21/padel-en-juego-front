@@ -3,72 +3,96 @@
     "id": "reg-1",
     "tournamentCategoryId": "cat-1",
     "pairId": "pair-1",
-    "status": "CONFIRMED",
+    "status": "ACCEPTED",
     "registeredAt": "2026-09-08T12:00:00.000Z",
     "statusNote": null,
-    "statusChangedAt": null
+    "statusChangedAt": null,
+    "rankingPointsPlayer1": 300,
+    "rankingPointsPlayer2": 280,
+    "tournamentPointsAwarded": null
   },
   {
     "id": "reg-2",
     "tournamentCategoryId": "cat-1",
     "pairId": "pair-2",
-    "status": "CONFIRMED",
+    "status": "ACCEPTED",
     "registeredAt": "2026-09-08T12:00:00.000Z",
     "statusNote": null,
-    "statusChangedAt": null
+    "statusChangedAt": null,
+    "rankingPointsPlayer1": 315,
+    "rankingPointsPlayer2": 292,
+    "tournamentPointsAwarded": null
   },
   {
     "id": "reg-3",
     "tournamentCategoryId": "cat-1",
     "pairId": "pair-3",
-    "status": "CONFIRMED",
+    "status": "ACCEPTED",
     "registeredAt": "2026-09-08T12:00:00.000Z",
     "statusNote": null,
-    "statusChangedAt": null
+    "statusChangedAt": null,
+    "rankingPointsPlayer1": 330,
+    "rankingPointsPlayer2": 304,
+    "tournamentPointsAwarded": null
   },
   {
     "id": "reg-4",
     "tournamentCategoryId": "cat-1",
     "pairId": "pair-4",
-    "status": "CONFIRMED",
+    "status": "ACCEPTED",
     "registeredAt": "2026-09-08T12:00:00.000Z",
     "statusNote": null,
-    "statusChangedAt": null
+    "statusChangedAt": null,
+    "rankingPointsPlayer1": 345,
+    "rankingPointsPlayer2": 316,
+    "tournamentPointsAwarded": null
   },
   {
     "id": "reg-5",
     "tournamentCategoryId": "cat-1",
     "pairId": "pair-5",
-    "status": "CONFIRMED",
+    "status": "ACCEPTED",
     "registeredAt": "2026-09-08T12:00:00.000Z",
     "statusNote": null,
-    "statusChangedAt": null
+    "statusChangedAt": null,
+    "rankingPointsPlayer1": 360,
+    "rankingPointsPlayer2": 328,
+    "tournamentPointsAwarded": null
   },
   {
     "id": "reg-6",
     "tournamentCategoryId": "cat-1",
     "pairId": "pair-6",
-    "status": "CONFIRMED",
+    "status": "ACCEPTED",
     "registeredAt": "2026-09-08T12:00:00.000Z",
     "statusNote": null,
-    "statusChangedAt": null
+    "statusChangedAt": null,
+    "rankingPointsPlayer1": 375,
+    "rankingPointsPlayer2": 340,
+    "tournamentPointsAwarded": null
   },
   {
     "id": "reg-7",
     "tournamentCategoryId": "cat-1",
     "pairId": "pair-7",
-    "status": "CONFIRMED",
+    "status": "ACCEPTED",
     "registeredAt": "2026-09-08T12:00:00.000Z",
     "statusNote": null,
-    "statusChangedAt": null
+    "statusChangedAt": null,
+    "rankingPointsPlayer1": 390,
+    "rankingPointsPlayer2": 352,
+    "tournamentPointsAwarded": null
   },
   {
     "id": "reg-8",
     "tournamentCategoryId": "cat-1",
     "pairId": "pair-8",
-    "status": "CONFIRMED",
+    "status": "ACCEPTED",
     "registeredAt": "2026-09-08T12:00:00.000Z",
     "statusNote": null,
-    "statusChangedAt": null
+    "statusChangedAt": null,
+    "rankingPointsPlayer1": 405,
+    "rankingPointsPlayer2": 364,
+    "tournamentPointsAwarded": null
   }
 ]

@@ -58,6 +58,8 @@ interface GroupZonesPanelProps {
   matchRules: MatchRules;
   courts?: Court[];
   allMatches?: Match[];
+  reservations?: import("@core-api").CourtReservation[];
+  matchDurationMinutes?: number;
   scheduleSavingMatchId?: string | null;
   onSaveSchedule?: (input: {
     matchId: string;
@@ -84,6 +86,8 @@ export default function GroupZonesPanel({
   matchRules,
   courts = [],
   allMatches,
+  reservations = [],
+  matchDurationMinutes,
   scheduleSavingMatchId = null,
   onSaveSchedule,
   onOpenResult,
@@ -233,6 +237,8 @@ export default function GroupZonesPanel({
                               courts={courts}
                               pairLabels={pairLabels}
                               allMatches={scheduleMatches}
+                              reservations={reservations}
+                              matchDurationMinutes={matchDurationMinutes}
                               disabled={!canEdit}
                               isSaving={scheduleSavingMatchId === match.id}
                               onSave={onSaveSchedule}
@@ -325,6 +331,8 @@ export default function GroupZonesPanel({
           courts={courts}
           pairLabels={pairLabels}
           allMatches={scheduleMatches}
+          reservations={reservations}
+          matchDurationMinutes={matchDurationMinutes}
           isSaving={
             scheduleMatch != null && scheduleSavingMatchId === scheduleMatch.id
           }

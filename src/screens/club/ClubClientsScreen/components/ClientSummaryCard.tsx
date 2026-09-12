@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom";
 import type { ClubClientSummary } from "@core-api";
+import Avatar from "@/components/Avatar";
 import { formatLocationEs } from "@/lib/dates";
 import { ROUTES } from "@/router/routes";
-import ClientAvatar from "./ClientAvatar";
 
 interface ClientSummaryCardProps {
   summary: ClubClientSummary;
@@ -19,7 +19,11 @@ export default function ClientSummaryCard({ summary }: ClientSummaryCardProps) {
       data-testid={`client-card-${client.id}`}
     >
       <div className="flex items-center gap-3">
-        <ClientAvatar name={client.displayName} avatarUrl={client.avatarUrl} />
+        <Avatar
+          name={client.displayName}
+          imageUrl={client.avatarUrl}
+          size="md"
+        />
         <div className="min-w-0">
           <p className="truncate font-semibold text-foreground">
             {client.displayName}

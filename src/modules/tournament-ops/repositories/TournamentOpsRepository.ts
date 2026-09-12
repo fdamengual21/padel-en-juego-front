@@ -22,6 +22,68 @@ export interface ITournamentOpsRepository {
   generateBracket(categoryId: string): ReturnType<ReturnType<typeof coreApi>['generateBracket']>
   scheduleCategory(categoryId: string): ReturnType<ReturnType<typeof coreApi>['scheduleCategory']>
   listCourts(clubId: string): ReturnType<ReturnType<typeof coreApi>['listCourts']>
+  createCourt(
+    input: Parameters<ReturnType<typeof coreApi>["createCourt"]>[0],
+  ): ReturnType<ReturnType<typeof coreApi>["createCourt"]>
+  updateClub(
+    id: string,
+    patch: Parameters<ReturnType<typeof coreApi>["updateClub"]>[1],
+  ): ReturnType<ReturnType<typeof coreApi>["updateClub"]>
+  updateCourt(
+    id: string,
+    patch: Parameters<ReturnType<typeof coreApi>["updateCourt"]>[1],
+  ): ReturnType<ReturnType<typeof coreApi>["updateCourt"]>
+  listCourtPriceRules(
+    courtId: string,
+  ): ReturnType<ReturnType<typeof coreApi>["listCourtPriceRules"]>
+  upsertCourtPriceRule(
+    rule: Parameters<ReturnType<typeof coreApi>["upsertCourtPriceRule"]>[0],
+  ): ReturnType<ReturnType<typeof coreApi>["upsertCourtPriceRule"]>
+  deleteCourtPriceRule(
+    id: string,
+  ): ReturnType<ReturnType<typeof coreApi>["deleteCourtPriceRule"]>
+  listCourtReservations(
+    clubId: string,
+    options?: Parameters<ReturnType<typeof coreApi>["listCourtReservations"]>[1],
+  ): ReturnType<ReturnType<typeof coreApi>["listCourtReservations"]>
+  listPairAvailability(
+    pairId: string,
+  ): ReturnType<ReturnType<typeof coreApi>["listPairAvailability"]>
+  setPairAvailability(
+    items: Parameters<ReturnType<typeof coreApi>["setPairAvailability"]>[0],
+  ): ReturnType<ReturnType<typeof coreApi>["setPairAvailability"]>
+  createCourtReservation(
+    input: Parameters<ReturnType<typeof coreApi>["createCourtReservation"]>[0],
+  ): ReturnType<ReturnType<typeof coreApi>["createCourtReservation"]>
+  updateCourtReservation(
+    id: string,
+    patch: Parameters<ReturnType<typeof coreApi>["updateCourtReservation"]>[1],
+  ): ReturnType<ReturnType<typeof coreApi>["updateCourtReservation"]>
+  cancelCourtReservation(
+    id: string,
+  ): ReturnType<ReturnType<typeof coreApi>["cancelCourtReservation"]>
+  getCourtAgendaBoard(
+    clubId: string,
+    courtId: string,
+    options: Parameters<ReturnType<typeof coreApi>["getCourtAgendaBoard"]>[2],
+  ): ReturnType<ReturnType<typeof coreApi>["getCourtAgendaBoard"]>
+  quoteCourtSlot(
+    courtId: string,
+    startsAt: string,
+  ): ReturnType<ReturnType<typeof coreApi>["quoteCourtSlot"]>
+  listAvailableCourtSlots(
+    courtId: string,
+    dateIso: string,
+    options?: { ignoreReservationId?: string },
+  ): ReturnType<ReturnType<typeof coreApi>["listAvailableCourtSlots"]>
+  searchClubClients(
+    clubId: string,
+    query: string,
+    options?: { signal?: AbortSignal },
+  ): ReturnType<ReturnType<typeof coreApi>["searchClubClients"]>
+  createClient(
+    input: Parameters<ReturnType<typeof coreApi>["createClient"]>[0],
+  ): ReturnType<ReturnType<typeof coreApi>["createClient"]>
   getDashboard(clubId: string): ReturnType<ReturnType<typeof coreApi>['getDashboard']>
   getRanking(categoryId?: string): ReturnType<ReturnType<typeof coreApi>['getRanking']>
   getPlayerHome(playerId: string): ReturnType<ReturnType<typeof coreApi>['getPlayerHome']>
@@ -41,6 +103,10 @@ export interface ITournamentOpsRepository {
   createPlayer(
     input: import("@core-api").CreatePlayerInput,
   ): ReturnType<ReturnType<typeof coreApi>["createPlayer"]>;
+  updatePlayer(
+    playerId: string,
+    input: import("@core-api").UpdatePlayerInput,
+  ): ReturnType<ReturnType<typeof coreApi>["updatePlayer"]>;
   registerPair(
     input: import("@core-api").RegisterPairInput,
   ): ReturnType<ReturnType<typeof coreApi>["registerPair"]>;
@@ -52,6 +118,13 @@ export interface ITournamentOpsRepository {
     categoryId: string,
     options?: import("@core-api").SyncCategoryStructureOptions,
   ): ReturnType<ReturnType<typeof coreApi>["syncCategoryStructure"]>;
+  acceptRegistration(
+    registrationId: string,
+  ): ReturnType<ReturnType<typeof coreApi>["acceptRegistration"]>;
+  rejectRegistration(
+    registrationId: string,
+    note?: string | null,
+  ): ReturnType<ReturnType<typeof coreApi>["rejectRegistration"]>;
   disqualifyRegistration(
     registrationId: string,
     note: string,
@@ -158,6 +231,104 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
     return coreApi().listCourts(clubId)
   }
 
+  createCourt(input: Parameters<ReturnType<typeof coreApi>["createCourt"]>[0]) {
+    return coreApi().createCourt(input)
+  }
+
+  updateClub(
+    id: string,
+    patch: Parameters<ReturnType<typeof coreApi>["updateClub"]>[1],
+  ) {
+    return coreApi().updateClub(id, patch)
+  }
+
+  updateCourt(
+    id: string,
+    patch: Parameters<ReturnType<typeof coreApi>["updateCourt"]>[1],
+  ) {
+    return coreApi().updateCourt(id, patch)
+  }
+
+  listCourtPriceRules(courtId: string) {
+    return coreApi().listCourtPriceRules(courtId)
+  }
+
+  upsertCourtPriceRule(
+    rule: Parameters<ReturnType<typeof coreApi>["upsertCourtPriceRule"]>[0],
+  ) {
+    return coreApi().upsertCourtPriceRule(rule)
+  }
+
+  deleteCourtPriceRule(id: string) {
+    return coreApi().deleteCourtPriceRule(id)
+  }
+
+  listCourtReservations(
+    clubId: string,
+    options?: Parameters<ReturnType<typeof coreApi>["listCourtReservations"]>[1],
+  ) {
+    return coreApi().listCourtReservations(clubId, options)
+  }
+
+  listPairAvailability(pairId: string) {
+    return coreApi().listPairAvailability(pairId)
+  }
+
+  setPairAvailability(
+    items: Parameters<ReturnType<typeof coreApi>["setPairAvailability"]>[0],
+  ) {
+    return coreApi().setPairAvailability(items)
+  }
+
+  createCourtReservation(
+    input: Parameters<ReturnType<typeof coreApi>["createCourtReservation"]>[0],
+  ) {
+    return coreApi().createCourtReservation(input)
+  }
+
+  updateCourtReservation(
+    id: string,
+    patch: Parameters<ReturnType<typeof coreApi>["updateCourtReservation"]>[1],
+  ) {
+    return coreApi().updateCourtReservation(id, patch)
+  }
+
+  cancelCourtReservation(id: string) {
+    return coreApi().cancelCourtReservation(id)
+  }
+
+  getCourtAgendaBoard(
+    clubId: string,
+    courtId: string,
+    options: Parameters<ReturnType<typeof coreApi>["getCourtAgendaBoard"]>[2],
+  ) {
+    return coreApi().getCourtAgendaBoard(clubId, courtId, options)
+  }
+
+  quoteCourtSlot(courtId: string, startsAt: string) {
+    return coreApi().quoteCourtSlot(courtId, startsAt)
+  }
+
+  listAvailableCourtSlots(
+    courtId: string,
+    dateIso: string,
+    options?: { ignoreReservationId?: string },
+  ) {
+    return coreApi().listAvailableCourtSlots(courtId, dateIso, options)
+  }
+
+  searchClubClients(
+    clubId: string,
+    query: string,
+    options?: { signal?: AbortSignal },
+  ) {
+    return coreApi().searchClubClients(clubId, query, options)
+  }
+
+  createClient(input: Parameters<ReturnType<typeof coreApi>["createClient"]>[0]) {
+    return coreApi().createClient(input)
+  }
+
   getDashboard(clubId: string) {
     return coreApi().getDashboard(clubId)
   }
@@ -190,6 +361,13 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
     return coreApi().createPlayer(input)
   }
 
+  updatePlayer(
+    playerId: string,
+    input: import("@core-api").UpdatePlayerInput,
+  ) {
+    return coreApi().updatePlayer(playerId, input)
+  }
+
   registerPair(input: import("@core-api").RegisterPairInput) {
     return coreApi().registerPair(input)
   }
@@ -206,6 +384,14 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
     options?: import("@core-api").SyncCategoryStructureOptions,
   ) {
     return coreApi().syncCategoryStructure(categoryId, options)
+  }
+
+  acceptRegistration(registrationId: string) {
+    return coreApi().acceptRegistration(registrationId)
+  }
+
+  rejectRegistration(registrationId: string, note?: string | null) {
+    return coreApi().rejectRegistration(registrationId, note)
   }
 
   disqualifyRegistration(registrationId: string, note: string) {

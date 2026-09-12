@@ -1,7 +1,18 @@
 import type { CoreApiDb } from "../store/db";
 import type {
+  Client,
   Club,
   Court,
+  CourtAgendaBoardView,
+  CourtAgendaEvent,
+  CourtDaySummary,
+  CourtPriceRule,
+  CourtReservation,
+  CourtSlotQuote,
+  CourtAvailableSlot,
+  CreateClientInput,
+  CreateCourtInput,
+  CreateCourtReservationInput,
   GenerateGroupsConfig,
   GroupStanding,
   Match,
@@ -20,12 +31,14 @@ import type {
   TournamentRegistration,
   TournamentRound,
   TournamentRuleset,
+  UpdateCourtReservationInput,
 } from "../types";
 import {
   advanceBracketWinner,
   applyResultToMatch,
   applyWalkoverToMatch,
   buildEliminationBracket,
+  buildTournamentDayWindows,
   computeStandings,
   createId,
   delay,
@@ -46,14 +59,37 @@ import {
   validateMatchResultSets,
 } from "../domain/matchResultRules";
 import { validateMatchStatusTransition } from "../domain/matchPlayStatus";
-import { findScheduleConflicts, matchesOverlap } from "../domain/scheduleConflicts";
+import {
+  findScheduleConflicts,
+  isQualityPreset,
+  matchesOverlap,
+  resolveMatchDurationMinutes,
+  slotOverlapsReservation,
+} from "../domain/scheduleConflicts";
+import { pickRandomCourtImagePath } from "../domain/courtImages";
 import type { ScheduleConflict } from "../domain/scheduleConflicts";
 import {
   buildClubClientDetail,
   ensureClientFromPlayer,
   listClubClientSummaries,
 } from "../domain/clients";
-import type { ClubClientDetail, ClubClientSummary } from "../types";
+import { resolvePriceForSlot, validateCourtPriceRules } from "../domain/courtPricing";
+import {
+  generateDaySlots,
+  intervalsOverlap,
+  isClubOpenOnDate,
+  isCourtOpenAt,
+  isZeroLengthHours,
+  localDateIsoFromInstant,
+  resolveCourtHours,
+  weekdayIsoFromDateIso,
+} from "../domain/courtSlots";
+import type {
+  ClubClientDetail,
+  ClubClientSummary,
+  CourtDayPriceBand,
+  CourtLiveStatus,
+} from "../types";
 import type { PageQuery, PaginatedResult } from "../domain/pagination";
 
 export class TournamentEngine {
@@ -71,6 +107,46 @@ export class TournamentEngine {
   async getClub(id: string): Promise<Club | null> {
     await delay();
     return this.db.clubs.getById(id);
+  }
+
+  async updateClub(
+    id: string,
+    patch: import("../types").UpdateClubInput,
+  ): Promise<Club> {
+    await delay();
+    const current = this.db.clubs.getById(id);
+    if (!current) throw new Error("Club no encontrado");
+
+    const openTime = patch.openTime ?? current.openTime;
+    const closeTime = patch.closeTime ?? current.closeTime;
+    if (!isValidHhMm(openTime) || !isValidHhMm(closeTime)) {
+      throw new Error("Horario inválido (usá HH:mm)");
+    }
+    if (isZeroLengthHours(openTime, closeTime)) {
+      throw new Error("La apertura y el cierre no pueden ser la misma hora");
+    }
+
+    let openDays = current.openDays;
+    if (patch.openDays !== undefined) {
+      const normalized = [
+        ...new Set(
+          patch.openDays.filter((d) => d >= 1 && d <= 7),
+        ),
+      ].sort((a, b) => a - b) as import("../types").WeekdayIso[];
+      if (normalized.length === 0) {
+        throw new Error("Seleccioná al menos un día de apertura");
+      }
+      openDays = normalized;
+    }
+
+    return this.db.clubs.upsert({
+      ...current,
+      ...patch,
+      openTime,
+      closeTime,
+      openDays,
+      updatedAt: new Date().toISOString(),
+    });
   }
 
   async listPlayers(): Promise<Player[]> {
@@ -110,6 +186,8 @@ export class TournamentEngine {
     if (!firstName || !lastName) {
       throw new Error("Nombre y apellido son obligatorios");
     }
+    const categoryLevel = input.categoryLevel ?? 6;
+    const createdAt = new Date().toISOString();
     const player: Player = {
       id: createId("player"),
       userId: input.userId ?? null,
@@ -118,8 +196,66 @@ export class TournamentEngine {
       displayName: `${firstName} ${lastName}`,
       phone: input.phone?.trim() || null,
       email: input.email?.trim() || null,
-      categoryLevel: input.categoryLevel ?? "6ta",
-      createdAt: new Date().toISOString(),
+      categoryLevel,
+      categoryHistory: [
+        {
+          id: createId("pch"),
+          level: categoryLevel,
+          previousLevel: null,
+          reason: "initial",
+          at: createdAt,
+          by: "club",
+        },
+      ],
+      createdAt,
+    };
+    return this.db.players.upsert(player);
+  }
+
+  async updatePlayer(
+    playerId: string,
+    input: import("../types").UpdatePlayerInput,
+  ): Promise<Player> {
+    await delay();
+    const existing = this.db.players.getById(playerId);
+    if (!existing) throw new Error("Jugador no encontrado");
+
+    const firstName =
+      input.firstName !== undefined ? input.firstName.trim() : existing.firstName;
+    const lastName =
+      input.lastName !== undefined ? input.lastName.trim() : existing.lastName;
+    if (!firstName || !lastName) {
+      throw new Error("Nombre y apellido son obligatorios");
+    }
+
+    const nextLevel = input.categoryLevel ?? existing.categoryLevel;
+    const history = [...(existing.categoryHistory ?? [])];
+    if (input.categoryLevel !== undefined && nextLevel !== existing.categoryLevel) {
+      history.push({
+        id: createId("pch"),
+        level: nextLevel,
+        previousLevel: existing.categoryLevel,
+        reason: "self_update",
+        at: new Date().toISOString(),
+        by: "player",
+      });
+    }
+
+    const player: Player = {
+      ...existing,
+      firstName,
+      lastName,
+      displayName: `${firstName} ${lastName}`,
+      phone:
+        input.phone !== undefined
+          ? input.phone?.trim() || null
+          : existing.phone,
+      email:
+        input.email !== undefined
+          ? input.email?.trim() || null
+          : existing.email,
+      categoryLevel: nextLevel,
+      categoryHistory: history,
     };
     return this.db.players.upsert(player);
   }
@@ -168,14 +304,50 @@ export class TournamentEngine {
       id: createId("reg"),
       tournamentCategoryId: input.tournamentCategoryId,
       pairId: pair.id,
-      status: "CONFIRMED",
+      status: "PENDING",
       registeredAt: new Date().toISOString(),
       statusNote: null,
       statusChangedAt: null,
+      rankingPointsPlayer1: normalizeOptionalPoints(input.rankingPointsPlayer1),
+      rankingPointsPlayer2: player2Id
+        ? normalizeOptionalPoints(input.rankingPointsPlayer2)
+        : null,
+      tournamentPointsAwarded: null,
     };
     this.db.registrations.upsert(registration);
 
     const tournament = this.db.tournaments.getById(category.tournamentId);
+    const ruleset =
+      this.db.rulesets.find((r) => r.tournamentCategoryId === category.id)[0] ??
+      null;
+    const quality = isQualityPreset(ruleset?.preset);
+
+    if (!quality) {
+      const availability = input.availability ?? [];
+      if (availability.length === 0) {
+        throw new Error(
+          "Indicá al menos un día y franja horaria de disponibilidad",
+        );
+      }
+      for (const slot of availability) {
+        if (!slot.date || !isValidHhMm(slot.startTime) || !isValidHhMm(slot.endTime)) {
+          throw new Error("Disponibilidad inválida (día y HH:mm)");
+        }
+        if (toMinutes(slot.startTime) >= toMinutes(slot.endTime)) {
+          throw new Error("En disponibilidad, desde debe ser anterior a hasta");
+        }
+      }
+      await this.setPairAvailability(
+        availability.map((slot) => ({
+          pairId: pair.id,
+          date: slot.date,
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+          priority: null,
+        })),
+      );
+    }
+
     if (tournament) {
       ensureClientFromPlayer(this.db, tournament.clubId, p1);
       if (player2Id) {
@@ -235,6 +407,24 @@ export class TournamentEngine {
         : (input.sidePreference ?? pair.sidePreference ?? "any"),
     });
 
+    const registration = this.db.registrations.find((r) => r.pairId === pairId)[0];
+    if (registration) {
+      const nextReg = { ...registration };
+      if (input.rankingPointsPlayer1 !== undefined) {
+        nextReg.rankingPointsPlayer1 = normalizeOptionalPoints(
+          input.rankingPointsPlayer1,
+        );
+      }
+      if (input.rankingPointsPlayer2 !== undefined) {
+        nextReg.rankingPointsPlayer2 = player2Id
+          ? normalizeOptionalPoints(input.rankingPointsPlayer2)
+          : null;
+      } else if (!player2Id) {
+        nextReg.rankingPointsPlayer2 = null;
+      }
+      this.db.registrations.upsert(nextReg);
+    }
+
     const category = this.db.categories.getById(pair.tournamentCategoryId);
     const tournament = category
       ? this.db.tournaments.getById(category.tournamentId)
@@ -268,6 +458,63 @@ export class TournamentEngine {
     return buildClubClientDetail(this.db, client);
   }
 
+  async searchClubClients(
+    clubId: string,
+    query: string,
+    options?: { signal?: AbortSignal },
+  ): Promise<Client[]> {
+    await delay(350);
+    if (options?.signal?.aborted) {
+      const err = new Error("Aborted");
+      err.name = "AbortError";
+      throw err;
+    }
+    const q = query.trim().toLowerCase();
+    if (q.length < 2) return [];
+    return this.db.clients
+      .getAll()
+      .filter((c) => c.clubId === clubId)
+      .filter((c) => {
+        const hay =
+          `${c.displayName} ${c.firstName} ${c.lastName} ${c.phone ?? ""} ${c.email ?? ""}`.toLowerCase();
+        return hay.includes(q);
+      })
+      .slice(0, 12);
+  }
+
+  async createClient(input: CreateClientInput): Promise<Client> {
+    await delay();
+    const firstName = input.firstName.trim();
+    const lastName = input.lastName.trim();
+    if (!firstName || !lastName) {
+      throw new Error("Nombre y apellido son obligatorios");
+    }
+    if (input.playerId) {
+      const player = this.db.players.getById(input.playerId);
+      if (player) {
+        return ensureClientFromPlayer(this.db, input.clubId, player);
+      }
+    }
+    const now = new Date().toISOString();
+    const client: Client = {
+      id: createId("client"),
+      clubId: input.clubId,
+      playerId: input.playerId ?? null,
+      userId: input.userId ?? null,
+      firstName,
+      lastName,
+      displayName: `${firstName} ${lastName}`,
+      phone: input.phone?.trim() || null,
+      email: input.email?.trim() || null,
+      province: null,
+      city: null,
+      avatarUrl: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    return this.db.clients.upsert(client);
+  }
+
   async listTournaments(clubId?: string): Promise<Tournament[]> {
     await delay();
     const all = this.db.tournaments.getAll();
@@ -288,6 +535,7 @@ export class TournamentEngine {
       ...input,
       dailyStartTime: input.dailyStartTime || "10:00",
       dailyEndTime: input.dailyEndTime || "22:00",
+      registrationFee: Math.max(0, Number(input.registrationFee) || 0),
       id: createId("tournament"),
       createdAt: now,
       updatedAt: now,
@@ -302,9 +550,14 @@ export class TournamentEngine {
     await delay();
     const current = this.db.tournaments.getById(id);
     if (!current) throw new Error("Torneo no encontrado");
+    const nextFee =
+      patch.registrationFee !== undefined
+        ? Math.max(0, Number(patch.registrationFee) || 0)
+        : current.registrationFee;
     return this.db.tournaments.upsert({
       ...current,
       ...patch,
+      registrationFee: nextFee,
       updatedAt: new Date().toISOString(),
     });
   }
@@ -321,7 +574,7 @@ export class TournamentEngine {
 
   /**
    * Regenera grupos, partidos de grupo y bracket provisional según
-   * inscripciones confirmadas + pairsPerGroup del ruleset.
+   * inscripciones aceptadas + pairsPerGroup del ruleset.
    * Las zonas se derivan: ceil(parejas / pairsPerGroup); la última puede quedar corta.
    */
   async syncCategoryStructure(
@@ -335,7 +588,7 @@ export class TournamentEngine {
   }> {
     await delay();
     const regs = this.db.registrations.find(
-      (r) => r.tournamentCategoryId === categoryId && r.status === "CONFIRMED",
+      (r) => r.tournamentCategoryId === categoryId && r.status === "ACCEPTED",
     );
     const pairIds = new Set(regs.map((r) => r.pairId));
     const pairs = this.db.pairs.find(
@@ -355,7 +608,7 @@ export class TournamentEngine {
     if (!usable) {
       return {
         synced: false,
-        message: `Hay ${pairs.length} pareja(s) confirmada(s) completa(s). Hacen falta al menos 2 para armar zonas.`,
+        message: `Hay ${pairs.length} pareja(s) aceptada(s) completa(s). Hacen falta al menos 2 para armar zonas.`,
         groups: this.db.groups.find((g) => g.tournamentCategoryId === categoryId),
         matches: this.db.matches.find((m) => m.tournamentCategoryId === categoryId),
       };
@@ -609,20 +862,40 @@ export class TournamentEngine {
     const tournament = category
       ? this.db.tournaments.getById(category.tournamentId)
       : null;
+    const ruleset = category
+      ? this.db.rulesets.find((r) => r.tournamentCategoryId === category.id)[0]
+      : null;
+    const matchDurationMinutes = resolveMatchDurationMinutes(ruleset?.preset);
     const courts = tournament
       ? this.db.courts.find((c) => c.clubId === tournament.clubId && c.status === "active")
       : [];
-    const categoryMatches = this.db.matches.find(
-      (m) => m.tournamentCategoryId === match.tournamentCategoryId,
+    const clubCategoryIds = tournament
+      ? this.db.categories
+          .getAll()
+          .filter((c) => {
+            const t = this.db.tournaments.getById(c.tournamentId);
+            return t?.clubId === tournament.clubId;
+          })
+          .map((c) => c.id)
+      : [match.tournamentCategoryId];
+    const clubMatches = this.db.matches.find((m) =>
+      clubCategoryIds.includes(m.tournamentCategoryId),
     );
+    const reservations = tournament
+      ? this.db.courtReservations.find(
+          (r) => r.clubId === tournament.clubId && r.status !== "cancelled",
+        )
+      : [];
 
     const conflicts = findScheduleConflicts({
       matchId,
       scheduledAt: input.scheduledAt,
       courtId: input.courtId,
-      matches: categoryMatches,
+      matches: clubMatches,
       courts,
+      reservations,
       pairLabels: options?.pairLabels,
+      matchDurationMinutes,
     });
 
     if (conflicts.length > 0 && !options?.force) {
@@ -635,9 +908,9 @@ export class TournamentEngine {
       throw err;
     }
 
-    // Force con cancha: liberar esa cancha en partidos solapados (se la "quita" a los otros).
+    // Force con cancha: liberar esa cancha en partidos solapados (no toca reservas).
     if (options?.force && input.courtId && input.scheduledAt) {
-      for (const other of categoryMatches) {
+      for (const other of clubMatches) {
         if (other.id === matchId) continue;
         if (other.status === "cancelled") continue;
         if (!other.scheduledAt || other.courtId !== input.courtId) continue;
@@ -645,7 +918,7 @@ export class TournamentEngine {
           !matchesOverlap(
             input.scheduledAt,
             other.scheduledAt,
-            undefined,
+            matchDurationMinutes,
           )
         ) {
           continue;
@@ -691,7 +964,11 @@ export class TournamentEngine {
     input: Omit<TournamentCategory, "id">,
   ): Promise<TournamentCategory> {
     await delay();
-    return this.db.categories.upsert({ ...input, id: createId("cat") });
+    return this.db.categories.upsert({
+      ...input,
+      circuitType: input.circuitType ?? "NONE",
+      id: createId("cat"),
+    });
   }
 
   async listPairs(categoryId: string): Promise<TournamentPair[]> {
@@ -715,6 +992,9 @@ export class TournamentEngine {
         ...r,
         statusNote: r.statusNote ?? null,
         statusChangedAt: r.statusChangedAt ?? null,
+        rankingPointsPlayer1: r.rankingPointsPlayer1 ?? null,
+        rankingPointsPlayer2: r.rankingPointsPlayer2 ?? null,
+        tournamentPointsAwarded: r.tournamentPointsAwarded ?? null,
       }));
   }
 
@@ -857,9 +1137,11 @@ export class TournamentEngine {
       (r) => r.tournamentCategoryId === categoryId,
     );
     const regByPair = new Map(allRegs.map((r) => [r.pairId, r]));
-    const allPairs = this.db.pairs.find(
-      (p) => p.tournamentCategoryId === categoryId && p.status !== "withdrawn",
-    );
+    const allPairs = this.db.pairs.find((p) => {
+      if (p.tournamentCategoryId !== categoryId) return false;
+      if (p.status !== "withdrawn") return true;
+      return regByPair.get(p.id)?.status === "REJECTED";
+    });
 
     const hasPlayed = ctx.groupMatches.some(
       (m) =>
@@ -881,11 +1163,33 @@ export class TournamentEngine {
       const incomplete = !pair.player2Id;
       const disqualified =
         registration?.status === "DISQUALIFIED" || pair.status === "disqualified";
+      const playerNames =
+        ctx.pairPlayerNames[pair.id] ?? (["?", "?"] as [string, string]);
+      const avatarFor = (playerId: string | null): string | null => {
+        if (!playerId || !tournament) return null;
+        const client = this.db.clients
+          .find((c) => c.clubId === tournament.clubId && c.playerId === playerId)[0];
+        return client?.avatarUrl ?? null;
+      };
+      const clientIdFor = (playerId: string | null): string | null => {
+        if (!playerId || !tournament) return null;
+        const client = this.db.clients
+          .find((c) => c.clubId === tournament.clubId && c.playerId === playerId)[0];
+        return client?.id ?? null;
+      };
       return {
         pair,
         registration,
         label: ctx.pairLabels[pair.id] ?? pair.id,
-        playerNames: ctx.pairPlayerNames[pair.id] ?? (["?", "?"] as [string, string]),
+        playerNames,
+        playerAvatars: [
+          avatarFor(pair.player1Id),
+          avatarFor(pair.player2Id),
+        ] as [string | null, string | null],
+        playerClientIds: [
+          clientIdFor(pair.player1Id),
+          clientIdFor(pair.player2Id),
+        ] as [string | null, string | null],
         incomplete,
         disqualified,
       };
@@ -1009,7 +1313,7 @@ export class TournamentEngine {
     const qualifyPerGroup = ruleset?.qualifyPerGroup ?? 2;
 
     const regs = this.db.registrations.find(
-      (r) => r.tournamentCategoryId === categoryId && r.status === "CONFIRMED",
+      (r) => r.tournamentCategoryId === categoryId && r.status === "ACCEPTED",
     );
     const regPairIds = new Set(regs.map((r) => r.pairId));
     const pairs = this.db.pairs.find(
@@ -1058,7 +1362,7 @@ export class TournamentEngine {
     const packingOk = groupsRespectPairsPerGroup(groups, pairsPerGroup);
     let structureNotice: string | null = null;
     if (unassignedPairs.length > 0) {
-      structureNotice = `${unassignedPairs.length} pareja(s) confirmada(s) aún no están en el cuadro de zonas.`;
+      structureNotice = `${unassignedPairs.length} pareja(s) aceptada(s) aún no están en el cuadro de zonas.`;
     } else if (!packingOk && groups.length > 0) {
       structureNotice = `Las zonas no respetan el cupo de ${pairsPerGroup} parejas/zona. Al sincronizar se rearmarán conservando VS ya jugados.`;
     } else if (incompleteCount > 0) {
@@ -1081,7 +1385,683 @@ export class TournamentEngine {
 
   async listCourts(clubId: string): Promise<Court[]> {
     await delay();
-    return this.db.courts.find((c) => c.clubId === clubId);
+    return this.db.courts
+      .find((c) => c.clubId === clubId)
+      .map((court) => ({
+        ...court,
+        imageUrl: court.imageUrl ?? pickRandomCourtImagePath(),
+      }));
+  }
+
+  async createCourt(input: CreateCourtInput): Promise<Court> {
+    await delay();
+    const club = this.db.clubs.getById(input.clubId);
+    if (!club) throw new Error("Club no encontrado");
+    const name = input.name.trim();
+    if (!name) throw new Error("Ingresá el nombre de la cancha");
+
+    const slotDurationMinutes =
+      input.slotDurationMinutes === 120 ? 120 : 90;
+    const basePrice =
+      typeof input.basePrice === "number" && Number.isFinite(input.basePrice)
+        ? Math.max(0, input.basePrice)
+        : 12000;
+
+    const court: Court = {
+      id: createId("court"),
+      clubId: input.clubId,
+      name,
+      status: "active",
+      imageUrl: input.imageUrl ?? pickRandomCourtImagePath(),
+      slotDurationMinutes,
+      basePrice,
+      openTime: input.openTime ?? null,
+      closeTime: input.closeTime ?? null,
+    };
+    return this.db.courts.upsert(court);
+  }
+
+  async updateCourt(
+    id: string,
+    patch: Partial<
+      Pick<
+        Court,
+        | "name"
+        | "status"
+        | "imageUrl"
+        | "slotDurationMinutes"
+        | "basePrice"
+        | "openTime"
+        | "closeTime"
+      >
+    >,
+  ): Promise<Court> {
+    await delay();
+    const current = this.db.courts.getById(id);
+    if (!current) throw new Error("Cancha no encontrada");
+
+    const openTime =
+      patch.openTime !== undefined ? patch.openTime : current.openTime;
+    const closeTime =
+      patch.closeTime !== undefined ? patch.closeTime : current.closeTime;
+    if (openTime != null || closeTime != null) {
+      if (
+        openTime == null ||
+        closeTime == null ||
+        !isValidHhMm(openTime) ||
+        !isValidHhMm(closeTime)
+      ) {
+        throw new Error("Horario de cancha inválido (usá HH:mm en ambos)");
+      }
+      if (isZeroLengthHours(openTime, closeTime)) {
+        throw new Error("La apertura y el cierre no pueden ser la misma hora");
+      }
+    }
+
+    return this.db.courts.upsert({ ...current, ...patch });
+  }
+
+  async listCourtPriceRules(courtId: string): Promise<CourtPriceRule[]> {
+    await delay();
+    return this.db.courtPriceRules
+      .find((r) => r.courtId === courtId)
+      .sort(
+        (a, b) =>
+          a.startTime.localeCompare(b.startTime) ||
+          a.endTime.localeCompare(b.endTime),
+      );
+  }
+
+  async upsertCourtPriceRule(
+    rule: Omit<CourtPriceRule, "id"> & { id?: string },
+  ): Promise<CourtPriceRule> {
+    await delay();
+    const court = this.db.courts.getById(rule.courtId);
+    if (!court) throw new Error("Cancha no encontrada");
+
+    const next: CourtPriceRule = {
+      id: rule.id ?? createId("cpr"),
+      courtId: rule.courtId,
+      startTime: rule.startTime,
+      endTime: rule.endTime,
+      daysOfWeek: [...rule.daysOfWeek],
+      price: rule.price,
+      label: rule.label ?? null,
+    };
+
+    const siblings = this.db.courtPriceRules
+      .find((r) => r.courtId === rule.courtId && r.id !== next.id)
+      .map((r) => ({
+        startTime: r.startTime,
+        endTime: r.endTime,
+        daysOfWeek: r.daysOfWeek,
+        price: r.price,
+      }));
+    const overlapError = validateCourtPriceRules([
+      ...siblings,
+      {
+        startTime: next.startTime,
+        endTime: next.endTime,
+        daysOfWeek: next.daysOfWeek,
+        price: next.price,
+      },
+    ]);
+    if (overlapError) throw new Error(overlapError);
+
+    return this.db.courtPriceRules.upsert(next);
+  }
+
+  async deleteCourtPriceRule(id: string): Promise<boolean> {
+    await delay();
+    return this.db.courtPriceRules.remove(id);
+  }
+
+  async listCourtReservations(
+    clubId: string,
+    options?: { from?: string; to?: string; courtId?: string },
+  ): Promise<CourtReservation[]> {
+    await delay();
+    const fromMs = options?.from ? new Date(options.from).getTime() : null;
+    const toMs = options?.to ? new Date(options.to).getTime() : null;
+    return this.db.courtReservations
+      .getAll()
+      .filter((r) => r.clubId === clubId)
+      .filter((r) => (options?.courtId ? r.courtId === options.courtId : true))
+      .filter((r) => {
+        if (fromMs == null && toMs == null) return true;
+        const start = new Date(r.startsAt).getTime();
+        const end = new Date(r.endsAt).getTime();
+        if (Number.isNaN(start) || Number.isNaN(end)) return false;
+        if (fromMs != null && end <= fromMs) return false;
+        if (toMs != null && start >= toMs) return false;
+        return true;
+      })
+      .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+  }
+
+  async quoteCourtSlot(courtId: string, startsAt: string): Promise<CourtSlotQuote> {
+    await delay();
+    const court = this.db.courts.getById(courtId);
+    if (!court) throw new Error("Cancha no encontrada");
+    const club = this.db.clubs.getById(court.clubId);
+    if (!club) throw new Error("Club no encontrado");
+    const rules = this.db.courtPriceRules.find((r) => r.courtId === courtId);
+    const quoted = resolvePriceForSlot(court, rules, startsAt);
+    const endsAt = new Date(
+      new Date(startsAt).getTime() + court.slotDurationMinutes * 60_000,
+    ).toISOString();
+    return { price: quoted.price, label: quoted.label, endsAt };
+  }
+
+  /**
+   * Turnos fijos del día (apertura→cierre / duración de cancha),
+   * excluyendo los ya ocupados por reserva o partido de torneo.
+   */
+  async listAvailableCourtSlots(
+    courtId: string,
+    dateIso: string,
+    options?: { ignoreReservationId?: string },
+  ): Promise<CourtAvailableSlot[]> {
+    await delay();
+    const court = this.db.courts.getById(courtId);
+    if (!court) throw new Error("Cancha no encontrada");
+    const club = this.db.clubs.getById(court.clubId);
+    if (!club) throw new Error("Club no encontrado");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateIso)) {
+      throw new Error("Fecha inválida");
+    }
+    if (!isClubOpenOnDate(club, dateIso)) return [];
+
+    const hours = resolveCourtHours(court, club);
+    const slots = generateDaySlots(
+      dateIso,
+      hours.openTime,
+      hours.closeTime,
+      court.slotDurationMinutes,
+    );
+
+    return slots
+      .filter(
+        (slot) =>
+          !this.isCourtSlotOccupied(
+            court.clubId,
+            court.id,
+            slot.startsAt,
+            slot.endsAt,
+            options?.ignoreReservationId,
+          ),
+      )
+      .map((slot) => ({
+        startsAt: slot.startsAt,
+        endsAt: slot.endsAt,
+        label: `${formatLocalHm(slot.startsAt)} – ${formatLocalHm(slot.endsAt)}`,
+      }));
+  }
+
+  async createCourtReservation(
+    input: CreateCourtReservationInput,
+  ): Promise<CourtReservation> {
+    await delay();
+    const court = this.db.courts.getById(input.courtId);
+    if (!court || court.clubId !== input.clubId) {
+      throw new Error("Cancha no encontrada");
+    }
+    const club = this.db.clubs.getById(input.clubId);
+    if (!club) throw new Error("Club no encontrado");
+    const reservationDate = localDateIsoFromInstant(input.startsAt);
+    if (!reservationDate || !isClubOpenOnDate(club, reservationDate)) {
+      throw new Error("El club no abre ese día");
+    }
+    const client = this.db.clients.getById(input.clientId);
+    if (!client || client.clubId !== input.clubId) {
+      throw new Error("Cliente no encontrado");
+    }
+    const rules = this.db.courtPriceRules.find((r) => r.courtId === input.courtId);
+    const quoted = resolvePriceForSlot(court, rules, input.startsAt);
+    const endsAt =
+      input.endsAt ??
+      new Date(
+        new Date(input.startsAt).getTime() + court.slotDurationMinutes * 60_000,
+      ).toISOString();
+    this.assertCourtSlotFree(input.clubId, input.courtId, input.startsAt, endsAt);
+
+    const reservation: CourtReservation = {
+      id: createId("reservation"),
+      clubId: input.clubId,
+      clientId: input.clientId,
+      courtId: input.courtId,
+      startsAt: input.startsAt,
+      endsAt,
+      status: "booked",
+      price: input.price ?? quoted.price,
+      createdAt: new Date().toISOString(),
+    };
+    return this.db.courtReservations.upsert(reservation);
+  }
+
+  async updateCourtReservation(
+    id: string,
+    patch: UpdateCourtReservationInput,
+  ): Promise<CourtReservation> {
+    await delay();
+    const current = this.db.courtReservations.getById(id);
+    if (!current) throw new Error("Reserva no encontrada");
+
+    const courtId = patch.courtId === undefined ? current.courtId : patch.courtId;
+    const startsAt = patch.startsAt ?? current.startsAt;
+    let endsAt = patch.endsAt ?? current.endsAt;
+    if (patch.startsAt && courtId && !patch.endsAt) {
+      const court = this.db.courts.getById(courtId);
+      if (court) {
+        endsAt = new Date(
+          new Date(patch.startsAt).getTime() + court.slotDurationMinutes * 60_000,
+        ).toISOString();
+      }
+    }
+
+    if (courtId && (patch.startsAt || patch.endsAt || patch.courtId !== undefined)) {
+      this.assertCourtSlotFree(
+        current.clubId,
+        courtId,
+        startsAt,
+        endsAt,
+        current.id,
+      );
+    }
+
+    if (patch.clientId) {
+      const client = this.db.clients.getById(patch.clientId);
+      if (!client || client.clubId !== current.clubId) {
+        throw new Error("Cliente no encontrado");
+      }
+    }
+
+    return this.db.courtReservations.upsert({
+      ...current,
+      ...patch,
+      courtId,
+      startsAt,
+      endsAt,
+    });
+  }
+
+  async cancelCourtReservation(id: string): Promise<CourtReservation> {
+    return this.updateCourtReservation(id, { status: "cancelled" });
+  }
+
+  async getCourtAgendaBoard(
+    clubId: string,
+    courtId: string,
+    options: { from: string; to: string; summaryDate: string },
+  ): Promise<CourtAgendaBoardView> {
+    await delay();
+    const club = this.db.clubs.getById(clubId);
+    if (!club) throw new Error("Club no encontrado");
+    const court = this.db.courts.getById(courtId);
+    if (!court || court.clubId !== clubId) throw new Error("Cancha no encontrada");
+
+    const courts = this.db.courts
+      .find((c) => c.clubId === clubId)
+      .map((c) => ({
+        ...c,
+        imageUrl: c.imageUrl ?? pickRandomCourtImagePath(),
+      }));
+    const selectedCourt =
+      courts.find((c) => c.id === courtId) ?? {
+        ...court,
+        imageUrl: court.imageUrl ?? pickRandomCourtImagePath(),
+      };
+
+    const priceRules = this.db.courtPriceRules
+      .find((r) => r.courtId === courtId)
+      .sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+    const events = this.buildCourtAgendaEvents(
+      clubId,
+      courtId,
+      options.from,
+      options.to,
+    );
+    const daySummary = this.buildCourtDaySummary(
+      club,
+      selectedCourt,
+      priceRules,
+      options.summaryDate,
+    );
+
+    return {
+      clubId,
+      courtId,
+      generatedAt: new Date().toISOString(),
+      club,
+      court: selectedCourt,
+      courts,
+      priceRules,
+      daySummary,
+      events,
+      notice: null,
+    };
+  }
+
+  private isCourtSlotOccupied(
+    clubId: string,
+    courtId: string,
+    startsAt: string,
+    endsAt: string,
+    ignoreReservationId?: string,
+  ): boolean {
+    const overlappingReservation = this.db.courtReservations.getAll().find((r) => {
+      if (r.clubId !== clubId || r.courtId !== courtId) return false;
+      if (r.status === "cancelled") return false;
+      if (ignoreReservationId && r.id === ignoreReservationId) return false;
+      return intervalsOverlap(r.startsAt, r.endsAt, startsAt, endsAt);
+    });
+    if (overlappingReservation) return true;
+
+    const overlappingMatch = this.db.matches.getAll().find((m) => {
+      if (m.courtId !== courtId || !m.scheduledAt) return false;
+      if (m.status === "cancelled") return false;
+      const ruleset = this.db.rulesets.find(
+        (r) => r.tournamentCategoryId === m.tournamentCategoryId,
+      )[0];
+      const durationMs =
+        resolveMatchDurationMinutes(ruleset?.preset) * 60_000;
+      const matchEnd = new Date(
+        new Date(m.scheduledAt).getTime() + durationMs,
+      ).toISOString();
+      return intervalsOverlap(m.scheduledAt, matchEnd, startsAt, endsAt);
+    });
+    return Boolean(overlappingMatch);
+  }
+
+  private assertCourtSlotFree(
+    clubId: string,
+    courtId: string,
+    startsAt: string,
+    endsAt: string,
+    ignoreReservationId?: string,
+  ): void {
+    if (
+      this.isCourtSlotOccupied(
+        clubId,
+        courtId,
+        startsAt,
+        endsAt,
+        ignoreReservationId,
+      )
+    ) {
+      const reservationBusy = this.db.courtReservations.getAll().some((r) => {
+        if (r.clubId !== clubId || r.courtId !== courtId) return false;
+        if (r.status === "cancelled") return false;
+        if (ignoreReservationId && r.id === ignoreReservationId) return false;
+        return intervalsOverlap(r.startsAt, r.endsAt, startsAt, endsAt);
+      });
+      throw new Error(
+        reservationBusy
+          ? "Ese horario ya está reservado en la cancha"
+          : "Hay un partido de torneo en ese horario",
+      );
+    }
+  }
+
+  private buildCourtDaySummary(
+    club: Club,
+    court: Court,
+    priceRules: CourtPriceRule[],
+    summaryDate: string,
+  ): CourtDaySummary {
+    const hours = resolveCourtHours(court, club);
+    const priceBands = buildDayPriceBands(
+      court,
+      priceRules,
+      summaryDate,
+      hours.openTime,
+      hours.closeTime,
+    );
+    const liveStatus = this.resolveCourtLiveStatus(club, court);
+
+    if (!isClubOpenOnDate(club, summaryDate)) {
+      return {
+        date: summaryDate,
+        totalSlots: 0,
+        occupiedSlots: 0,
+        freeSlots: 0,
+        nextFreeAt: null,
+        minPrice: null,
+        message: "Club cerrado este día",
+        priceBands,
+        availableSlots: [],
+        liveStatus,
+      };
+    }
+
+    const slots = generateDaySlots(
+      summaryDate,
+      hours.openTime,
+      hours.closeTime,
+      court.slotDurationMinutes,
+    );
+
+    const reservations = this.db.courtReservations
+      .getAll()
+      .filter(
+        (r) =>
+          r.courtId === court.id &&
+          r.status !== "cancelled" &&
+          intervalsOverlap(
+            r.startsAt,
+            r.endsAt,
+            `${summaryDate}T00:00:00`,
+            `${summaryDate}T23:59:59.999`,
+          ),
+      );
+
+    const matches = this.db.matches.getAll().filter((m) => {
+      if (m.courtId !== court.id || !m.scheduledAt || m.status === "cancelled") {
+        return false;
+      }
+      const ruleset = this.db.rulesets.find(
+        (r) => r.tournamentCategoryId === m.tournamentCategoryId,
+      )[0];
+      const durationMs =
+        resolveMatchDurationMinutes(ruleset?.preset) * 60_000;
+      const matchEnd = new Date(
+        new Date(m.scheduledAt).getTime() + durationMs,
+      ).toISOString();
+      return intervalsOverlap(
+        m.scheduledAt,
+        matchEnd,
+        `${summaryDate}T00:00:00`,
+        `${summaryDate}T23:59:59.999`,
+      );
+    });
+
+    let occupiedSlots = 0;
+    let nextFreeAt: string | null = null;
+    const prices: number[] = [];
+    const availableSlots: CourtAvailableSlot[] = [];
+
+    for (const slot of slots) {
+      const busy =
+        reservations.some((r) =>
+          intervalsOverlap(r.startsAt, r.endsAt, slot.startsAt, slot.endsAt),
+        ) ||
+        matches.some((m) => {
+          const ruleset = this.db.rulesets.find(
+            (r) => r.tournamentCategoryId === m.tournamentCategoryId,
+          )[0];
+          const durationMs =
+            resolveMatchDurationMinutes(ruleset?.preset) * 60_000;
+          const matchEnd = new Date(
+            new Date(m.scheduledAt!).getTime() + durationMs,
+          ).toISOString();
+          return intervalsOverlap(
+            m.scheduledAt!,
+            matchEnd,
+            slot.startsAt,
+            slot.endsAt,
+          );
+        });
+      if (busy) {
+        occupiedSlots += 1;
+        continue;
+      }
+      if (!nextFreeAt) nextFreeAt = slot.startsAt;
+      const quoted = resolvePriceForSlot(court, priceRules, slot.startsAt);
+      prices.push(quoted.price);
+      availableSlots.push({
+        startsAt: slot.startsAt,
+        endsAt: slot.endsAt,
+        label: `${formatLocalHm(slot.startsAt)} – ${formatLocalHm(slot.endsAt)}`,
+      });
+    }
+
+    const freeSlots = Math.max(0, slots.length - occupiedSlots);
+    const minPrice = prices.length ? Math.min(...prices) : null;
+    const message =
+      freeSlots === 0
+        ? "Sin turnos libres hoy"
+        : freeSlots === slots.length
+          ? "Cancha libre todo el día"
+          : `${freeSlots} turno${freeSlots === 1 ? "" : "s"} libre${freeSlots === 1 ? "" : "s"}`;
+
+    return {
+      date: summaryDate,
+      totalSlots: slots.length,
+      occupiedSlots,
+      freeSlots,
+      nextFreeAt,
+      minPrice,
+      message,
+      priceBands,
+      availableSlots,
+      liveStatus,
+    };
+  }
+
+  private resolveCourtLiveStatus(club: Club, court: Court): CourtLiveStatus {
+    const now = new Date();
+    if (!isCourtOpenAt(club, court, now)) return "closed";
+    const nowIso = now.toISOString();
+    const probeEnd = new Date(now.getTime() + 60_000).toISOString();
+    if (this.isCourtSlotOccupied(club.id, court.id, nowIso, probeEnd)) {
+      return "occupied";
+    }
+    return "available";
+  }
+
+  private buildCourtAgendaEvents(
+    clubId: string,
+    courtId: string,
+    from: string,
+    to: string,
+  ): CourtAgendaEvent[] {
+    const events: CourtAgendaEvent[] = [];
+    const clientsById = new Map(
+      this.db.clients.getAll().map((c) => [c.id, c] as const),
+    );
+    const priceRules = this.db.courtPriceRules.find((r) => r.courtId === courtId);
+    const court = this.db.courts.getById(courtId);
+
+    for (const reservation of this.db.courtReservations.getAll()) {
+      if (reservation.clubId !== clubId || reservation.courtId !== courtId) continue;
+      if (
+        !intervalsOverlap(reservation.startsAt, reservation.endsAt, from, to)
+      ) {
+        continue;
+      }
+      const client = clientsById.get(reservation.clientId);
+      const quoted =
+        court != null
+          ? resolvePriceForSlot(court, priceRules, reservation.startsAt)
+          : { price: reservation.price ?? 0, label: null as string | null };
+      events.push({
+        id: `res-${reservation.id}`,
+        kind: "reservation",
+        title: client?.displayName ?? "Reserva",
+        subtitle: quoted.label ?? "Reserva de cancha",
+        startAt: reservation.startsAt,
+        endAt: reservation.endsAt,
+        allDay: false,
+        status: reservation.status,
+        courtId,
+        reservationId: reservation.id,
+        matchId: null,
+        clientId: reservation.clientId,
+        price: reservation.price,
+        priceLabel: quoted.label,
+      });
+    }
+
+    const playersById = new Map(
+      this.db.players.getAll().map((p) => [p.id, p] as const),
+    );
+    const pairLabel = (pairId: string | null): string => {
+      if (!pairId) return "Pareja";
+      const pair = this.db.pairs.getById(pairId);
+      if (!pair) return "Pareja";
+      const p1 = playersById.get(pair.player1Id)?.displayName ?? "?";
+      const p2 = pair.player2Id
+        ? (playersById.get(pair.player2Id)?.displayName ?? "?")
+        : "busca pareja";
+      return `${p1} / ${p2}`;
+    };
+
+    const categoriesById = new Map(
+      this.db.categories.getAll().map((c) => [c.id, c] as const),
+    );
+    const tournamentsById = new Map(
+      this.db.tournaments.getAll().map((t) => [t.id, t] as const),
+    );
+    const rulesetsByCategory = new Map(
+      this.db.rulesets.getAll().map((r) => [r.tournamentCategoryId, r] as const),
+    );
+
+    for (const match of this.db.matches.getAll()) {
+      if (match.courtId !== courtId || !match.scheduledAt) continue;
+      if (match.status === "cancelled") continue;
+      const ruleset = rulesetsByCategory.get(match.tournamentCategoryId);
+      const matchDurationMs =
+        resolveMatchDurationMinutes(ruleset?.preset) * 60_000;
+      const matchEnd = new Date(
+        new Date(match.scheduledAt).getTime() + matchDurationMs,
+      ).toISOString();
+      if (!intervalsOverlap(match.scheduledAt, matchEnd, from, to)) continue;
+
+      const category = categoriesById.get(match.tournamentCategoryId);
+      const tournament = category
+        ? tournamentsById.get(category.tournamentId)
+        : null;
+      if (tournament && tournament.clubId !== clubId) continue;
+
+      const status =
+        match.status === "finished" || match.status === "walkover"
+          ? ("finished" as const)
+          : match.status === "inProgress"
+            ? ("inProgress" as const)
+            : ("scheduled" as const);
+
+      events.push({
+        id: `match-${match.id}`,
+        kind: "tournament_match",
+        title: `${pairLabel(match.pairAId)} vs ${pairLabel(match.pairBId)}`,
+        subtitle: tournament
+          ? `${tournament.name}${category ? ` · ${category.name}` : ""}`
+          : "Partido de torneo",
+        startAt: match.scheduledAt,
+        endAt: matchEnd,
+        allDay: false,
+        status,
+        courtId,
+        reservationId: null,
+        matchId: match.id,
+        clientId: null,
+        price: null,
+        priceLabel: null,
+      });
+    }
+
+    return events.sort((a, b) => a.startAt.localeCompare(b.startAt));
   }
 
   async listPairAvailability(pairId: string): Promise<PairAvailability[]> {
@@ -1108,8 +2088,20 @@ export class TournamentEngine {
     zoneAnchors?: Record<string, number>,
   ): Promise<{ groups: TournamentGroup[]; validation: ReturnType<typeof validateGroupConfig> }> {
     await delay();
+    const acceptedPairIds = new Set(
+      this.db.registrations
+        .find(
+          (r) =>
+            r.tournamentCategoryId === categoryId && r.status === "ACCEPTED",
+        )
+        .map((r) => r.pairId),
+    );
     const pairs = this.db.pairs.find(
-      (p) => p.tournamentCategoryId === categoryId && p.status === "active",
+      (p) =>
+        p.tournamentCategoryId === categoryId &&
+        p.status === "active" &&
+        acceptedPairIds.has(p.id) &&
+        Boolean(p.player1Id && p.player2Id),
     );
     const validation = validateGroupConfig(pairs.length, config);
     if (!validation.ok) {
@@ -1327,6 +2319,66 @@ export class TournamentEngine {
     return updatedReg;
   }
 
+  /** Acepta una inscripción pendiente: habilita la pareja para zonas y partidos. */
+  async acceptRegistration(
+    registrationId: string,
+  ): Promise<TournamentRegistration> {
+    await delay();
+    const registration = this.db.registrations.getById(registrationId);
+    if (!registration) throw new Error("Inscripción no encontrada");
+    if (registration.status === "ACCEPTED") {
+      return registration;
+    }
+    if (registration.status !== "PENDING" && registration.status !== "WAITLIST") {
+      throw new Error("Solo se pueden aceptar inscripciones pendientes");
+    }
+
+    const pair = this.db.pairs.getById(registration.pairId);
+    if (!pair) throw new Error("Pareja no encontrada");
+    if (pair.status === "withdrawn" || pair.status === "disqualified") {
+      throw new Error("La pareja no está activa");
+    }
+
+    const now = new Date().toISOString();
+    return this.db.registrations.upsert({
+      ...registration,
+      status: "ACCEPTED",
+      statusNote: null,
+      statusChangedAt: now,
+    });
+  }
+
+  /** Rechaza una inscripción pendiente. La pareja no entra a zonas ni partidos. */
+  async rejectRegistration(
+    registrationId: string,
+    note?: string | null,
+  ): Promise<TournamentRegistration> {
+    await delay();
+    const registration = this.db.registrations.getById(registrationId);
+    if (!registration) throw new Error("Inscripción no encontrada");
+    if (registration.status === "REJECTED") {
+      return registration;
+    }
+    if (registration.status !== "PENDING" && registration.status !== "WAITLIST") {
+      throw new Error("Solo se pueden rechazar inscripciones pendientes");
+    }
+
+    const pair = this.db.pairs.getById(registration.pairId);
+    if (!pair) throw new Error("Pareja no encontrada");
+
+    const trimmed = note?.trim() || "Inscripción rechazada";
+    const now = new Date().toISOString();
+    const updatedReg = this.db.registrations.upsert({
+      ...registration,
+      status: "REJECTED",
+      statusNote: trimmed,
+      statusChangedAt: now,
+    });
+    this.db.pairs.upsert({ ...pair, status: "withdrawn" });
+
+    return updatedReg;
+  }
+
   /**
    * Baja la inscripción (no es desclasificación): deja nota, retira la pareja
    * y cancela partidos pendientes donde participaba.
@@ -1435,44 +2487,106 @@ export class TournamentEngine {
     const tournament = category
       ? this.db.tournaments.getById(category.tournamentId)
       : null;
+    const ruleset =
+      this.db.rulesets.find((r) => r.tournamentCategoryId === categoryId)[0] ??
+      null;
+    const quality = isQualityPreset(ruleset?.preset);
+    const durationMinutes = resolveMatchDurationMinutes(ruleset?.preset);
     const courts = tournament
       ? this.db.courts.find((c) => c.clubId === tournament.clubId && c.status === "active")
       : [];
 
     let scheduledCount = 0;
     let suboptimalCount = 0;
-    const occupied: { courtId: string; start: number; end: number; date: string }[] = [];
+    const occupied: { courtId: string; start: number; end: number; date: string }[] =
+      [];
+
+    // Sembrar ocupación con partidos ya agendados + reservas del club.
+    if (tournament) {
+      const clubCategoryIds = this.db.categories
+        .getAll()
+        .filter((c) => {
+          const t = this.db.tournaments.getById(c.tournamentId);
+          return t?.clubId === tournament.clubId;
+        })
+        .map((c) => c.id);
+      for (const m of this.db.matches.getAll()) {
+        if (!clubCategoryIds.includes(m.tournamentCategoryId)) continue;
+        if (!m.scheduledAt || !m.courtId || m.status === "cancelled") continue;
+        const mRuleset = this.db.rulesets.find(
+          (r) => r.tournamentCategoryId === m.tournamentCategoryId,
+        )[0];
+        const dur = resolveMatchDurationMinutes(mRuleset?.preset);
+        const start = new Date(m.scheduledAt);
+        if (Number.isNaN(start.getTime())) continue;
+        const date = m.scheduledAt.slice(0, 10);
+        const startMin = start.getUTCHours() * 60 + start.getUTCMinutes();
+        occupied.push({
+          courtId: m.courtId,
+          date,
+          start: startMin,
+          end: startMin + dur,
+        });
+      }
+      for (const r of this.db.courtReservations.getAll()) {
+        if (r.clubId !== tournament.clubId || r.status === "cancelled") continue;
+        if (!r.courtId) continue;
+        const start = new Date(r.startsAt);
+        const end = new Date(r.endsAt);
+        if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) continue;
+        occupied.push({
+          courtId: r.courtId,
+          date: r.startsAt.slice(0, 10),
+          start: start.getUTCHours() * 60 + start.getUTCMinutes(),
+          end: end.getUTCHours() * 60 + end.getUTCMinutes(),
+        });
+      }
+    }
+
+    const tournamentDays =
+      tournament != null
+        ? buildTournamentDayWindows({
+            startDate: tournament.startDate,
+            endDate: tournament.endDate,
+            dailyStartTime: tournament.dailyStartTime,
+            dailyEndTime: tournament.dailyEndTime,
+          })
+        : [];
 
     for (const match of matches) {
-      const pairAWindows: AvailabilityWindow[] = this.db.pairAvailability
-        .find((a) => a.pairId === match.pairAId)
-        .map((a) => ({
-          date: a.date,
-          startTime: a.startTime,
-          endTime: a.endTime,
-          pairId: a.pairId,
-        }));
-      const pairBWindows: AvailabilityWindow[] = this.db.pairAvailability
-        .find((a) => a.pairId === match.pairBId)
-        .map((a) => ({
-          date: a.date,
-          startTime: a.startTime,
-          endTime: a.endTime,
-          pairId: a.pairId,
-        }));
-      const pairOverlap = intersectWindows(pairAWindows, pairBWindows);
-      const tournamentWindow: AvailabilityWindow[] =
-        tournament != null
-          ? pairOverlap.map((w) => ({
-              ...w,
-              startTime:
-                w.startTime < tournament.dailyStartTime
-                  ? tournament.dailyStartTime
-                  : w.startTime,
-              endTime:
-                w.endTime > tournament.dailyEndTime ? tournament.dailyEndTime : w.endTime,
-            }))
-          : pairOverlap;
+      let candidateWindows: AvailabilityWindow[] = [];
+
+      if (quality || !tournament) {
+        // Quality: se acomoda desde el horario de comienzo del torneo (días del evento).
+        candidateWindows = tournamentDays;
+      } else {
+        const pairAWindows: AvailabilityWindow[] = this.db.pairAvailability
+          .find((a) => a.pairId === match.pairAId)
+          .map((a) => ({
+            date: a.date,
+            startTime: a.startTime,
+            endTime: a.endTime,
+            pairId: a.pairId,
+          }));
+        const pairBWindows: AvailabilityWindow[] = this.db.pairAvailability
+          .find((a) => a.pairId === match.pairBId)
+          .map((a) => ({
+            date: a.date,
+            startTime: a.startTime,
+            endTime: a.endTime,
+            pairId: a.pairId,
+          }));
+        const pairOverlap = intersectWindows(
+          pairAWindows,
+          pairBWindows,
+          durationMinutes,
+        );
+        candidateWindows = intersectWindows(
+          pairOverlap,
+          tournamentDays,
+          durationMinutes,
+        );
+      }
 
       let best: {
         score: number;
@@ -1482,7 +2596,7 @@ export class TournamentEngine {
       } | null = null;
 
       for (const court of courts) {
-        const courtWindows: AvailabilityWindow[] = this.db.courtAvailability
+        const courtWindowsRaw: AvailabilityWindow[] = this.db.courtAvailability
           .find((a) => a.courtId === court.id)
           .map((a) => ({
             date: a.date,
@@ -1490,26 +2604,62 @@ export class TournamentEngine {
             endTime: a.endTime,
             courtId: court.id,
           }));
-        const slots = intersectWindows(tournamentWindow, courtWindows);
+        // Si no hay courtAvailability seed, la cancha está libre en los días del torneo.
+        const courtWindows =
+          courtWindowsRaw.length > 0
+            ? courtWindowsRaw
+            : candidateWindows.map((w) => ({ ...w, courtId: court.id }));
+        const slots = intersectWindows(
+          candidateWindows,
+          courtWindows,
+          durationMinutes,
+        );
         for (const slot of slots) {
           const startMin =
-            Number(slot.startTime.slice(0, 2)) * 60 + Number(slot.startTime.slice(3, 5));
-          const endMin = startMin + 90;
+            Number(slot.startTime.slice(0, 2)) * 60 +
+            Number(slot.startTime.slice(3, 5));
+          // Quality: preferir arrancar en dailyStartTime.
+          const preferredStart = quality
+            ? toMinutes(tournament?.dailyStartTime ?? slot.startTime)
+            : startMin;
+          const tryStart = quality
+            ? Math.max(startMin, preferredStart)
+            : startMin;
+          const slotEndMin =
+            Number(slot.endTime.slice(0, 2)) * 60 +
+            Number(slot.endTime.slice(3, 5));
+          if (tryStart + durationMinutes > slotEndMin) continue;
+
           const conflict = occupied.some(
             (o) =>
               o.courtId === court.id &&
               o.date === slot.date &&
-              !(endMin <= o.start || startMin >= o.end),
+              !(tryStart + durationMinutes <= o.start || tryStart >= o.end),
           );
           if (conflict) continue;
+
+          const startsAtIso = `${slot.date}T${String(Math.floor(tryStart / 60)).padStart(2, "0")}:${String(tryStart % 60).padStart(2, "0")}:00.000Z`;
+          const endsAtIso = new Date(
+            new Date(startsAtIso).getTime() + durationMinutes * 60_000,
+          ).toISOString();
+          const reservationHit = this.db.courtReservations.getAll().some(
+            (r) =>
+              r.clubId === tournament?.clubId &&
+              r.courtId === court.id &&
+              r.status !== "cancelled" &&
+              slotOverlapsReservation(startsAtIso, endsAtIso, r),
+          );
+          if (reservationHit) continue;
+
           let score = 80;
-          if (startMin >= 18 * 60) score += 15;
-          if (startMin < 12 * 60) score -= 10;
+          if (quality && tryStart === preferredStart) score += 20;
+          if (tryStart >= 18 * 60) score += 15;
+          if (tryStart < 12 * 60) score -= 10;
           if (!best || score > best.score) {
             best = {
               score,
               date: slot.date,
-              startTime: slot.startTime,
+              startTime: `${String(Math.floor(tryStart / 60)).padStart(2, "0")}:${String(tryStart % 60).padStart(2, "0")}`,
               courtId: court.id,
             };
           }
@@ -1518,12 +2668,13 @@ export class TournamentEngine {
 
       if (best) {
         const startMin =
-          Number(best.startTime.slice(0, 2)) * 60 + Number(best.startTime.slice(3, 5));
+          Number(best.startTime.slice(0, 2)) * 60 +
+          Number(best.startTime.slice(3, 5));
         occupied.push({
           courtId: best.courtId,
           date: best.date,
           start: startMin,
-          end: startMin + 90,
+          end: startMin + durationMinutes,
         });
         this.db.matches.upsert({
           ...match,
@@ -1563,7 +2714,7 @@ export class TournamentEngine {
       .slice(0, 8);
     const registrations = this.db.registrations
       .getAll()
-      .filter((r) => categoryIds.includes(r.tournamentCategoryId) && r.status === "CONFIRMED");
+      .filter((r) => categoryIds.includes(r.tournamentCategoryId) && r.status === "ACCEPTED");
     const courts = this.db.courts.find((c) => c.clubId === clubId);
     const live = matches.filter((m) => m.status === "inProgress").length;
     return {
@@ -1602,4 +2753,56 @@ export class TournamentEngine {
     const recent = matches.filter((m) => m.status === "finished").slice(-5).reverse();
     return { pairs, nextMatch: next, recentMatches: recent };
   }
+}
+
+function normalizeOptionalPoints(value: number | null | undefined): number | null {
+  if (value == null || Number.isNaN(Number(value))) return null;
+  return Math.max(0, Math.round(Number(value)));
+}
+
+function formatLocalHm(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "--:--";
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+function buildDayPriceBands(
+  court: Court,
+  priceRules: CourtPriceRule[],
+  dateIso: string,
+  openTime: string,
+  closeTime: string,
+): CourtDayPriceBand[] {
+  const weekday = weekdayIsoFromDateIso(dateIso);
+  const dayRules = priceRules
+    .filter((rule) => rule.daysOfWeek.includes(weekday))
+    .slice()
+    .sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+  if (dayRules.length === 0) {
+    return [
+      {
+        startTime: openTime,
+        endTime: closeTime,
+        price: court.basePrice,
+        label: "Base",
+      },
+    ];
+  }
+
+  return dayRules.map((rule) => ({
+    startTime: rule.startTime,
+    endTime: rule.endTime,
+    price: rule.price,
+    label: rule.label,
+  }));
+}
+
+function isValidHhMm(value: string): boolean {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(value.trim());
+}
+
+function toMinutes(hm: string): number {
+  const [h, m] = hm.split(":").map((part) => Number(part));
+  return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
 }

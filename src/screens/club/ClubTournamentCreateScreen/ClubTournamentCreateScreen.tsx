@@ -27,6 +27,7 @@ export default function ClubTournamentCreateScreen() {
         dailyEndTime: values.dailyEndTime,
         status: "registrationOpen",
         format: values.format,
+        registrationFee: values.registrationFee,
       });
       const category = await Api.TournamentOpsService().createCategory({
         tournamentId: tournament.id,
@@ -36,6 +37,7 @@ export default function ClubTournamentCreateScreen() {
         level: values.categoryKind === "level" ? values.categoryLevel : null,
         sumaTarget: values.categoryKind === "suma" ? values.sumaTarget : null,
         maxPairs: values.maxPairs,
+        circuitType: values.circuitType,
         status: "active",
       });
       await Api.TournamentOpsService().upsertRuleset({

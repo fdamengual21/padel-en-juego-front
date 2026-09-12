@@ -21,5 +21,6 @@ export const ROUTES = {
     clientDetail: (id: string) => `/club/clientes/${id}`,
     courts: "/club/canchas",
     schedule: "/club/agenda",
+    settings: "/club/configuracion",
   },
 } as const;

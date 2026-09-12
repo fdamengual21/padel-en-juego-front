@@ -8,6 +8,7 @@
     "endDate": "2026-09-22",
     "status": "draft",
     "format": "GROUPS_ELIMINATION",
+    "registrationFee": 15000,
     "createdAt": "2026-09-08T10:00:00.000Z",
     "updatedAt": "2026-09-08T10:00:00.000Z",
     "dailyStartTime": "10:00",

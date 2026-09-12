@@ -3,24 +3,44 @@
     "id": "court-1",
     "clubId": "club-1",
     "name": "Cancha 1",
-    "status": "active"
+    "status": "active",
+    "imageUrl": null,
+    "slotDurationMinutes": 90,
+    "basePrice": 12000,
+    "openTime": null,
+    "closeTime": null
   },
   {
     "id": "court-2",
     "clubId": "club-1",
     "name": "Cancha 2",
-    "status": "active"
+    "status": "active",
+    "imageUrl": null,
+    "slotDurationMinutes": 90,
+    "basePrice": 12000,
+    "openTime": null,
+    "closeTime": null
   },
   {
     "id": "court-3",
     "clubId": "club-1",
     "name": "Cancha 3",
-    "status": "active"
+    "status": "active",
+    "imageUrl": null,
+    "slotDurationMinutes": 120,
+    "basePrice": 15000,
+    "openTime": null,
+    "closeTime": null
   },
   {
     "id": "court-4",
     "clubId": "club-1",
     "name": "Cancha 4",
-    "status": "active"
+    "status": "active",
+    "imageUrl": null,
+    "slotDurationMinutes": 90,
+    "basePrice": 11000,
+    "openTime": "10:00",
+    "closeTime": "22:00"
   }
 ]

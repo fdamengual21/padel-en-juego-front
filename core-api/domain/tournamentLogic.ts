@@ -827,6 +827,7 @@ export interface AvailabilityWindow {
 export function intersectWindows(
   a: AvailabilityWindow[],
   b: AvailabilityWindow[],
+  minDurationMinutes = 60,
 ): AvailabilityWindow[] {
   const out: AvailabilityWindow[] = [];
   for (const wa of a) {
@@ -834,7 +835,7 @@ export function intersectWindows(
       if (wa.date !== wb.date) continue;
       const start = Math.max(toMinutes(wa.startTime), toMinutes(wb.startTime));
       const end = Math.min(toMinutes(wa.endTime), toMinutes(wb.endTime));
-      if (end - start >= 90) {
+      if (end - start >= minDurationMinutes) {
         const sh = String(Math.floor(start / 60)).padStart(2, "0");
         const sm = String(start % 60).padStart(2, "0");
         const eh = String(Math.floor(end / 60)).padStart(2, "0");
@@ -850,4 +851,32 @@ export function intersectWindows(
     }
   }
   return out;
+}
+
+/** Días inclusive entre dos fechas ISO `YYYY-MM-DD`. */
+export function eachDateInclusive(startDate: string, endDate: string): string[] {
+  const out: string[] = [];
+  const cursor = new Date(`${startDate}T12:00:00`);
+  const end = new Date(`${endDate}T12:00:00`);
+  if (Number.isNaN(cursor.getTime()) || Number.isNaN(end.getTime())) return out;
+  while (cursor.getTime() <= end.getTime()) {
+    out.push(cursor.toISOString().slice(0, 10));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return out;
+}
+
+/** Ventanas sintéticas del torneo (días × franja diaria). */
+export function buildTournamentDayWindows(input: {
+  startDate: string;
+  endDate: string | null;
+  dailyStartTime: string;
+  dailyEndTime: string;
+}): AvailabilityWindow[] {
+  const end = input.endDate ?? input.startDate;
+  return eachDateInclusive(input.startDate, end).map((date) => ({
+    date,
+    startTime: input.dailyStartTime,
+    endTime: input.dailyEndTime,
+  }));
 }

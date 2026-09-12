@@ -242,10 +242,15 @@ export function buildClubClientDetail(
     .sort((a, b) => b.startsAt.localeCompare(a.startsAt))
     .slice(0, 10);
 
+  const linkedPlayer = client.playerId
+    ? playersById.get(client.playerId) ?? null
+    : null;
+
   return {
     ...summary,
     tournaments,
     recentReservations,
+    categoryLevel: linkedPlayer?.categoryLevel ?? null,
   };
 }
 

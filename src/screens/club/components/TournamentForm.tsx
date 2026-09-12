@@ -9,17 +9,20 @@ import {
 import { formatLongDateEs } from "@/lib/dates";
 import {
   CATEGORY_LEVELS,
+  formatCategoryLevel,
   type CategoryGender,
   type CategoryKind,
-  type CategoryLevelCode,
+  type CategoryLevel,
   type EqualsResolution,
   type RulesetPreset,
+  type TournamentCircuitType,
   type TournamentFormat,
 } from "@core-api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { circuitTypeLabel } from "@/modules/tournaments/types";
 
 export function defaultTournamentFormValues(
   partial?: Partial<TournamentFormValues>,
@@ -31,17 +34,19 @@ export function defaultTournamentFormValues(
     endDate: "2026-10-03",
     dailyStartTime: "10:00",
     dailyEndTime: "22:00",
+    registrationFee: 0,
     format: "GROUPS_ELIMINATION",
     matchPlayType: "STANDARD",
     equalsResolution: "goldenPoint",
     setsToWin: 2,
     tiebreakPoints: 7,
     categoryKind: "level",
-    categoryLevel: "6ta",
+    categoryLevel: 6,
     categoryGender: "male",
     sumaTarget: null,
-    categoryName: "6ta Masculino",
+    categoryName: `${formatCategoryLevel(6)} Masculino`,
     maxPairs: 16,
+    circuitType: "NONE",
     pairsPerGroup: 4,
     qualifyPerGroup: 2,
     ...partial,
@@ -58,7 +63,7 @@ export function buildCategoryDisplayName(values: TournamentFormValues): string {
   if (values.categoryKind === "suma") {
     return `Suma ${values.sumaTarget ?? 12} ${genderLabel}`;
   }
-  return `${values.categoryLevel ?? "6ta"} ${genderLabel}`;
+  return `${formatCategoryLevel(values.categoryLevel ?? 6)} ${genderLabel}`;
 }
 
 interface TournamentFormProps {
@@ -128,6 +133,21 @@ export default function TournamentForm({
                 value={values.description}
                 onChange={(e) => patch("description", e.target.value)}
               />
+            </Field>
+            <Field label="Precio de inscripción" htmlFor="registrationFee">
+              <Input
+                id="registrationFee"
+                type="number"
+                min={0}
+                step={100}
+                value={values.registrationFee}
+                onChange={(e) =>
+                  patch("registrationFee", Math.max(0, Number(e.target.value) || 0))
+                }
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Monto por pareja (0 = sin cargo / a confirmar).
+              </p>
             </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Inicio" htmlFor="start">
@@ -216,14 +236,17 @@ export default function TournamentForm({
                 <select
                   id="level"
                   className="h-8 w-full rounded-lg border border-border bg-background px-2 text-sm"
-                  value={values.categoryLevel ?? "6ta"}
+                  value={values.categoryLevel ?? 6}
                   onChange={(e) =>
-                    patch("categoryLevel", e.target.value as CategoryLevelCode)
+                    patch(
+                      "categoryLevel",
+                      Number(e.target.value) as CategoryLevel,
+                    )
                   }
                 >
                   {CATEGORY_LEVELS.map((level) => (
                     <option key={level} value={level}>
-                      {level}
+                      {formatCategoryLevel(level)}
                     </option>
                   ))}
                 </select>
@@ -242,7 +265,8 @@ export default function TournamentForm({
                   }}
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Ej. Suma 12: 7ma+5ta o dos 6tas. Puede ser mixto.
+                  Ej. Suma 12: {formatCategoryLevel(7)}+{formatCategoryLevel(5)}{" "}
+                  o dos {formatCategoryLevel(6)}. Puede ser mixto.
                 </p>
               </Field>
             )}
@@ -262,6 +286,32 @@ export default function TournamentForm({
                 onChange={(e) => patch("maxPairs", Number(e.target.value))}
               />
             </Field>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Circuito de ranking</p>
+              {(
+                [
+                  ["NONE", circuitTypeLabel("NONE")],
+                  ["CICUPA", circuitTypeLabel("CICUPA")],
+                ] as const
+              ).map(([value, label]) => (
+                <label key={value} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="circuitType"
+                    checked={values.circuitType === value}
+                    onChange={() =>
+                      patch("circuitType", value as TournamentCircuitType)
+                    }
+                  />
+                  {label}
+                </label>
+              ))}
+              <p className="text-xs text-muted-foreground">
+                Si hay circuito, al inscribir se puede anotar el snapshot de
+                puntos acumulados de cada jugador.
+              </p>
+            </div>
           </div>
         </Section>
 
