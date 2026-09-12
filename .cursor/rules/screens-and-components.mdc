@@ -1,0 +1,32 @@
+---
+description: Estructura de screens y componentes (local vs global)
+globs: src/screens/**,src/components/**,src/layout/**
+alwaysApply: false
+---
+
+# Screens y componentes
+
+## Screens
+
+- Cada screen vive en `src/screens/<modo>/<ScreenName>/` (`club`, `users` o `entry`).
+- Nombre siempre termina en `Screen`.
+- `index.ts` reexporta el default: `export { default } from "./ScreenName"`.
+- La screen compone UI/estado local; negocio via `Api` / modules.
+
+## Componentes locales vs globales
+
+| Alcance | Ubicacion |
+|---------|-----------|
+| Solo una screen | `screens/.../EsaScreen/components/` |
+| Varias screens del mismo modo | `screens/club/components/` o `screens/users/components/` |
+| Club + users (o entry) / UI generica | `src/components/<dominio>/` |
+| Primitivos shadcn | `src/components/ui/` |
+| Shells / navegacion de modo | `src/layout/` |
+
+## Reglas
+
+- Un archivo, un componente default export.
+- Props tipadas con `interface [Component]Props`.
+- Copy de UI en espanol; codigo/identifiers en ingles.
+- No duplicar en screens lo que ya existe en `src/components/`.
+- Hooks solo de una screen: `screens/<Screen>/hooks/` si hace falta.

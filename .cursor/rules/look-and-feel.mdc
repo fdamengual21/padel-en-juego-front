@@ -1,0 +1,41 @@
+---
+description: Look premium padel club — tokens, densidad, anti-patrones
+globs: src/**/*.{tsx,css}
+alwaysApply: false
+---
+
+# Look & Feel
+
+**Premium padel club**: limpio, deportivo, energético. No ERP/MUI-admin. No gaming (glow, neones, HUD).
+
+**Theme default: light.** No activar dark por `prefers-color-scheme`. `.dark` solo con toggle explícito futuro. Diseñar y verificar siempre en light primero.
+
+## Marca (referencia StartPadel)
+
+- **Acento lima** (`--primary`): CTAs, item activo de nav, ranking, campeón de bracket, estados “activos”.
+- **Texto / navy** (`--foreground`, `--primary-foreground` sobre lima): contraste alto sobre botones y chips activos.
+- **Canvas light** (`--background` gris muy claro, `--card` blanco): contenido siempre light.
+- **Sidebar club navy** (`--sidebar*`): solo el aside del modo club. No convertir toda la app a dark.
+- Marca = **acento** — no pintar fondos de página enteros de lima.
+- Tipografía: **Geist** (ya en `index.css`). Evitar Inter/Roboto/Arial por defecto. Score más fuerte/condensado que el texto.
+
+## Tokens (`src/index.css` + Tailwind)
+
+`background` → `card` | `foreground` `muted` `border` | `primary` (+ `primary-foreground`) | `success` `warning` `destructive` | `sidebar*` | `radius-*` | spacing coherente.
+
+Sin hex hardcodeados en screens/components. Usar clases semánticas (`bg-primary`, `text-muted-foreground`, `bg-sidebar`, …).
+
+## UI
+
+- Superficies antes que Card; no Cards anidadas. Card solo si agrupa (partido, torneo, cliente) o hay interacción.
+- Estados de partido/torneo: chips chicos (`EN VIVO`, `PROGRAMADO`, `EN CURSO`, …), no bloques de color. Lima solo para activo/vivo; resto muted/warning/destructive.
+- Preferir domain (`MatchCard`, `Score`, `TournamentCard`, `BracketView`, …) antes que Card/Badge genéricos.
+- Detalle de torneo (club): cards de resumen **siempre visibles**; tabs sin Resumen/Resultados.
+- Player: light, mobile, bottom nav; activo = icono en pastilla lima.
+- Club: denso, desktop, **sidebar navy** + contenido light; activo = fondo lima + texto navy.
+- Dashboard club: KPIs compactos + próximos partidos (una composición clara, no “admin widgets”).
+- Bracket = viz (`xyflow`+dagre), no verdad; mobile por rondas + pan/zoom; copy humano (`1° Zona A`); acento lima en final/campeón.
+
+## Evitar
+
+Purple-on-white / cream+serif AI, dark por defecto o por OS, multi-shadow, pills excesivos, marca como fondo de página, enums en UI, lógica de torneo en el cliente, Inter como fuente de marca.

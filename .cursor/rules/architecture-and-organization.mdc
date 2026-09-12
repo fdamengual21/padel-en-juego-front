@@ -1,0 +1,54 @@
+---
+description: Carpetas, capas, core-api mock, modules y tipos
+globs: src/**/*.{ts,tsx},core-api/**/*.ts
+alwaysApply: false
+---
+
+# Arquitectura y organizacion
+
+```text
+core-api/                 # mock: JSON + memoria (+ localStorage)
+src/api/Api.ts            # fachada lazy
+src/modules/              # repositories + services
+src/layout/               # shells de modo (ClubShell, UserShell)
+src/screens/
+  entry/                  # landing / elegir modo
+  club/                   # modo club (admin)
+  users/                  # modo usuario/jugador
+src/components/
+  ui/                     # primitivos shadcn
+  tournaments/            # dominio reutilizable (club + users)
+src/router/
+src/app/                  # providers de app (sesion mock, etc.)
+```
+
+## Modos UI
+
+- **club** y **users** viven en folders separados bajo `src/screens/`.
+- Shells en `src/layout/` (nav lateral club, bottom nav users).
+- Rutas URL pueden seguir en espanol (`/club`, `/player`); el codigo de carpetas esta en ingles (`users`).
+
+## Screens y componentes
+
+- Cada screen: `src/screens/<modo>/<ScreenName>/` con `ScreenName.tsx` + `index.ts` (reexport default).
+- Nombre de screen termina en `Screen`.
+- Solo se usa en esa screen → `screens/.../<Screen>/components/`.
+- Varias screens del mismo modo → `screens/<modo>/components/` (ej. `TournamentForm`).
+- Reutilizable entre modos o generico → `src/components/` (por dominio: `tournaments/`, `ui/`).
+- Un archivo, un componente `export default`. Props: `interface XProps`.
+
+## Dependencias
+
+```text
+UI (screens/layout/components) → Api.XxxService() → Service → Repository → @core-api
+```
+
+- Logica de torneo en `core-api` (`syncCategoryStructure`, AutoMatch, bracket).
+- Grupos/partidos/bracket: **automaticos** al sincronizar inscripciones (sin botones Generar en UI).
+- Horario manual: `match.scheduleManual = true` (AutoMatch no lo pisa).
+- Categorias: `kind=level` (1ra–8va) o `kind=suma` (+ `sumaTarget`); gender male/female/mixed.
+- Screens/components: sin logica de negocio de torneo; orquestan UI + llamadas a Api.
+
+## Tipos
+
+- Wire/dominio `camelCase`. Sin `any`. Props: `interface XProps`.
