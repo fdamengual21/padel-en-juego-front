@@ -1,7 +1,78 @@
-import type { Match, MatchRules, MatchStatus } from "../types";
+import type {
+  Match,
+  MatchRules,
+  MatchStatus,
+  TournamentStatus,
+} from "../types";
 import { isMatchResultComplete } from "./matchResultRules";
 
 export type MatchPlayStatus = "pending" | "started" | "finished";
+
+/** Mutaciones de partido que el club puede disparar desde la UI. */
+export type MatchMutationKind = "schedule" | "status" | "result";
+
+export type MatchMutationValidationResult =
+  | { ok: true }
+  | { ok: false; message: string };
+
+/**
+ * Bloquea mutaciones si el torneo está cerrado o el partido cancelado.
+ * Agenda/estado: también si el partido ya tiene resultado.
+ * Resultado: se puede corregir mientras el torneo siga abierto.
+ */
+export function validateMatchMutation(
+  match: Pick<
+    Match,
+    "status" | "sets" | "winnerPairId" | "pairAId" | "pairBId" | "scheduledAt"
+  >,
+  context: {
+    tournamentStatus: TournamentStatus | null | undefined;
+    matchRules?: MatchRules | null;
+  },
+  kind: MatchMutationKind,
+): MatchMutationValidationResult {
+  if (context.tournamentStatus === "finished") {
+    return {
+      ok: false,
+      message: "No se puede modificar un partido de un torneo finalizado.",
+    };
+  }
+
+  if (context.tournamentStatus === "cancelled") {
+    return {
+      ok: false,
+      message: "No se puede modificar un partido de un torneo cancelado.",
+    };
+  }
+
+  if (match.status === "cancelled") {
+    return {
+      ok: false,
+      message: "No se puede modificar un partido cancelado.",
+    };
+  }
+
+  if (kind === "result") return { ok: true };
+
+  const matchClosed =
+    match.status === "finished" ||
+    match.status === "walkover" ||
+    (context.matchRules
+      ? isMatchResultComplete(match, context.matchRules)
+      : Boolean(match.winnerPairId && match.sets.length > 0));
+
+  if (matchClosed) {
+    return {
+      ok: false,
+      message:
+        kind === "schedule"
+          ? "No se puede cambiar el horario de un partido finalizado."
+          : "El partido ya está cerrado y no se puede cambiar el estado.",
+    };
+  }
+
+  return { ok: true };
+}
 
 /** El horario asignado ya pasó (o es ahora). */
 export function hasMatchStartedBySchedule(

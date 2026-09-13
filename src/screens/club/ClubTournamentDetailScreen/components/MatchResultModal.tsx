@@ -78,6 +78,12 @@ export default function MatchResultModal({
   }, [matchRules, maxSlots]);
 
   const canSave = Boolean(match?.pairAId && match?.pairBId && filledSets.length > 0);
+  const isEditingExisting = Boolean(
+    match &&
+      (match.status === "finished" ||
+        match.status === "walkover" ||
+        match.sets.length > 0),
+  );
 
   const patchSet = (index: number, side: "A" | "B", value: string) => {
     const n = Number(value);
@@ -122,7 +128,9 @@ export default function MatchResultModal({
         data-testid="match-result-modal"
       >
         <DialogHeader className="px-4 pt-4">
-          <DialogTitle>Cargar resultado</DialogTitle>
+          <DialogTitle>
+            {isEditingExisting ? "Editar resultado" : "Cargar resultado"}
+          </DialogTitle>
           <DialogDescription>
             Sets a ganar: {matchRules.setsToWin}
             {matchRules.superTiebreakEnabled

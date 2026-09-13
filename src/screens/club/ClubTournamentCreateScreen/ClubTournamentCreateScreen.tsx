@@ -9,6 +9,7 @@ import {
 } from "@/modules/tournaments/types";
 import { createId } from "@core-api";
 import { ROUTES } from "@/router/routes";
+import { toastError, toastSuccess } from "@/lib/toast";
 
 export default function ClubTournamentCreateScreen() {
   const { clubId } = useMockSession();
@@ -54,8 +55,12 @@ export default function ClubTournamentCreateScreen() {
       return tournament;
     },
     onSuccess: (tournament) => {
+      toastSuccess("Torneo creado");
       void qc.invalidateQueries({ queryKey: ["tournaments"] });
       void navigate(ROUTES.club.tournamentDetail(tournament.id));
+    },
+    onError: (err: Error) => {
+      toastError("No se pudo crear el torneo", err.message);
     },
   });
 

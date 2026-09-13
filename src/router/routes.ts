@@ -1,5 +1,9 @@
 export const ROUTES = {
   home: "/",
+  auth: {
+    login: "/ingresar",
+    register: "/registro",
+  },
   player: {
     root: "/player",
     home: "/player",

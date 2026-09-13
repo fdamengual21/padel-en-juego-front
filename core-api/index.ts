@@ -10,6 +10,9 @@ export {
   intersectWindows,
   buildTournamentDayWindows,
   eachDateInclusive,
+  isGroupMatchesComplete,
+  listFinishedGroupIds,
+  groupQualificationTargetLabel,
 } from "./domain/tournamentLogic";
 export {
   scoreboardSlotCount,
@@ -27,12 +30,16 @@ export {
   resolveMatchPlayStatus,
   matchPlayStatusLabel,
   validateMatchStatusTransition,
+  validateMatchMutation,
   type MatchPlayStatus,
+  type MatchMutationKind,
+  type MatchMutationValidationResult,
 } from "./domain/matchPlayStatus";
 export {
   findScheduleConflicts,
   listAvailableCourtsAt,
   matchesOverlap,
+  matchesSharePair,
   slotOverlapsReservation,
   describeScheduleConflictMatch,
   pairLabelForMatch,
@@ -50,6 +57,22 @@ export {
   pickRandomCourtImagePath,
   type CourtImagePath,
 } from "./domain/courtImages";
+export {
+  PLAYER_COVER_PATHS,
+  defaultPlayerCoverPath,
+  isPlayerCoverPath,
+  type PlayerCoverPath,
+} from "./domain/playerCovers";
+export {
+  buildPlayerDashboard,
+  matchPhaseLabel,
+} from "./domain/playerDashboard";
+export { buildPlayerFeed } from "./domain/playerFeed";
+export {
+  listProvincesFromCatalog,
+  listCitiesFromCatalog,
+  findProvinceByName,
+} from "./domain/locations";
 export {
   ensureClientFromPlayer,
   buildClubClientSummary,

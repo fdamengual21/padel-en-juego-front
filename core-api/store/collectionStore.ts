@@ -1,6 +1,6 @@
 import type { CollectionName } from "../types";
 
-const STORAGE_KEY = "startpadel.core-api.v10";
+const STORAGE_KEY = "startpadel.core-api.v11";
 
 function canUseLocalStorage(): boolean {
   return typeof localStorage !== "undefined";

@@ -9,6 +9,8 @@ interface CuadroBoardProps {
   onOpenResult: (match: Match) => void;
   onSyncStructure?: () => void;
   syncPending?: boolean;
+  /** Vista jugador/guest: copy sin “cargar resultado”. */
+  readOnly?: boolean;
 }
 
 export default function CuadroBoard({
@@ -17,6 +19,7 @@ export default function CuadroBoard({
   onOpenResult,
   onSyncStructure,
   syncPending = false,
+  readOnly = false,
 }: CuadroBoardProps) {
   const sortedRounds = [...board.rounds].sort((a, b) => a.order - b.order);
   const sectionTrail = [
@@ -30,8 +33,10 @@ export default function CuadroBoard({
         <div>
           <p className="text-sm font-medium">Cuadro del torneo</p>
           <p className="text-sm text-muted-foreground">
-            {sectionTrail}. Misma tabla que Zonas: tocá una fila para cargar el
-            resultado. 1° a cuartos; 2° a octavos.
+            {sectionTrail}
+            {readOnly
+              ? ". Consultá horarios, estado y resultados."
+              : ". Misma tabla que Zonas: tocá una fila para cargar el resultado. 1° a cuartos; 2° a octavos."}
           </p>
           <p className="mt-1 text-[11px] text-muted-foreground">
             Actualizado{" "}
@@ -89,7 +94,7 @@ export default function CuadroBoard({
         pairLabels={board.pairLabels}
         pairPlayerNames={board.pairPlayerNames}
         matchRules={board.matchRules}
-        onMatchClick={onOpenResult}
+        onMatchClick={readOnly ? undefined : onOpenResult}
         heightClassName="h-[720px]"
       />
     </div>

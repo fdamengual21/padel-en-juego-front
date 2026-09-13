@@ -64,5 +64,16 @@
     "status": "booked",
     "price": 11000,
     "createdAt": "2026-09-12T13:00:00.000Z"
+  },
+  {
+    "id": "reservation-7",
+    "clubId": "club-1",
+    "clientId": "client-1",
+    "courtId": "court-2",
+    "startsAt": "2026-09-20T21:00:00.000Z",
+    "endsAt": "2026-09-20T22:30:00.000Z",
+    "status": "booked",
+    "price": 18000,
+    "createdAt": "2026-09-12T14:00:00.000Z"
   }
 ]

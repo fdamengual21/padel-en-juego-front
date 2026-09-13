@@ -95,6 +95,15 @@ export interface ITournamentOpsRepository {
   getDashboard(clubId: string): ReturnType<ReturnType<typeof coreApi>['getDashboard']>
   getRanking(categoryId?: string): ReturnType<ReturnType<typeof coreApi>['getRanking']>
   getPlayerHome(playerId: string): ReturnType<ReturnType<typeof coreApi>['getPlayerHome']>
+  getPlayerFeed(
+    clubId: string,
+    playerId: string | null,
+  ): ReturnType<ReturnType<typeof coreApi>['getPlayerFeed']>
+  listProvinces(): ReturnType<ReturnType<typeof coreApi>['listProvinces']>
+  listCities(
+    provinceIdOrName: string,
+  ): ReturnType<ReturnType<typeof coreApi>['listCities']>
+  listPlayerCoverImages(): ReturnType<ReturnType<typeof coreApi>['listPlayerCoverImages']>
   listPlayers(): ReturnType<ReturnType<typeof coreApi>["listPlayers"]>;
   listClubClients(
     clubId: string,
@@ -108,9 +117,18 @@ export interface ITournamentOpsRepository {
     query: string,
     options?: { signal?: AbortSignal },
   ): ReturnType<ReturnType<typeof coreApi>["searchPlayers"]>;
+  findIdentityMatches(
+    input: import("@core-api").FindIdentityMatchesInput,
+  ): ReturnType<ReturnType<typeof coreApi>["findIdentityMatches"]>;
   createPlayer(
     input: import("@core-api").CreatePlayerInput,
   ): ReturnType<ReturnType<typeof coreApi>["createPlayer"]>;
+  login(
+    input: import("@core-api").LoginInput,
+  ): ReturnType<ReturnType<typeof coreApi>["login"]>;
+  registerAccount(
+    input: import("@core-api").RegisterAccountInput,
+  ): ReturnType<ReturnType<typeof coreApi>["registerAccount"]>;
   updatePlayer(
     playerId: string,
     input: import("@core-api").UpdatePlayerInput,
@@ -357,6 +375,22 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
     return coreApi().getPlayerHome(playerId)
   }
 
+  getPlayerFeed(clubId: string, playerId: string | null) {
+    return coreApi().getPlayerFeed(clubId, playerId)
+  }
+
+  listProvinces() {
+    return coreApi().listProvinces()
+  }
+
+  listCities(provinceIdOrName: string) {
+    return coreApi().listCities(provinceIdOrName)
+  }
+
+  listPlayerCoverImages() {
+    return coreApi().listPlayerCoverImages()
+  }
+
   listPlayers() {
     return coreApi().listPlayers()
   }
@@ -373,8 +407,20 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
     return coreApi().searchPlayers(query, options)
   }
 
+  findIdentityMatches(input: import("@core-api").FindIdentityMatchesInput) {
+    return coreApi().findIdentityMatches(input)
+  }
+
   createPlayer(input: import("@core-api").CreatePlayerInput) {
     return coreApi().createPlayer(input)
+  }
+
+  login(input: import("@core-api").LoginInput) {
+    return coreApi().login(input)
+  }
+
+  registerAccount(input: import("@core-api").RegisterAccountInput) {
+    return coreApi().registerAccount(input)
   }
 
   updatePlayer(

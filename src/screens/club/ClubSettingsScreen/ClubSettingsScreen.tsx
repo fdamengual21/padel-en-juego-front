@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { WeekdayIso } from "@core-api";
 import Api from "@/api/Api";
 import { useMockSession } from "@/app/MockSessionProvider";
+import ProvinceCityFields from "@/components/ProvinceCityFields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -46,15 +47,19 @@ export default function ClubSettingsScreen() {
   };
 
   const saveMutation = useMutation({
-    mutationFn: () =>
-      Api.ClubService().update(clubId, {
+    mutationFn: () => {
+      if (!province.trim() || !city.trim()) {
+        throw new Error("Elegí provincia y localidad");
+      }
+      return Api.ClubService().update(clubId, {
         name: name.trim(),
         province: province.trim() || null,
         city: city.trim() || null,
         openTime,
         closeTime,
         openDays,
-      }),
+      });
+    },
     onSuccess: async () => {
       setSavedMsg("✓ Configuración guardada");
       setError(null);
@@ -102,30 +107,19 @@ export default function ClubSettingsScreen() {
             }}
           />
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="club-province">Provincia</Label>
-            <Input
-              id="club-province"
-              value={province}
-              onChange={(e) => {
-                clearSavedOnEdit();
-                setProvince(e.target.value);
-              }}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="club-city">Ciudad</Label>
-            <Input
-              id="club-city"
-              value={city}
-              onChange={(e) => {
-                clearSavedOnEdit();
-                setCity(e.target.value);
-              }}
-            />
-          </div>
-        </div>
+        <ProvinceCityFields
+          idPrefix="club"
+          province={province}
+          city={city}
+          onProvinceChange={(next) => {
+            clearSavedOnEdit();
+            setProvince(next);
+          }}
+          onCityChange={(next) => {
+            clearSavedOnEdit();
+            setCity(next);
+          }}
+        />
       </section>
 
       <section className="space-y-4 rounded-xl border border-border bg-card p-4">
@@ -196,7 +190,13 @@ export default function ClubSettingsScreen() {
       <div className="flex justify-end">
         <Button
           type="button"
-          disabled={saveMutation.isPending || !name.trim() || openDays.length === 0}
+          disabled={
+            saveMutation.isPending ||
+            !name.trim() ||
+            !province.trim() ||
+            !city.trim() ||
+            openDays.length === 0
+          }
           onClick={() => void saveMutation.mutateAsync()}
         >
           {saveMutation.isPending ? "Guardando…" : "Guardar configuración"}

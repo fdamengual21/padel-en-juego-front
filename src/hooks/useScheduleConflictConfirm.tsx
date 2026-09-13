@@ -117,7 +117,36 @@ function ScheduleConflictResolveDialog({
     (c) => c.type === "reservation",
   );
   const capacityConflict = request.conflicts.find((c) => c.type === "capacity");
+  const pairConflicts = request.conflicts.filter((c) => c.type === "pair");
   const hora = formatScheduleShortEs(request.scheduledAt);
+
+  if (pairConflicts.length > 0) {
+    const description = pairConflicts
+      .map((c) => c.summary)
+      .filter(Boolean)
+      .join(" ");
+    return (
+      <WarningDialog
+        open={open}
+        onOpenChange={(next) => {
+          if (!next) onCancel();
+        }}
+        title="No se puede guardar"
+        description={
+          description ||
+          `Una de las parejas ya tiene otro partido el ${hora}.`
+        }
+        confirmLabel="Entendido"
+        cancelLabel="Volver"
+        onConfirm={onCancel}
+      >
+        <p className="text-xs text-muted-foreground">
+          Un equipo no puede jugar dos partidos el mismo día a la misma hora,
+          aunque sea en canchas distintas.
+        </p>
+      </WarningDialog>
+    );
+  }
 
   const proposedCourtName =
     request.courts.find((c) => c.id === request.proposedCourtId)?.name ??

@@ -13,7 +13,7 @@ function envFlag(value: string | undefined, defaultValue: boolean): boolean {
 }
 
 export const FEATURES = {
-  /** Home del jugador */
+  /** Inicio del jugador (feed torneos/reservas) */
   home: envFlag(import.meta.env.VITE_FEATURE_HOME, true),
   /** Torneos (jugador y club) */
   tournaments: envFlag(import.meta.env.VITE_FEATURE_TOURNAMENTS, true),
@@ -21,7 +21,7 @@ export const FEATURES = {
   ranking: envFlag(import.meta.env.VITE_FEATURE_RANKING, false),
   /** Historial del jugador */
   history: envFlag(import.meta.env.VITE_FEATURE_HISTORY, true),
-  /** Perfil del jugador */
+  /** Perfil del jugador (resumen + cuenta) */
   profile: envFlag(import.meta.env.VITE_FEATURE_PROFILE, true),
   /** Dashboard club */
   clubDashboard: envFlag(import.meta.env.VITE_FEATURE_CLUB_DASHBOARD, true),

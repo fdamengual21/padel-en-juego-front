@@ -47,7 +47,7 @@ export interface ScheduleConflictReservationInfo {
 }
 
 export interface ScheduleConflict {
-  type: "court" | "capacity" | "reservation";
+  type: "court" | "capacity" | "reservation" | "pair";
   /** Resumen corto sin listar partidos (para UI). */
   summary: string;
   /** Mensaje completo (logs / errores de API). */
@@ -141,6 +141,61 @@ function overlappingMatches(
   );
 }
 
+function matchPairIds(
+  match: Pick<Match, "pairAId" | "pairBId">,
+): string[] {
+  return [match.pairAId, match.pairBId].filter(
+    (id): id is string => Boolean(id),
+  );
+}
+
+/** True si los dos partidos comparten al menos una pareja. */
+export function matchesSharePair(
+  a: Pick<Match, "pairAId" | "pairBId">,
+  b: Pick<Match, "pairAId" | "pairBId">,
+): boolean {
+  const aIds = matchPairIds(a);
+  if (aIds.length === 0) return false;
+  const bIds = new Set(matchPairIds(b));
+  return aIds.some((id) => bIds.has(id));
+}
+
+function describePairBusyConflict(input: {
+  subject: Pick<Match, "pairAId" | "pairBId">;
+  others: ScheduleConflictMatchInfo[];
+  pairLabels: Record<string, string>;
+}): string {
+  const subjectPairIds = matchPairIds(input.subject);
+  const parts: string[] = [];
+
+  for (const pairId of subjectPairIds) {
+    const busy = input.others.filter(
+      (m) => m.pairAId === pairId || m.pairBId === pairId,
+    );
+    if (busy.length === 0) continue;
+
+    const pairLabel = input.pairLabels[pairId] ?? "Una pareja";
+    const details = busy
+      .map((m) => {
+        const opponentId = m.pairAId === pairId ? m.pairBId : m.pairAId;
+        const opponent = opponentId
+          ? (input.pairLabels[opponentId] ?? "otra pareja")
+          : "otra pareja";
+        const court = m.courtName ? m.courtName : "sin cancha";
+        return `vs ${opponent} (${court})`;
+      })
+      .join("; ");
+    parts.push(
+      `${pairLabel} ya tiene otro partido a esa hora: ${details}.`,
+    );
+  }
+
+  return (
+    parts.join(" ") ||
+    "Una de las parejas ya tiene otro partido a esa hora."
+  );
+}
+
 function overlappingReservations(input: {
   courtId: string | null;
   startsAt: string;
@@ -209,7 +264,7 @@ export function listAvailableCourtsAt(input: {
 
 /**
  * Conflictos al asignar horario/cancha.
- * Incluye solapes con otros partidos y con reservas de cancha.
+ * Incluye solapes de pareja, cancha, reservas y capacidad.
  */
 export function findScheduleConflicts(
   input: FindScheduleConflictsInput,
@@ -266,6 +321,28 @@ export function findScheduleConflicts(
   });
 
   const conflicts: ScheduleConflict[] = [];
+  const subject = matches.find((m) => m.id === matchId) ?? null;
+
+  if (subject && matchPairIds(subject).length > 0) {
+    const pairOverlaps = overlapping.filter((m) =>
+      matchesSharePair(subject, m),
+    );
+    if (pairOverlaps.length > 0) {
+      const infos = pairOverlaps.map(toInfo);
+      const summary = describePairBusyConflict({
+        subject,
+        others: infos,
+        pairLabels,
+      });
+      conflicts.push({
+        type: "pair",
+        summary,
+        message: summary,
+        conflictingMatches: infos,
+        conflictingReservations: [],
+      });
+    }
+  }
 
   if (courtId) {
     const sameCourt = overlapping.filter((m) => m.courtId === courtId);

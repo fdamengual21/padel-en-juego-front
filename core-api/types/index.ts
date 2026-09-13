@@ -110,11 +110,51 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  /** Contraseña mock (solo demo local). */
+  password: string;
   phone: string | null;
   status: EntityStatus;
   province: string | null;
   city: string | null;
   createdAt: string;
+}
+
+/** User sin password para respuestas de API. */
+export type PublicUser = Omit<User, "password">;
+
+export interface AuthSession {
+  user: PublicUser;
+  player: Player;
+}
+
+export interface RegisterAccountInput {
+  firstName: string;
+  lastName: string;
+  age: number;
+  email: string;
+  password: string;
+  categoryLevel: import("./categories").CategoryLevel;
+  province: string;
+  city: string;
+}
+
+/** Provincia del catálogo geo (mock API). */
+export interface LocationProvince {
+  id: string;
+  name: string;
+  cities: LocationCity[];
+}
+
+/** Localidad / ciudad perteneciente a una provincia. */
+export interface LocationCity {
+  id: string;
+  name: string;
+  provinceId: string;
+}
+
+export interface LoginInput {
+  email: string;
+  password: string;
 }
 
 export interface ClubMember {
@@ -134,10 +174,16 @@ export interface Player {
   lastName: string;
   phone: string | null;
   email: string | null;
+  /** Edad declarada (registro / alta). */
+  age: number | null;
   /** Nivel oficial vigente del jugador (1–8). */
   categoryLevel: import("./categories").CategoryLevel;
   /** Historial de categorías (más reciente al final). */
   categoryHistory: import("./categories").PlayerCategoryHistoryEntry[];
+  /** URL de avatar (mock local / CDN). */
+  avatarUrl: string | null;
+  /** URL de portada del perfil (mock local / CDN). */
+  coverUrl: string | null;
   createdAt: string;
 }
 
@@ -223,6 +269,7 @@ export interface CreatePlayerInput {
   lastName: string;
   phone?: string | null;
   email?: string | null;
+  age?: number | null;
   categoryLevel?: import("./categories").CategoryLevel;
   userId?: string | null;
 }
@@ -232,7 +279,10 @@ export interface UpdatePlayerInput {
   lastName?: string;
   phone?: string | null;
   email?: string | null;
+  age?: number | null;
   categoryLevel?: import("./categories").CategoryLevel;
+  avatarUrl?: string | null;
+  coverUrl?: string | null;
 }
 
 export interface RegisterPairInput {
@@ -507,6 +557,65 @@ export interface ClubClientDetail extends ClubClientSummary {
   categoryLevel: import("./categories").CategoryLevel | null;
 }
 
+/** Partido enriquecido para UI de jugador (versus + fase en español). */
+export interface PlayerMatchView {
+  match: Match;
+  phaseLabel: string;
+  pairALabel: string;
+  pairBLabel: string;
+  courtLabel: string | null;
+}
+
+/** Participación de torneo del jugador con partidos y fase alcanzada. */
+export interface PlayerTournamentHistoryEntry {
+  tournamentId: string;
+  tournamentName: string;
+  clubId: string;
+  clubName: string;
+  tournamentStatus: TournamentStatus;
+  startDate: string;
+  endDate: string | null;
+  categoryId: string;
+  categoryName: string;
+  pairId: string;
+  partnerName: string | null;
+  matchesWon: number;
+  matchesLost: number;
+  outcome: ClientTournamentOutcome;
+  /** Fase más avanzada jugada (excluye consolación). */
+  phaseReached: MatchPhase | null;
+  phaseReachedLabel: string | null;
+  matches: PlayerMatchView[];
+}
+
+export interface PlayerDashboard {
+  player: Player;
+  city: string | null;
+  province: string | null;
+  matchesPlayed: number;
+  matchesWon: number;
+  matchesLost: number;
+  tournamentsCount: number;
+  tournamentsWon: number;
+  tournamentsLost: number;
+  nextMatch: PlayerMatchView | null;
+  recentMatches: PlayerMatchView[];
+  tournaments: PlayerTournamentHistoryEntry[];
+}
+
+/** Reserva próxima enriquecida para el inicio del jugador. */
+export interface PlayerUpcomingReservation {
+  reservation: CourtReservation;
+  courtName: string;
+  clubName: string;
+}
+
+/** Feed de Inicio (torneos futuros + reservas si hay sesión). */
+export interface PlayerFeed {
+  upcomingTournaments: Tournament[];
+  upcomingReservations: PlayerUpcomingReservation[];
+}
+
 export interface CoreApiSnapshot {
   clubs: Club[];
   users: User[];
@@ -573,6 +682,8 @@ export interface ZonesBoardView {
   allMatches: Match[];
   qualifyPerGroup: number;
   pairsPerGroup: number;
+  /** Zonas con todos los partidos finalizados (pueden mostrar clasificados). */
+  finishedGroupIds: string[];
   unassignedPairs: CuadroBoardView["unassignedPairs"];
   notice: string | null;
 }
@@ -827,6 +938,36 @@ export interface CreateClientInput {
   userId?: string | null;
 }
 
+/** Coincidencia por email/teléfono al dar de alta en el club. */
+export type IdentityMatchKind = "club_client" | "app_user" | "club_player";
+
+export interface IdentityMatch {
+  kind: IdentityMatchKind;
+  displayName: string;
+  firstName: string;
+  lastName: string;
+  email: string | null;
+  phone: string | null;
+  age: number | null;
+  categoryLevel: number | null;
+  clientId: string | null;
+  playerId: string | null;
+  userId: string | null;
+  clubId: string | null;
+  /** Texto UX, ej. "Cliente del club" / "Usuario registrado en la app". */
+  sourceLabel: string;
+}
+
+export interface FindIdentityMatchesInput {
+  clubId: string;
+  email?: string | null;
+  phone?: string | null;
+}
+
+export interface FindIdentityMatchesResult {
+  matches: IdentityMatch[];
+}
+
 /** Opciones al sincronizar zonas / partidos / cuadro. */
 export interface SyncCategoryStructureOptions {
   /**
@@ -834,6 +975,11 @@ export interface SyncCategoryStructureOptions {
    * Si false, regenera anclando parejas ya jugadas a su zona.
    */
   preserveResults?: boolean;
+  /**
+   * Limpia agendas automáticas (!scheduleManual) y vuelve a auto-agendar.
+   * Usar al cambiar fechas / franja / tipo de partido del torneo.
+   */
+  rescheduleAuto?: boolean;
 }
 
 export interface DisqualifyRegistrationInput {

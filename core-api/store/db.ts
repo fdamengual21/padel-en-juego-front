@@ -184,7 +184,25 @@ function withPlayerDefaults(player: Player): Player {
       by: "system",
     });
   }
-  return { ...player, categoryLevel, categoryHistory };
+  return {
+    ...player,
+    categoryLevel,
+    categoryHistory,
+    age: player.age ?? null,
+    email: player.email ?? null,
+    avatarUrl: player.avatarUrl ?? null,
+    coverUrl: player.coverUrl ?? null,
+  };
+}
+
+const DEFAULT_MOCK_PASSWORD = "12345678";
+
+function withUserDefaults(user: User): User {
+  return {
+    ...withLocation(user),
+    phone: user.phone ?? null,
+    password: user.password?.trim() || DEFAULT_MOCK_PASSWORD,
+  };
 }
 
 function withTournamentDefaults(tournament: Tournament): Tournament {
@@ -236,6 +254,7 @@ function hydrateSnapshot(
   if (!persisted) {
     return {
       ...seed,
+      users: seed.users.map(withUserDefaults),
       players: seed.players.map(withPlayerDefaults),
       tournaments: seed.tournaments.map(withTournamentDefaults),
       categories: seed.categories.map(withTournamentCategoryDefaults),
@@ -247,7 +266,7 @@ function hydrateSnapshot(
     withClientDefaults,
   );
   const clubs = (partial.clubs ?? seed.clubs).map(withClubDefaults);
-  const users = (partial.users ?? seed.users).map(withLocation);
+  const users = (partial.users ?? seed.users).map(withUserDefaults);
   const players = (partial.players ?? seed.players).map(withPlayerDefaults);
   const tournaments = (partial.tournaments ?? seed.tournaments).map(
     withTournamentDefaults,

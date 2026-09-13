@@ -20,14 +20,24 @@ import {
 import { formatScheduleShortEs } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 
-export function toDatetimeLocalValue(iso: string | null): string {
+export function toScheduleDateValue(iso: string | null): string {
   if (!iso) return "";
-  return iso.slice(0, 16);
+  return iso.slice(0, 10);
 }
 
-export function fromDatetimeLocalValue(value: string): string | null {
-  if (!value) return null;
-  return `${value}:00.000Z`;
+export function toScheduleTimeValue(iso: string | null): string {
+  if (!iso) return "";
+  return iso.slice(11, 16);
+}
+
+/** Combina fecha (YYYY-MM-DD) y hora (HH:mm). Ambos vacíos → sin horario. */
+export function fromScheduleDateAndTime(
+  date: string,
+  time: string,
+): string | null {
+  if (!date && !time) return null;
+  if (!date || !time) return null;
+  return `${date}T${time}:00.000Z`;
 }
 
 type SaveSchedulePayload = {
@@ -118,14 +128,19 @@ export function MatchScheduleTimeModal({
   onOpenChange,
   onSave,
 }: MatchScheduleTimeModalProps) {
-  const [value, setValue] = useState("");
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
   const { confirmConflicts, dialog: conflictDialog } =
     useScheduleConflictConfirm(pairLabels);
 
   useEffect(() => {
     if (!open || !match) return;
-    setValue(toDatetimeLocalValue(match.scheduledAt));
+    setDate(toScheduleDateValue(match.scheduledAt));
+    setTime(toScheduleTimeValue(match.scheduledAt));
   }, [open, match]);
+
+  const scheduleComplete = Boolean(date) === Boolean(time);
+  const canSave = Boolean(match) && scheduleComplete && !isSaving;
 
   return (
     <>
@@ -142,16 +157,33 @@ export function MatchScheduleTimeModal({
                 : "Definí fecha y hora."}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="match-schedule-datetime">Fecha y hora</Label>
-            <Input
-              id="match-schedule-datetime"
-              type="datetime-local"
-              value={value}
-              disabled={isSaving || !match}
-              onChange={(e) => setValue(e.target.value)}
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="match-schedule-date">Fecha</Label>
+              <Input
+                id="match-schedule-date"
+                type="date"
+                value={date}
+                disabled={isSaving || !match}
+                onChange={(e) => setDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="match-schedule-time">Hora</Label>
+              <Input
+                id="match-schedule-time"
+                type="time"
+                value={time}
+                disabled={isSaving || !match}
+                onChange={(e) => setTime(e.target.value)}
+              />
+            </div>
           </div>
+          {!scheduleComplete ? (
+            <p className="text-xs text-muted-foreground">
+              Completá fecha y hora, o dejá ambos vacíos para quitar el horario.
+            </p>
+          ) : null}
           <DialogFooter>
             <Button
               type="button"
@@ -163,13 +195,13 @@ export function MatchScheduleTimeModal({
             </Button>
             <Button
               type="button"
-              disabled={isSaving || !match}
+              disabled={!canSave}
               onClick={() => {
                 if (!match) return;
                 void (async () => {
                   const saved = await saveWithConflictCheck({
                     matchId: match.id,
-                    scheduledAt: fromDatetimeLocalValue(value),
+                    scheduledAt: fromScheduleDateAndTime(date, time),
                     courtId: match.courtId,
                     allMatches,
                     courts,
@@ -235,7 +267,7 @@ export default function MatchCourtSelect({
       >
         <select
           key={`${match.id}-${match.courtId ?? "none"}-${selectEpoch}`}
-          className="h-7 w-full rounded-md border border-border bg-background px-1.5 text-[11px]"
+          className="h-8 w-full rounded-md border border-border bg-background px-1.5 text-sm"
           disabled={disabled || isSaving}
           value={match.courtId ?? ""}
           onChange={(e) => {
@@ -291,7 +323,7 @@ export function MatchHorarioButton({
       disabled={disabled}
       data-testid="match-horario-button"
       className={cn(
-        "rounded-md px-1 py-0.5 text-left text-xs whitespace-nowrap transition-colors",
+        "rounded-md px-1 py-0.5 text-left text-sm whitespace-nowrap transition-colors",
         disabled
           ? "cursor-not-allowed text-muted-foreground"
           : "text-sidebar underline-offset-2 hover:bg-muted hover:underline",

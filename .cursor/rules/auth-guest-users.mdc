@@ -1,0 +1,53 @@
+---
+description: Reglas de negocio para usuarios no logueados (vista jugador guest)
+alwaysApply: true
+---
+
+# Auth — usuarios no logueados (guest)
+
+## Principio
+
+La **vista de jugador** (`/player/*`) es usable **sin sesión**. El guest puede explorar; las acciones que mutan o son personales requieren cuenta.
+
+## Permitido sin login
+
+- Ver inicio (mensaje de exploración), listado de torneos, detalle de torneo (cuadro/info).
+- Ver ranking (si el feature está on).
+- Navegar la app jugador y volver a Entry / vista club.
+- Buscar/mirar información pública de clubes y torneos.
+
+## Requiere login (o registro)
+
+- Inscribirse a un torneo.
+- Reservar cancha / gestionar “mis reservas”.
+- Historial personal y perfil.
+- Cualquier acción que asocie actividad a un `User`/`Player` con cuenta.
+
+## UX al tocar acción protegida
+
+1. Mostrar gate (`RequirePlayerAuth`) o redirigir a `/ingresar?next=…`.
+2. Ofrecer **Ingresar** y **Crear cuenta** (mismo destino `next` al terminar).
+3. El formulario de **registro** (nombre, apellido, edad, email, contraseña, repetir, categoría) es la fuente de verdad de identidad de la **cuenta app**.
+4. El alta **manual** de participante/cliente en el club reutiliza los **mismos campos**, con reglas distintas:
+   - Obligatorios: **solo nombre y apellido**.
+   - Opcionales: edad, categoría, email, teléfono.
+   - Si se carga email o teléfono y ya hay cliente / jugador / usuario app → modal para **reutilizar** o **dar de alta nuevo**.
+
+## Fuentes de identidad
+
+1. **Alta club** (manual): `Client` / `Player` sin cuenta (`userId` null), propios del club.
+2. **Registro app**: `User` + `Player` vinculados. El **email de cuenta es único** (no se permiten dos users con el mismo email).
+
+Al registrarse en la app, si existe un cliente de club con el mismo email (o teléfono coincidente), se **asocia** ese cliente al `userId` / `playerId` nuevos.
+
+## Mock demo
+
+- Contraseña de prueba: `12345678`.
+- Emails ficticios (ej. `juan@padel.test`, `ana@padel.test`).
+- Sesión en `localStorage` (`startpadel.auth-session.v1`); datos en core-api mock.
+
+## Modelo
+
+- Guest: `userId` / `playerId` = `null`, `isAuthenticated` = false.
+- Registrado: `User` + `Player` enlazados; al loguear se setea la sesión.
+- Alta manual de club: `Player`/`Client` **sin** `userId` hasta que ese email se registre (entonces se vincula).

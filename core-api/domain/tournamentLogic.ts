@@ -550,13 +550,24 @@ function applyEntrantToSlot(
   };
 }
 
-function resolveBye(match: Match): void {
+/**
+ * Bye solo si falta una pareja por padding del cuadro (no hay rival).
+ * No es bye si el hueco espera el ganador de un partido anterior (MATCH_WINNER).
+ */
+function resolveBye(match: Match, slotA: MatchSlot, slotB: MatchSlot): void {
+  const awaitingFeeder = (slot: MatchSlot, pairId: string | null) =>
+    slot.sourceType === "MATCH_WINNER" && !pairId;
+
+  if (awaitingFeeder(slotA, match.pairAId) || awaitingFeeder(slotB, match.pairBId)) {
+    return;
+  }
+
   if (match.pairAId && !match.pairBId) {
     match.winnerPairId = match.pairAId;
-    match.status = 'finished';
+    match.status = "finished";
   } else if (match.pairBId && !match.pairAId) {
     match.winnerPairId = match.pairBId;
-    match.status = 'finished';
+    match.status = "finished";
   }
 }
 
@@ -573,17 +584,55 @@ export function phaseForQualifiedCount(count: number): TournamentRound['type'] {
  * 2° (y más) → octavos (empareje aleatorio).
  * Ganadores de octavos + 1° → cuartos (aleatorio), luego semi/final.
  *
- * Si resolvePairs=false (zonas incompletas), los slots quedan como
- * "1° Zona A" sin pairId hasta que terminen todos los partidos de zona.
+ * Los pairId se resuelven por zona terminada (`resolvedGroupIds` o
+ * `resolvePairs=true` para todas). Zonas aún en juego quedan como "1° Zona A".
  */
+export function isGroupMatchesComplete(
+  matches: Match[],
+  groupId: string,
+): boolean {
+  const groupMatches = matches.filter(
+    (m) => m.groupId === groupId && m.phase === "GROUP",
+  );
+  if (groupMatches.length === 0) return false;
+  return groupMatches.every(
+    (m) => m.status === "finished" || m.status === "walkover",
+  );
+}
+
+export function listFinishedGroupIds(
+  groups: TournamentGroup[],
+  matches: Match[],
+): string[] {
+  return groups
+    .filter((g) => isGroupMatchesComplete(matches, g.id))
+    .map((g) => g.id);
+}
+
+/** Destino en el cuadro según posición de zona (copy UI). */
+export function groupQualificationTargetLabel(position: number): string {
+  if (position <= 1) return "Pasa a cuartos";
+  return "Pasa a octavos";
+}
+
 export function buildEliminationBracket(
   categoryId: string,
   groups: TournamentGroup[],
   standings: GroupStanding[],
   qualifyPerGroup: number,
-  options?: { resolvePairs?: boolean },
+  options?: {
+    /** @deprecated Preferir resolvedGroupIds para avance parcial por zona. */
+    resolvePairs?: boolean;
+    /** Grupos cuyos partidos de zona ya terminaron (se asigna pairId). */
+    resolvedGroupIds?: Iterable<string>;
+  },
 ): { rounds: TournamentRound[]; matches: Match[]; slots: MatchSlot[] } {
-  const resolvePairs = options?.resolvePairs ?? false;
+  const resolved =
+    options?.resolvedGroupIds != null
+      ? new Set(options.resolvedGroupIds)
+      : options?.resolvePairs
+        ? new Set(groups.map((g) => g.id))
+        : new Set<string>();
   const sortedGroups = [...groups].sort((a, b) => a.order - b.order);
   const firsts: BracketEntrant[] = [];
   const playIn: BracketEntrant[] = [];
@@ -593,11 +642,12 @@ export function buildEliminationBracket(
       .filter((s) => s.groupId === group.id)
       .sort((a, b) => a.position - b.position);
     const slotsNeeded = Math.max(1, qualifyPerGroup);
+    const groupResolved = resolved.has(group.id);
     for (let i = 0; i < slotsNeeded; i++) {
       const row = rows[i];
       const position = row?.position && row.position > 0 ? row.position : i + 1;
       const entrant: BracketEntrant = {
-        pairId: resolvePairs && row ? row.pairId : null,
+        pairId: groupResolved && row ? row.pairId : null,
         groupId: group.id,
         position,
         sourceMatchId: null,
@@ -641,11 +691,10 @@ export function buildEliminationBracket(
     const r16Matches: Match[] = [];
     for (let i = 0; i < bracketSize / 2; i++) {
       const match = emptyMatch(categoryId, r16);
-      slots.push(
-        applyEntrantToSlot(match, 'A', padded[i * 2]),
-        applyEntrantToSlot(match, 'B', padded[i * 2 + 1]),
-      );
-      resolveBye(match);
+      const slotA = applyEntrantToSlot(match, 'A', padded[i * 2]);
+      const slotB = applyEntrantToSlot(match, 'B', padded[i * 2 + 1]);
+      slots.push(slotA, slotB);
+      resolveBye(match, slotA, slotB);
       r16Matches.push(match);
       matches.push(match);
     }
@@ -672,8 +721,10 @@ export function buildEliminationBracket(
   if (qfPool.length === 1) {
     const fin = pushRound('FINAL', 'Final');
     const match = emptyMatch(categoryId, fin);
-    slots.push(applyEntrantToSlot(match, 'A', qfPool[0]), applyEntrantToSlot(match, 'B', null));
-    resolveBye(match);
+    const slotA = applyEntrantToSlot(match, 'A', qfPool[0]);
+    const slotB = applyEntrantToSlot(match, 'B', null);
+    slots.push(slotA, slotB);
+    resolveBye(match, slotA, slotB);
     matches.push(match);
     return { rounds, matches, slots };
   }
@@ -696,11 +747,10 @@ export function buildEliminationBracket(
     while (padded.length < size) padded.push(null);
     for (let i = 0; i < size / 2; i++) {
       const match = emptyMatch(categoryId, qf);
-      slots.push(
-        applyEntrantToSlot(match, 'A', padded[i * 2]),
-        applyEntrantToSlot(match, 'B', padded[i * 2 + 1]),
-      );
-      resolveBye(match);
+      const slotA = applyEntrantToSlot(match, 'A', padded[i * 2]);
+      const slotB = applyEntrantToSlot(match, 'B', padded[i * 2 + 1]);
+      slots.push(slotA, slotB);
+      resolveBye(match, slotA, slotB);
       stageMatches.push(match);
       matches.push(match);
     }

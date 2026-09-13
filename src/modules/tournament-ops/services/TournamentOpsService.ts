@@ -194,6 +194,22 @@ export class TournamentOpsService {
     return this.repository.getPlayerHome(playerId);
   }
 
+  getPlayerFeed(clubId: string, playerId: string | null) {
+    return this.repository.getPlayerFeed(clubId, playerId);
+  }
+
+  listProvinces() {
+    return this.repository.listProvinces();
+  }
+
+  listCities(provinceIdOrName: string) {
+    return this.repository.listCities(provinceIdOrName);
+  }
+
+  listPlayerCoverImages() {
+    return this.repository.listPlayerCoverImages();
+  }
+
   listPlayers() {
     return this.repository.listPlayers();
   }
@@ -210,8 +226,20 @@ export class TournamentOpsService {
     return this.repository.searchPlayers(query, options);
   }
 
+  findIdentityMatches(input: import("@core-api").FindIdentityMatchesInput) {
+    return this.repository.findIdentityMatches(input);
+  }
+
   createPlayer(input: import("@core-api").CreatePlayerInput) {
     return this.repository.createPlayer(input);
+  }
+
+  login(input: import("@core-api").LoginInput) {
+    return this.repository.login(input);
+  }
+
+  registerAccount(input: import("@core-api").RegisterAccountInput) {
+    return this.repository.registerAccount(input);
   }
 
   updatePlayer(

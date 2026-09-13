@@ -2,8 +2,15 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { CalendarClock, Pencil } from "lucide-react";
-import type { Client, Court, CourtAgendaEvent, CourtReservation } from "@core-api";
+import type {
+  Client,
+  Court,
+  CourtAgendaEvent,
+  CourtReservation,
+  IdentityMatch,
+} from "@core-api";
 import Api from "@/api/Api";
+import DuplicateIdentityDialog from "@/components/auth/DuplicateIdentityDialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -93,6 +100,49 @@ function WhatsAppIcon({ className }: { className?: string }) {
   );
 }
 
+async function createClientFromDraft(
+  clubId: string,
+  draft: ManualClientDraft,
+  link?: { playerId?: string | null; userId?: string | null },
+): Promise<Client> {
+  return Api.TournamentOpsService().createClient({
+    clubId,
+    firstName: draft.firstName,
+    lastName: draft.lastName,
+    phone: draft.phone || null,
+    email: draft.email || null,
+    playerId: link?.playerId ?? null,
+    userId: link?.userId ?? null,
+  });
+}
+
+async function resolveClientIdFromMatch(
+  clubId: string,
+  draft: ManualClientDraft,
+  match: IdentityMatch,
+): Promise<string> {
+  if (match.clientId) return match.clientId;
+  if (match.playerId) {
+    const created = await createClientFromDraft(clubId, draft, {
+      playerId: match.playerId,
+      userId: match.userId,
+    });
+    return created.id;
+  }
+  if (match.userId) {
+    const created = await createClientFromDraft(clubId, {
+      ...draft,
+      firstName: match.firstName || draft.firstName,
+      lastName: match.lastName || draft.lastName,
+      email: match.email ?? draft.email,
+      phone: match.phone ?? draft.phone,
+    }, { userId: match.userId, playerId: match.playerId });
+    return created.id;
+  }
+  const created = await createClientFromDraft(clubId, draft);
+  return created.id;
+}
+
 async function resolveClientId(
   clubId: string,
   slot: ClientSlotValue,
@@ -101,14 +151,7 @@ async function resolveClientId(
     if (!slot.client) throw new Error("Elegí un cliente");
     return slot.client.id;
   }
-  const draft: ManualClientDraft = slot.draft;
-  const created = await Api.TournamentOpsService().createClient({
-    clubId,
-    firstName: draft.firstName,
-    lastName: draft.lastName,
-    phone: draft.phone || null,
-    email: draft.email || null,
-  });
+  const created = await createClientFromDraft(clubId, slot.draft);
   return created.id;
 }
 
@@ -134,6 +177,9 @@ export default function CourtReservationModal({
   const [clientSlot, setClientSlot] = useState<ClientSlotValue>(() =>
     emptyClientSlot(),
   );
+  const [dupOpen, setDupOpen] = useState(false);
+  const [dupMatches, setDupMatches] = useState<IdentityMatch[]>([]);
+  const [allowCreateNew, setAllowCreateNew] = useState(false);
   const [dateIso, setDateIso] = useState(() => toDateIso(presetStartsAt));
   const [selectedStartsAt, setSelectedStartsAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -154,6 +200,9 @@ export default function CourtReservationModal({
     setMode(initialMode);
     setError(null);
     setBusy(false);
+    setDupOpen(false);
+    setDupMatches([]);
+    setAllowCreateNew(false);
 
     if (initialMode === "create") {
       const start = presetStartsAt ?? undefined;
@@ -275,26 +324,76 @@ export default function CourtReservationModal({
     }
   };
 
+  const persistReservation = async (clientId: string) => {
+    if (!selectedStartsAt) throw new Error("Elegí un turno");
+    if (mode === "create" || !reservation) {
+      await Api.TournamentOpsService().createCourtReservation({
+        clubId,
+        courtId: court.id,
+        clientId,
+        startsAt: selectedStartsAt,
+        price: quote?.price ?? null,
+      });
+      return;
+    }
+    await Api.TournamentOpsService().updateCourtReservation(reservation.id, {
+      clientId,
+      startsAt: selectedStartsAt,
+      price: quote?.price ?? reservation.price,
+    });
+  };
+
   const handleSave = () =>
     run(async () => {
       if (!selectedStartsAt) throw new Error("Elegí un turno");
-      const clientId = await resolveClientId(clubId, clientSlot);
-      if (mode === "create" || !reservation) {
-        await Api.TournamentOpsService().createCourtReservation({
-          clubId,
-          courtId: court.id,
-          clientId,
-          startsAt: selectedStartsAt,
-          price: quote?.price ?? null,
-        });
-        return;
+
+      if (clientSlot.mode === "manual" && !allowCreateNew) {
+        const draft = clientSlot.draft;
+        const hasContact = Boolean(
+          draft.email.trim() || draft.phone.trim(),
+        );
+        if (hasContact) {
+          const { matches } = await Api.TournamentOpsService().findIdentityMatches({
+            clubId,
+            email: draft.email || null,
+            phone: draft.phone || null,
+          });
+          if (matches.length > 0) {
+            setDupMatches(matches);
+            setDupOpen(true);
+            return;
+          }
+        }
       }
-      await Api.TournamentOpsService().updateCourtReservation(reservation.id, {
-        clientId,
-        startsAt: selectedStartsAt,
-        price: quote?.price ?? reservation.price,
-      });
+
+      const clientId = await resolveClientId(clubId, clientSlot);
+      setAllowCreateNew(false);
+      await persistReservation(clientId);
     });
+
+  const handleUseIdentityMatch = (match: IdentityMatch) =>
+    void run(async () => {
+      if (clientSlot.mode !== "manual") return;
+      const clientId = await resolveClientIdFromMatch(
+        clubId,
+        clientSlot.draft,
+        match,
+      );
+      setDupOpen(false);
+      setAllowCreateNew(false);
+      await persistReservation(clientId);
+    });
+
+  const handleCreateNewDespiteMatch = () => {
+    setDupOpen(false);
+    setAllowCreateNew(true);
+    // Re-run save after state updates: use microtask with forced create.
+    void run(async () => {
+      const clientId = await resolveClientId(clubId, clientSlot);
+      setAllowCreateNew(false);
+      await persistReservation(clientId);
+    });
+  };
 
   const handleCancelReservation = () => {
     if (!reservation) return;
@@ -313,6 +412,7 @@ export default function CourtReservationModal({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="max-w-lg gap-0 overflow-hidden p-0"
@@ -549,5 +649,13 @@ export default function CourtReservationModal({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    <DuplicateIdentityDialog
+      open={dupOpen}
+      matches={dupMatches}
+      onOpenChange={setDupOpen}
+      onUseMatch={(match) => void handleUseIdentityMatch(match)}
+      onCreateNew={handleCreateNewDespiteMatch}
+    />
+    </>
   );
 }

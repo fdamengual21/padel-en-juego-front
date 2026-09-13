@@ -1,47 +1,88 @@
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import Api from "@/api/Api";
 import { useMockSession } from "@/app/MockSessionProvider";
+import RequirePlayerAuth from "@/components/auth/RequirePlayerAuth";
 import MatchCard from "@/components/tournaments/MatchCard";
+import { buttonVariants } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ROUTES } from "@/router/routes";
+import { cn } from "@/lib/utils";
+import TournamentHistoryCard from "./components/TournamentHistoryCard";
 
 export default function UserHistoryScreen() {
   const { playerId } = useMockSession();
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["player-home", playerId],
-    queryFn: () => Api.TournamentOpsService().getPlayerHome(playerId),
+    queryFn: () => Api.TournamentOpsService().getPlayerHome(playerId!),
+    enabled: Boolean(playerId),
   });
-  const { data: pairs = [] } = useQuery({
-    queryKey: ["pairs", "cat-1"],
-    queryFn: () => Api.TournamentOpsService().listPairs("cat-1"),
-  });
-  const { data: players = [] } = useQuery({
-    queryKey: ["players"],
-    queryFn: () => Api.TournamentOpsService().listPlayers(),
-  });
-  const pairLabel = (id: string | null) => {
-    if (!id) return "Por definir";
-    const pair = pairs.find((p) => p.id === id);
-    if (!pair) return id;
-    const p1 = players.find((p) => p.id === pair.player1Id)?.displayName ?? "?";
-    const p2 = players.find((p) => p.id === pair.player2Id)?.displayName ?? "?";
-    return `${p1} / ${p2}`;
-  };
 
   return (
-    <div className="p-4 space-y-4" data-testid="player-history">
+    <div className="space-y-4 p-4" data-testid="player-history">
       <h2 className="text-2xl font-semibold tracking-tight">Historial</h2>
-      <div className="space-y-3">
-        {(data?.recentMatches ?? []).map((match) => (
-          <MatchCard
-            key={match.id}
-            match={match}
-            pairALabel={pairLabel(match.pairAId)}
-            pairBLabel={pairLabel(match.pairBId)}
-          />
-        ))}
-        {(data?.recentMatches?.length ?? 0) === 0 ? (
-          <p className="text-sm text-muted-foreground">Sin partidos finalizados.</p>
-        ) : null}
-      </div>
+
+      <RequirePlayerAuth
+        nextPath={ROUTES.player.history}
+        actionLabel="Ver tu historial"
+      >
+        {isLoading || !data ? (
+          <p className="text-sm text-muted-foreground">Cargando historial…</p>
+        ) : (
+          <Tabs defaultValue="tournaments">
+            <TabsList className="w-full">
+              <TabsTrigger value="tournaments" className="flex-1">
+                Torneos
+              </TabsTrigger>
+              <TabsTrigger value="matches" className="flex-1">
+                Partidos recientes
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="tournaments" className="mt-3 space-y-3">
+              {data.tournaments.length === 0 ? (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Todavía no jugaste torneos.
+                  </p>
+                  <Link
+                    to={ROUTES.player.tournaments}
+                    className={cn(buttonVariants({ variant: "outline" }), "h-10")}
+                  >
+                    Ver torneos
+                  </Link>
+                </div>
+              ) : (
+                data.tournaments.map((entry) => (
+                  <TournamentHistoryCard
+                    key={`${entry.tournamentId}-${entry.categoryId}-${entry.pairId}`}
+                    entry={entry}
+                  />
+                ))
+              )}
+            </TabsContent>
+
+            <TabsContent value="matches" className="mt-3 space-y-3">
+              {data.recentMatches.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Sin partidos finalizados.
+                </p>
+              ) : (
+                data.recentMatches.map((item) => (
+                  <MatchCard
+                    key={item.match.id}
+                    match={item.match}
+                    pairALabel={item.pairALabel}
+                    pairBLabel={item.pairBLabel}
+                    courtLabel={item.courtLabel}
+                    phaseLabel={item.phaseLabel}
+                  />
+                ))
+              )}
+            </TabsContent>
+          </Tabs>
+        )}
+      </RequirePlayerAuth>
     </div>
   );
 }

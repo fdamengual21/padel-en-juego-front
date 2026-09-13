@@ -10,7 +10,7 @@ import { ROUTES } from "@/router/routes";
 import { cn } from "@/lib/utils";
 
 export default function EntryScreen() {
-  const { clubId } = useMockSession();
+  const { clubId, enterAsGuest } = useMockSession();
   const { data: club } = useQuery({
     queryKey: ["club", clubId],
     queryFn: () => Api.ClubService().getById(clubId),
@@ -27,14 +27,36 @@ export default function EntryScreen() {
           </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Link to={ROUTES.player.home} className={cn(buttonVariants(), "h-12")}>
-            Entrar como jugador
+          <Link
+            to={ROUTES.player.home}
+            className={cn(buttonVariants(), "h-12")}
+            onClick={() => enterAsGuest()}
+            data-testid="entry-player-guest"
+          >
+            Explorar como jugador
           </Link>
           <Link
             to={ROUTES.club.dashboard}
             className={cn(buttonVariants({ variant: "outline" }), "h-12")}
           >
             Entrar como club
+          </Link>
+        </div>
+        <div className="flex flex-wrap justify-center gap-3 text-sm">
+          <Link
+            to={ROUTES.auth.login}
+            className="font-medium underline-offset-4 hover:underline"
+            data-testid="entry-login"
+          >
+            Ingresar
+          </Link>
+          <span className="text-muted-foreground">·</span>
+          <Link
+            to={ROUTES.auth.register}
+            className="font-medium underline-offset-4 hover:underline"
+            data-testid="entry-register"
+          >
+            Crear cuenta
           </Link>
         </div>
         <FeatureGuard feature="tournaments">

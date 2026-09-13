@@ -47,6 +47,7 @@ import {
   groupsRespectPairsPerGroup,
   appendPairsToZones,
   assignPairsToZonesPreservingPlayed,
+  listFinishedGroupIds,
   matchPairingKey,
   intersectWindows,
   resolveGroupConfig,
@@ -58,7 +59,11 @@ import {
   isMatchResultComplete,
   validateMatchResultSets,
 } from "../domain/matchResultRules";
-import { validateMatchStatusTransition } from "../domain/matchPlayStatus";
+import {
+  validateMatchMutation,
+  validateMatchStatusTransition,
+  type MatchMutationKind,
+} from "../domain/matchPlayStatus";
 import {
   findScheduleConflicts,
   isQualityPreset,
@@ -67,6 +72,15 @@ import {
   slotOverlapsReservation,
 } from "../domain/scheduleConflicts";
 import { pickRandomCourtImagePath } from "../domain/courtImages";
+import {
+  PLAYER_COVER_PATHS,
+} from "../domain/playerCovers";
+import { buildPlayerDashboard } from "../domain/playerDashboard";
+import { buildPlayerFeed } from "../domain/playerFeed";
+import {
+  listCitiesFromCatalog,
+  listProvincesFromCatalog,
+} from "../domain/locations";
 import type { ScheduleConflict } from "../domain/scheduleConflicts";
 import {
   buildClubClientDetail,
@@ -180,6 +194,161 @@ export class TournamentEngine {
       .slice(0, 12);
   }
 
+  async login(
+    input: import("../types").LoginInput,
+  ): Promise<import("../types").AuthSession> {
+    await delay();
+    const email = input.email.trim().toLowerCase();
+    const password = input.password;
+    if (!email || !password) {
+      throw new Error("Ingresá email y contraseña");
+    }
+    const user = this.db.users
+      .getAll()
+      .find((u) => u.email.trim().toLowerCase() === email);
+    if (!user || user.password !== password) {
+      throw new Error("Email o contraseña incorrectos");
+    }
+    if (user.status !== "active") {
+      throw new Error("Esta cuenta está desactivada");
+    }
+    let player = this.db.players.getAll().find((p) => p.userId === user.id);
+    if (!player) {
+      const [firstName, ...rest] = user.name.split(" ");
+      player = await this.createPlayer({
+        firstName: firstName || user.name,
+        lastName: rest.join(" ") || "Jugador",
+        email: user.email,
+        phone: user.phone,
+        userId: user.id,
+        categoryLevel: 6,
+        age: 25,
+      });
+    }
+    return this.toAuthSession(user, player);
+  }
+
+  async registerAccount(
+    input: import("../types").RegisterAccountInput,
+  ): Promise<import("../types").AuthSession> {
+    await delay();
+    const firstName = input.firstName.trim();
+    const lastName = input.lastName.trim();
+    const email = input.email.trim().toLowerCase();
+    const password = input.password;
+    const age = Math.round(Number(input.age));
+    const categoryLevel = input.categoryLevel;
+
+    if (!firstName || !lastName) {
+      throw new Error("Nombre y apellido son obligatorios");
+    }
+    if (!Number.isFinite(age) || age < 12 || age > 99) {
+      throw new Error("Ingresá una edad válida");
+    }
+    if (!email || !email.includes("@")) {
+      throw new Error("Ingresá un email válido");
+    }
+    if (!password || password.length < 8) {
+      throw new Error("La contraseña debe tener al menos 8 caracteres");
+    }
+    const emailTaken = this.db.users
+      .getAll()
+      .some((u) => u.email.trim().toLowerCase() === email);
+    if (emailTaken) {
+      throw new Error("Ya existe una cuenta con ese email");
+    }
+
+    const province = input.province.trim();
+    const city = input.city.trim();
+    if (!province) {
+      throw new Error("Elegí tu provincia");
+    }
+    if (!city) {
+      throw new Error("Elegí tu localidad");
+    }
+    const cities = listCitiesFromCatalog(province);
+    if (!cities.some((c) => c.name === city)) {
+      throw new Error("La localidad no corresponde a la provincia elegida");
+    }
+
+    const now = new Date().toISOString();
+    const user = this.db.users.upsert({
+      id: createId("user"),
+      name: `${firstName} ${lastName}`,
+      email,
+      password,
+      phone: null,
+      status: "active",
+      province,
+      city,
+      createdAt: now,
+    });
+
+    // Vincular player huérfano con mismo email si existe (alta manual previa).
+    let player = this.db.players
+      .getAll()
+      .find(
+        (p) =>
+          !p.userId &&
+          (p.email ?? "").trim().toLowerCase() === email,
+      );
+    if (player) {
+      player = this.db.players.upsert({
+        ...player,
+        userId: user.id,
+        firstName,
+        lastName,
+        displayName: `${firstName} ${lastName}`,
+        email,
+        age,
+        categoryLevel,
+      });
+    } else {
+      player = await this.createPlayer({
+        firstName,
+        lastName,
+        email,
+        age,
+        categoryLevel,
+        userId: user.id,
+      });
+    }
+
+    // Clientes de cualquier club con el mismo email o teléfono → asociar.
+    const linkPhones = new Set(
+      [normalizePhoneDigits(player.phone)].filter(Boolean),
+    );
+    for (const client of this.db.clients.getAll()) {
+      const clientEmail = (client.email ?? "").trim().toLowerCase();
+      const clientPhone = normalizePhoneDigits(client.phone);
+      const emailHit = Boolean(clientEmail && clientEmail === email);
+      const phoneHit = Boolean(
+        clientPhone && linkPhones.has(clientPhone),
+      );
+      if (!emailHit && !phoneHit) continue;
+      this.db.clients.upsert({
+        ...client,
+        userId: user.id,
+        playerId: client.playerId ?? player.id,
+        firstName: client.firstName || firstName,
+        lastName: client.lastName || lastName,
+        displayName:
+          client.displayName || `${firstName} ${lastName}`,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
+    return this.toAuthSession(user, player);
+  }
+
+  private toAuthSession(
+    user: import("../types").User,
+    player: Player,
+  ): import("../types").AuthSession {
+    const { password: _pw, ...publicUser } = user;
+    return { user: publicUser, player };
+  }
+
   async createPlayer(input: import("../types").CreatePlayerInput): Promise<Player> {
     await delay();
     const firstName = input.firstName.trim();
@@ -188,6 +357,10 @@ export class TournamentEngine {
       throw new Error("Nombre y apellido son obligatorios");
     }
     const categoryLevel = input.categoryLevel ?? 6;
+    const age =
+      typeof input.age === "number" && Number.isFinite(input.age)
+        ? Math.max(1, Math.round(input.age))
+        : null;
     const createdAt = new Date().toISOString();
     const player: Player = {
       id: createId("player"),
@@ -197,6 +370,7 @@ export class TournamentEngine {
       displayName: `${firstName} ${lastName}`,
       phone: input.phone?.trim() || null,
       email: input.email?.trim() || null,
+      age,
       categoryLevel,
       categoryHistory: [
         {
@@ -208,6 +382,8 @@ export class TournamentEngine {
           by: "club",
         },
       ],
+      avatarUrl: null,
+      coverUrl: null,
       createdAt,
     };
     return this.db.players.upsert(player);
@@ -255,8 +431,22 @@ export class TournamentEngine {
         input.email !== undefined
           ? input.email?.trim() || null
           : existing.email,
+      age:
+        input.age !== undefined
+          ? typeof input.age === "number" && Number.isFinite(input.age)
+            ? Math.max(1, Math.round(input.age))
+            : null
+          : existing.age,
       categoryLevel: nextLevel,
       categoryHistory: history,
+      avatarUrl:
+        input.avatarUrl !== undefined
+          ? input.avatarUrl?.trim() || null
+          : existing.avatarUrl,
+      coverUrl:
+        input.coverUrl !== undefined
+          ? input.coverUrl?.trim() || null
+          : existing.coverUrl,
     };
     return this.db.players.upsert(player);
   }
@@ -483,6 +673,136 @@ export class TournamentEngine {
       .slice(0, 12);
   }
 
+  /**
+   * Busca clientes del club, jugadores y usuarios de app que coincidan
+   * por email y/o teléfono (para avisar al dar de alta manual).
+   */
+  async findIdentityMatches(
+    input: import("../types").FindIdentityMatchesInput,
+  ): Promise<import("../types").FindIdentityMatchesResult> {
+    await delay();
+    const email = (input.email ?? "").trim().toLowerCase();
+    const phoneDigits = normalizePhoneDigits(input.phone);
+    if (!email && !phoneDigits) return { matches: [] };
+
+    const matches: import("../types").IdentityMatch[] = [];
+    const seen = new Set<string>();
+
+    const push = (match: import("../types").IdentityMatch) => {
+      const key = [
+        match.kind,
+        match.clientId ?? "",
+        match.playerId ?? "",
+        match.userId ?? "",
+      ].join(":");
+      if (seen.has(key)) return;
+      seen.add(key);
+      matches.push(match);
+    };
+
+    const emailOrPhoneMatch = (
+      candidateEmail: string | null | undefined,
+      candidatePhone: string | null | undefined,
+    ) => {
+      const e = (candidateEmail ?? "").trim().toLowerCase();
+      const p = normalizePhoneDigits(candidatePhone);
+      const byEmail = Boolean(email && e && e === email);
+      const byPhone = Boolean(phoneDigits && p && p === phoneDigits);
+      return byEmail || byPhone;
+    };
+
+    for (const client of this.db.clients.getAll()) {
+      if (client.clubId !== input.clubId) continue;
+      if (!emailOrPhoneMatch(client.email, client.phone)) continue;
+      const linkedPlayer = client.playerId
+        ? this.db.players.getById(client.playerId)
+        : null;
+      push({
+        kind: "club_client",
+        displayName: client.displayName,
+        firstName: client.firstName,
+        lastName: client.lastName,
+        email: client.email,
+        phone: client.phone,
+        age: linkedPlayer?.age ?? null,
+        categoryLevel: linkedPlayer?.categoryLevel ?? null,
+        clientId: client.id,
+        playerId: client.playerId,
+        userId: client.userId,
+        clubId: client.clubId,
+        sourceLabel: client.userId
+          ? "Cliente del club (vinculado a cuenta app)"
+          : "Cliente del club",
+      });
+    }
+
+    for (const player of this.db.players.getAll()) {
+      if (!emailOrPhoneMatch(player.email, player.phone)) continue;
+      if (player.userId) {
+        const user = this.db.users.getById(player.userId);
+        if (!user || user.status !== "active") continue;
+        const { password: _pw, ..._public } = user;
+        push({
+          kind: "app_user",
+          displayName: player.displayName,
+          firstName: player.firstName,
+          lastName: player.lastName,
+          email: player.email ?? user.email,
+          phone: player.phone ?? user.phone,
+          age: player.age,
+          categoryLevel: player.categoryLevel,
+          clientId: null,
+          playerId: player.id,
+          userId: user.id,
+          clubId: null,
+          sourceLabel: "Usuario registrado en la app",
+        });
+      } else {
+        push({
+          kind: "club_player",
+          displayName: player.displayName,
+          firstName: player.firstName,
+          lastName: player.lastName,
+          email: player.email,
+          phone: player.phone,
+          age: player.age,
+          categoryLevel: player.categoryLevel,
+          clientId: null,
+          playerId: player.id,
+          userId: null,
+          clubId: null,
+          sourceLabel: "Jugador dado de alta en un club",
+        });
+      }
+    }
+
+    // Usuarios app sin player aún (raro) por email/tel.
+    for (const user of this.db.users.getAll()) {
+      if (user.status !== "active") continue;
+      if (!emailOrPhoneMatch(user.email, user.phone)) continue;
+      const already = matches.some((m) => m.userId === user.id);
+      if (already) continue;
+      const [firstName, ...rest] = user.name.split(" ");
+      push({
+        kind: "app_user",
+        displayName: user.name,
+        firstName: firstName || user.name,
+        lastName: rest.join(" ") || "",
+        email: user.email,
+        phone: user.phone,
+        age: null,
+        categoryLevel: null,
+        clientId: null,
+        playerId: null,
+        userId: user.id,
+        clubId: null,
+        sourceLabel: "Usuario registrado en la app",
+      });
+    }
+
+    return { matches };
+  }
+
   async createClient(input: CreateClientInput): Promise<Client> {
     await delay();
     const firstName = input.firstName.trim();
@@ -694,7 +1014,12 @@ export class TournamentEngine {
       if (!elimBusy) {
         await this.generateBracket(categoryId);
       }
-      await this.scheduleCategory(categoryId);
+      await this.scheduleCategory(categoryId, {
+        rebuildAuto: options?.rescheduleAuto === true,
+      });
+      if (options?.rescheduleAuto) {
+        structureNote += " Se rearmó la agenda automática (horarios manuales se conservan).";
+      }
     }
 
     const rulesetAfter = this.db.rulesets.find(
@@ -858,6 +1183,7 @@ export class TournamentEngine {
     await delay();
     const match = this.db.matches.getById(matchId);
     if (!match) throw new Error("Partido no encontrado");
+    this.assertMatchMutable(match, "schedule");
 
     const category = this.db.categories.getById(match.tournamentCategoryId);
     const tournament = category
@@ -898,6 +1224,19 @@ export class TournamentEngine {
       pairLabels: options?.pairLabels,
       matchDurationMinutes,
     });
+
+    const pairConflicts = conflicts.filter((c) => c.type === "pair");
+    if (pairConflicts.length > 0) {
+      const err = new Error(
+        pairConflicts.map((c) => c.message).join("\n"),
+      ) as Error & {
+        conflicts: ScheduleConflict[];
+        code: string;
+      };
+      err.conflicts = pairConflicts;
+      err.code = "SCHEDULE_PAIR_CONFLICT";
+      throw err;
+    }
 
     if (conflicts.length > 0 && !options?.force) {
       const err = new Error(conflicts.map((c) => c.message).join("\n")) as Error & {
@@ -944,6 +1283,7 @@ export class TournamentEngine {
     await delay();
     const match = this.db.matches.getById(matchId);
     if (!match) throw new Error("Partido no encontrado");
+    this.assertMatchMutable(match, "status");
 
     const transition = validateMatchStatusTransition(match, status);
     if (!transition.ok) throw new Error(transition.message);
@@ -1124,6 +1464,7 @@ export class TournamentEngine {
       allMatches: ctx.allMatches,
       qualifyPerGroup: ctx.qualifyPerGroup,
       pairsPerGroup: ctx.pairsPerGroup,
+      finishedGroupIds: listFinishedGroupIds(ctx.groups, ctx.groupMatches),
       unassignedPairs: ctx.unassignedPairs,
       notice: ctx.structureNotice,
     };
@@ -1833,6 +2174,25 @@ export class TournamentEngine {
     return Boolean(overlappingMatch);
   }
 
+  private assertMatchMutable(match: Match, kind: MatchMutationKind): void {
+    const category = this.db.categories.getById(match.tournamentCategoryId);
+    const tournament = category
+      ? this.db.tournaments.getById(category.tournamentId)
+      : null;
+    const ruleset = category
+      ? this.db.rulesets.find((r) => r.tournamentCategoryId === category.id)[0]
+      : null;
+    const validation = validateMatchMutation(
+      match,
+      {
+        tournamentStatus: tournament?.status,
+        matchRules: ruleset?.matchRules ?? null,
+      },
+      kind,
+    );
+    if (!validation.ok) throw new Error(validation.message);
+  }
+
   private assertCourtSlotAligned(
     club: Club,
     court: Court,
@@ -2256,6 +2616,7 @@ export class TournamentEngine {
     await delay();
     const match = this.db.matches.getById(matchId);
     if (!match) throw new Error("Partido no encontrado");
+    this.assertMatchMutable(match, "result");
     const ruleset = this.db.rulesets.find(
       (r) => r.tournamentCategoryId === match.tournamentCategoryId,
     )[0];
@@ -2287,13 +2648,13 @@ export class TournamentEngine {
         (m) =>
           m.tournamentCategoryId === updated.tournamentCategoryId && m.phase === "GROUP",
       );
-      const zoneStageComplete =
-        allGroupMatches.length > 0 &&
-        allGroupMatches.every((m) =>
-          ruleset?.matchRules
-            ? isMatchResultComplete(m, ruleset.matchRules) || m.status === "walkover"
-            : m.status === "finished" || m.status === "walkover",
-        );
+      const finishedGroupIds = listFinishedGroupIds(
+        this.db.groups.find(
+          (g) => g.tournamentCategoryId === updated.tournamentCategoryId,
+        ),
+        allGroupMatches,
+      );
+      const anyZoneFinished = finishedGroupIds.length > 0;
       const elimBusy = this.db.matches
         .find(
           (m) =>
@@ -2305,7 +2666,8 @@ export class TournamentEngine {
             m.status === "walkover" ||
             m.status === "inProgress",
         );
-      if (zoneStageComplete && !elimBusy) {
+      // Regenerar cuadro al cerrar una zona (aunque otras sigan en juego).
+      if (anyZoneFinished && !elimBusy) {
         await this.generateBracket(updated.tournamentCategoryId);
         await this.scheduleCategory(updated.tournamentCategoryId);
       }
@@ -2534,8 +2896,7 @@ export class TournamentEngine {
     const groupMatches = this.db.matches.find(
       (m) => m.tournamentCategoryId === categoryId && m.phase === "GROUP",
     );
-    const zoneStageComplete =
-      groupMatches.length > 0 && groupMatches.every((m) => m.status === "finished");
+    const finishedGroupIds = listFinishedGroupIds(groups, groupMatches);
 
     const previousBracketIds = this.db.matches
       .find((m) => m.tournamentCategoryId === categoryId && m.phase !== "GROUP")
@@ -2547,7 +2908,7 @@ export class TournamentEngine {
     );
 
     const built = buildEliminationBracket(categoryId, groups, standings, qualify, {
-      resolvePairs: zoneStageComplete,
+      resolvedGroupIds: finishedGroupIds,
     });
     for (const round of built.rounds) this.db.rounds.upsert(round);
     for (const match of built.matches) this.db.matches.upsert(match);
@@ -2555,8 +2916,31 @@ export class TournamentEngine {
     return built;
   }
 
-  async scheduleCategory(categoryId: string): Promise<ScheduleResult> {
+  async scheduleCategory(
+    categoryId: string,
+    options?: { rebuildAuto?: boolean },
+  ): Promise<ScheduleResult> {
     await delay();
+
+    if (options?.rebuildAuto) {
+      const autoMatches = this.db.matches.find(
+        (m) =>
+          m.tournamentCategoryId === categoryId &&
+          m.status !== "finished" &&
+          m.status !== "walkover" &&
+          m.status !== "cancelled" &&
+          !m.scheduleManual,
+      );
+      for (const match of autoMatches) {
+        if (match.scheduledAt == null && match.courtId == null) continue;
+        this.db.matches.upsert({
+          ...match,
+          scheduledAt: null,
+          courtId: null,
+        });
+      }
+    }
+
     const matches = this.db.matches.find(
       (m) =>
         m.tournamentCategoryId === categoryId &&
@@ -2582,8 +2966,13 @@ export class TournamentEngine {
 
     let scheduledCount = 0;
     let suboptimalCount = 0;
-    const occupied: { courtId: string; start: number; end: number; date: string }[] =
-      [];
+    const occupied: {
+      courtId: string | null;
+      start: number;
+      end: number;
+      date: string;
+      pairIds: string[];
+    }[] = [];
 
     // Sembrar ocupación con partidos ya agendados + reservas del club.
     if (tournament) {
@@ -2596,7 +2985,7 @@ export class TournamentEngine {
         .map((c) => c.id);
       for (const m of this.db.matches.getAll()) {
         if (!clubCategoryIds.includes(m.tournamentCategoryId)) continue;
-        if (!m.scheduledAt || !m.courtId || m.status === "cancelled") continue;
+        if (!m.scheduledAt || m.status === "cancelled") continue;
         const mRuleset = this.db.rulesets.find(
           (r) => r.tournamentCategoryId === m.tournamentCategoryId,
         )[0];
@@ -2610,6 +2999,9 @@ export class TournamentEngine {
           date,
           start: startMin,
           end: startMin + dur,
+          pairIds: [m.pairAId, m.pairBId].filter(
+            (id): id is string => Boolean(id),
+          ),
         });
       }
       for (const r of this.db.courtReservations.getAll()) {
@@ -2623,6 +3015,7 @@ export class TournamentEngine {
           date: r.startsAt.slice(0, 10),
           start: start.getUTCHours() * 60 + start.getUTCMinutes(),
           end: end.getUTCHours() * 60 + end.getUTCMinutes(),
+          pairIds: [],
         });
       }
     }
@@ -2665,109 +3058,141 @@ export class TournamentEngine {
           pairBWindows,
           durationMinutes,
         );
-        candidateWindows = intersectWindows(
-          pairOverlap,
-          tournamentDays,
-          durationMinutes,
-        );
+        // Sin disponibilidad cargada (o sin solape): usar la ventana del torneo.
+        candidateWindows =
+          pairOverlap.length > 0
+            ? intersectWindows(pairOverlap, tournamentDays, durationMinutes)
+            : tournamentDays;
       }
 
-      let best: {
-        score: number;
-        date: string;
-        startTime: string;
-        courtId: string;
-      } | null = null;
+      // Día → horario → cancha: el primer hueco libre gana; si el día está lleno, el siguiente.
+      const orderedWindows = [...candidateWindows].sort(
+        (a, b) =>
+          a.date.localeCompare(b.date) ||
+          a.startTime.localeCompare(b.startTime),
+      );
+      const stepMinutes = Math.max(30, Math.min(60, durationMinutes));
+      let chosen: { date: string; startTime: string; courtId: string } | null =
+        null;
 
-      for (const court of courts) {
-        const courtWindowsRaw: AvailabilityWindow[] = this.db.courtAvailability
-          .find((a) => a.courtId === court.id)
-          .map((a) => ({
-            date: a.date,
-            startTime: a.startTime,
-            endTime: a.endTime,
-            courtId: court.id,
-          }));
-        // Si no hay courtAvailability seed, la cancha está libre en los días del torneo.
-        const courtWindows =
-          courtWindowsRaw.length > 0
-            ? courtWindowsRaw
-            : candidateWindows.map((w) => ({ ...w, courtId: court.id }));
-        const slots = intersectWindows(
-          candidateWindows,
-          courtWindows,
-          durationMinutes,
-        );
-        for (const slot of slots) {
-          const startMin =
-            Number(slot.startTime.slice(0, 2)) * 60 +
-            Number(slot.startTime.slice(3, 5));
-          // Quality: preferir arrancar en dailyStartTime.
-          const preferredStart = quality
-            ? toMinutes(tournament?.dailyStartTime ?? slot.startTime)
-            : startMin;
-          const tryStart = quality
-            ? Math.max(startMin, preferredStart)
-            : startMin;
-          const slotEndMin =
-            Number(slot.endTime.slice(0, 2)) * 60 +
-            Number(slot.endTime.slice(3, 5));
-          if (tryStart + durationMinutes > slotEndMin) continue;
-
-          const conflict = occupied.some(
-            (o) =>
-              o.courtId === court.id &&
-              o.date === slot.date &&
-              !(tryStart + durationMinutes <= o.start || tryStart >= o.end),
+      dayLoop: for (const window of orderedWindows) {
+        const courtWindowsByCourt = new Map<string, AvailabilityWindow[]>();
+        for (const court of courts) {
+          const courtWindowsRaw: AvailabilityWindow[] = this.db.courtAvailability
+            .find((a) => a.courtId === court.id)
+            .map((a) => ({
+              date: a.date,
+              startTime: a.startTime,
+              endTime: a.endTime,
+              courtId: court.id,
+            }));
+          const courtWindows =
+            courtWindowsRaw.length > 0
+              ? courtWindowsRaw
+              : [{ ...window, courtId: court.id }];
+          const daySlots = intersectWindows(
+            [window],
+            courtWindows,
+            durationMinutes,
           );
-          if (conflict) continue;
+          if (daySlots.length > 0) {
+            courtWindowsByCourt.set(court.id, daySlots);
+          }
+        }
+        if (courtWindowsByCourt.size === 0) continue;
 
-          const startsAtIso = `${slot.date}T${String(Math.floor(tryStart / 60)).padStart(2, "0")}:${String(tryStart % 60).padStart(2, "0")}:00.000Z`;
-          const endsAtIso = new Date(
-            new Date(startsAtIso).getTime() + durationMinutes * 60_000,
-          ).toISOString();
-          const reservationHit = this.db.courtReservations.getAll().some(
-            (r) =>
-              r.clubId === tournament?.clubId &&
-              r.courtId === court.id &&
-              r.status !== "cancelled" &&
-              slotOverlapsReservation(startsAtIso, endsAtIso, r),
-          );
-          if (reservationHit) continue;
+        const slotStartCandidates = [...courtWindowsByCourt.values()]
+          .flat()
+          .map((s) => toMinutes(s.startTime));
+        const slotEndCandidates = [...courtWindowsByCourt.values()]
+          .flat()
+          .map((s) => toMinutes(s.endTime));
+        const dayStartMin = Math.min(...slotStartCandidates);
+        const dayEndMin = Math.max(...slotEndCandidates);
+        const preferredStart = quality
+          ? toMinutes(tournament?.dailyStartTime ?? minutesToHm(dayStartMin))
+          : dayStartMin;
+        const firstTry = Math.max(dayStartMin, preferredStart);
 
-          let score = 80;
-          if (quality && tryStart === preferredStart) score += 20;
-          if (tryStart >= 18 * 60) score += 15;
-          if (tryStart < 12 * 60) score -= 10;
-          if (!best || score > best.score) {
-            best = {
-              score,
-              date: slot.date,
-              startTime: `${String(Math.floor(tryStart / 60)).padStart(2, "0")}:${String(tryStart % 60).padStart(2, "0")}`,
+        for (
+          let tryStart = firstTry;
+          tryStart + durationMinutes <= dayEndMin;
+          tryStart += stepMinutes
+        ) {
+          for (const court of courts) {
+            const daySlots = courtWindowsByCourt.get(court.id);
+            if (!daySlots) continue;
+            const fitsWindow = daySlots.some((s) => {
+              const sStart = toMinutes(s.startTime);
+              const sEnd = toMinutes(s.endTime);
+              return tryStart >= sStart && tryStart + durationMinutes <= sEnd;
+            });
+            if (!fitsWindow) continue;
+
+            const conflict = occupied.some((o) => {
+              if (o.date !== window.date) return false;
+              if (tryStart + durationMinutes <= o.start || tryStart >= o.end) {
+                return false;
+              }
+              if (o.courtId === court.id) return true;
+              if (
+                (match.pairAId && o.pairIds.includes(match.pairAId)) ||
+                (match.pairBId && o.pairIds.includes(match.pairBId))
+              ) {
+                return true;
+              }
+              return false;
+            });
+            if (conflict) continue;
+
+            const startTime = minutesToHm(tryStart);
+            const startsAtIso = `${window.date}T${startTime}:00.000Z`;
+            const endsAtIso = new Date(
+              new Date(startsAtIso).getTime() + durationMinutes * 60_000,
+            ).toISOString();
+            const reservationHit = this.db.courtReservations.getAll().some(
+              (r) =>
+                r.clubId === tournament?.clubId &&
+                r.courtId === court.id &&
+                r.status !== "cancelled" &&
+                slotOverlapsReservation(startsAtIso, endsAtIso, r),
+            );
+            if (reservationHit) continue;
+
+            chosen = {
+              date: window.date,
+              startTime,
               courtId: court.id,
             };
+            break dayLoop;
           }
         }
       }
 
-      if (best) {
-        const startMin =
-          Number(best.startTime.slice(0, 2)) * 60 +
-          Number(best.startTime.slice(3, 5));
+      if (chosen) {
+        const startMin = toMinutes(chosen.startTime);
         occupied.push({
-          courtId: best.courtId,
-          date: best.date,
+          courtId: chosen.courtId,
+          date: chosen.date,
           start: startMin,
           end: startMin + durationMinutes,
+          pairIds: [match.pairAId, match.pairBId].filter(
+            (id): id is string => Boolean(id),
+          ),
         });
         this.db.matches.upsert({
           ...match,
-          courtId: best.courtId,
-          scheduledAt: `${best.date}T${best.startTime}:00.000Z`,
+          courtId: chosen.courtId,
+          scheduledAt: `${chosen.date}T${chosen.startTime}:00.000Z`,
           status: "scheduled",
         });
         scheduledCount += 1;
-        if (best.score < 85) suboptimalCount += 1;
+        if (
+          tournamentDays.length > 0 &&
+          chosen.date !== tournamentDays[0]?.date
+        ) {
+          suboptimalCount += 1;
+        }
       }
     }
 
@@ -2922,23 +3347,37 @@ export class TournamentEngine {
 
   async getPlayerHome(playerId: string) {
     await delay();
-    const pairs = this.db.pairs
-      .getAll()
-      .filter((p) => p.player1Id === playerId || p.player2Id === playerId);
-    const pairIds = new Set(pairs.map((p) => p.id));
-    const matches = this.db.matches
-      .getAll()
-      .filter((m) => pairIds.has(m.pairAId ?? "") || pairIds.has(m.pairBId ?? ""))
-      .sort((a, b) => (a.scheduledAt ?? "").localeCompare(b.scheduledAt ?? ""));
-    const next = matches.find((m) => m.status !== "finished") ?? null;
-    const recent = matches.filter((m) => m.status === "finished").slice(-5).reverse();
-    return { pairs, nextMatch: next, recentMatches: recent };
+    return buildPlayerDashboard(this.db, playerId);
+  }
+
+  async getPlayerFeed(clubId: string, playerId: string | null) {
+    await delay();
+    return buildPlayerFeed(this.db, clubId, playerId);
+  }
+
+  async listProvinces() {
+    await delay();
+    return listProvincesFromCatalog().map(({ id, name }) => ({ id, name }));
+  }
+
+  async listCities(provinceIdOrName: string) {
+    await delay();
+    return listCitiesFromCatalog(provinceIdOrName);
+  }
+
+  listPlayerCoverImages() {
+    return [...PLAYER_COVER_PATHS];
   }
 }
 
 function normalizeOptionalPoints(value: number | null | undefined): number | null {
   if (value == null || Number.isNaN(Number(value))) return null;
   return Math.max(0, Math.round(Number(value)));
+}
+
+function normalizePhoneDigits(phone: string | null | undefined): string {
+  if (!phone?.trim()) return "";
+  return phone.replace(/\D/g, "");
 }
 
 function formatLocalHm(iso: string): string {
@@ -3009,4 +3448,10 @@ function isValidHhMm(value: string): boolean {
 function toMinutes(hm: string): number {
   const [h, m] = hm.split(":").map((part) => Number(part));
   return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
+}
+
+function minutesToHm(total: number): string {
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }

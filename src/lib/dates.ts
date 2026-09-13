@@ -1,6 +1,8 @@
 import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
 import "dayjs/locale/es";
 
+dayjs.extend(utc);
 dayjs.locale("es");
 
 function capitalizeWord(value: string): string {
@@ -17,12 +19,15 @@ export function formatLongDateEs(isoDate: string): string {
   return `${weekday} ${d.format("D")} de ${month} ${d.format("YYYY")}`;
 }
 
-/** Ejemplo: "Sábado 15:00" */
+/**
+ * Horario de partido/agenda (hora de pared guardada con sufijo Z).
+ * Ejemplo: "Domingo 19 15:00hs"
+ */
 export function formatScheduleShortEs(isoDate: string | null | undefined): string {
   if (!isoDate) return "Sin horario";
-  const d = dayjs(isoDate);
+  const d = dayjs.utc(isoDate);
   if (!d.isValid()) return "Sin horario";
-  return `${capitalizeWord(d.format("dddd"))} ${d.format("HH:mm")}`;
+  return `${capitalizeWord(d.format("dddd"))} ${d.format("D")} ${d.format("HH:mm")}hs`;
 }
 
 /** Día de torneo (fecha calendario): "Sábado 20 de Septiembre" */

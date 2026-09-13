@@ -9,6 +9,8 @@ import {
 import ClubShell from "@/layout/ClubShell";
 import UserShell from "@/layout/UserShell";
 import EntryScreen from "@/screens/entry/EntryScreen";
+import LoginScreen from "@/screens/entry/LoginScreen";
+import RegisterScreen from "@/screens/entry/RegisterScreen";
 import ClubDashboardScreen from "@/screens/club/ClubDashboardScreen";
 import ClubTournamentsScreen from "@/screens/club/ClubTournamentsScreen";
 import ClubTournamentCreateScreen from "@/screens/club/ClubTournamentCreateScreen";
@@ -24,6 +26,7 @@ import UserRankingScreen from "@/screens/users/UserRankingScreen";
 import UserHistoryScreen from "@/screens/users/UserHistoryScreen";
 import UserProfileScreen from "@/screens/users/UserProfileScreen";
 import RequireFeature from "@/router/guards/RequireFeature";
+import RequireAuth from "@/router/guards/RequireAuth";
 import { ROUTES } from "@/router/routes";
 
 function RootLayout() {
@@ -34,6 +37,8 @@ const router = createBrowserRouter(
   createRoutesFromElements(
     <Route element={<RootLayout />}>
       <Route path={ROUTES.home} element={<EntryScreen />} />
+      <Route path={ROUTES.auth.login} element={<LoginScreen />} />
+      <Route path={ROUTES.auth.register} element={<RegisterScreen />} />
 
       <Route path={ROUTES.player.root} element={<UserShell />}>
         <Route element={<RequireFeature feature="home" redirectTo={ROUTES.home} />}>
@@ -45,20 +50,29 @@ const router = createBrowserRouter(
           }
         >
           <Route path="torneos" element={<UserTournamentsScreen />} />
-          <Route path="torneos/:tournamentId" element={<UserTournamentDetailScreen />} />
+          <Route
+            path="torneos/:tournamentId"
+            element={<UserTournamentDetailScreen />}
+          />
         </Route>
         <Route
           element={<RequireFeature feature="ranking" redirectTo={ROUTES.player.home} />}
         >
           <Route path="ranking" element={<UserRankingScreen />} />
         </Route>
-        <Route
-          element={<RequireFeature feature="history" redirectTo={ROUTES.player.home} />}
-        >
-          <Route path="historial" element={<UserHistoryScreen />} />
+        <Route element={<RequireAuth />}>
+          <Route
+            element={
+              <RequireFeature feature="history" redirectTo={ROUTES.player.home} />
+            }
+          >
+            <Route path="historial" element={<UserHistoryScreen />} />
+          </Route>
         </Route>
         <Route
-          element={<RequireFeature feature="profile" redirectTo={ROUTES.player.home} />}
+          element={
+            <RequireFeature feature="profile" redirectTo={ROUTES.player.home} />
+          }
         >
           <Route path="perfil" element={<UserProfileScreen />} />
         </Route>
@@ -74,28 +88,44 @@ const router = createBrowserRouter(
         </Route>
         <Route
           element={
-            <RequireFeature feature="tournaments" redirectTo={ROUTES.club.dashboard} />
+            <RequireFeature
+              feature="tournaments"
+              redirectTo={ROUTES.club.dashboard}
+            />
           }
         >
           <Route path="torneos" element={<ClubTournamentsScreen />} />
           <Route path="torneos/nuevo" element={<ClubTournamentCreateScreen />} />
-          <Route path="torneos/:tournamentId" element={<ClubTournamentDetailScreen />} />
+          <Route
+            path="torneos/:tournamentId"
+            element={<ClubTournamentDetailScreen />}
+          />
         </Route>
         <Route
-          element={<RequireFeature feature="clients" redirectTo={ROUTES.club.dashboard} />}
+          element={
+            <RequireFeature feature="clients" redirectTo={ROUTES.club.dashboard} />
+          }
         >
           <Route path="clientes" element={<ClubClientsScreen />} />
-          <Route path="clientes/:clientId" element={<ClubClientDetailScreen />} />
+          <Route
+            path="clientes/:clientId"
+            element={<ClubClientDetailScreen />}
+          />
         </Route>
         <Route path="jugadores" element={<Navigate to={ROUTES.club.clients} replace />} />
         <Route
-          element={<RequireFeature feature="courts" redirectTo={ROUTES.club.dashboard} />}
+          element={
+            <RequireFeature feature="courts" redirectTo={ROUTES.club.dashboard} />
+          }
         >
           <Route path="canchas" element={<ClubCourtsScreen />} />
         </Route>
         <Route
           element={
-            <RequireFeature feature="clubSettings" redirectTo={ROUTES.club.dashboard} />
+            <RequireFeature
+              feature="clubSettings"
+              redirectTo={ROUTES.club.dashboard}
+            />
           }
         >
           <Route path="configuracion" element={<ClubSettingsScreen />} />

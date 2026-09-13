@@ -1,0 +1,28 @@
+---
+description: Feedback con toasts de éxito y error en mutaciones UI
+alwaysApply: true
+---
+
+# Toasts — éxito y error
+
+Regla general para mutaciones y acciones de usuario (guardar, sincronizar, aceptar, eliminar, agenda, resultados, etc.).
+
+## Obligatorio
+
+- Toda mutación exitosa muestra `toastSuccess(...)`.
+- Todo fallo muestra `toastError(...)` con mensaje usable (español).
+- Usar helpers de `@/lib/toast` (`toastSuccess`, `toastError`, `toastInfo`).
+- El Toaster global vive en `src/main.tsx` (`@/components/ui/toaster`).
+
+## Evitar
+
+- Banners/inline `setMessage` como único feedback de guardado.
+- Toasts en syncs silenciosos de fondo (mount / cambio de tab) — solo en acciones disparadas por el usuario.
+- Copy técnico o enums en el toast.
+
+## Ejemplo
+
+```ts
+onSuccess: () => toastSuccess("Configuración guardada"),
+onError: (err: Error) => toastError("No se pudo guardar", err.message),
+```
