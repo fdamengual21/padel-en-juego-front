@@ -86,5 +86,16 @@
     "user1Id": null,
     "user2Id": null,
     "sidePreference": null
+  },
+  {
+    "id": "pair-9",
+    "tournamentCategoryId": "cat-2",
+    "player1Id": "player-1",
+    "player2Id": "player-3",
+    "seed": 1,
+    "status": "active",
+    "user1Id": "user-2",
+    "user2Id": null,
+    "sidePreference": null
   }
 ]

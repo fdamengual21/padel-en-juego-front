@@ -32,7 +32,7 @@
     "startTime": "18:00",
     "endTime": "23:00",
     "daysOfWeek": [5, 6],
-    "price": 20000,
+    "price": 18000,
     "label": "Pico"
   }
 ]

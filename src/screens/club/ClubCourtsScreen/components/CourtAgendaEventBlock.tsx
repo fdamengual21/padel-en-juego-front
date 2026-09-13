@@ -53,7 +53,7 @@ export default function CourtAgendaEventBlock({
     <button
       type="button"
       className={cn(
-        "absolute overflow-hidden rounded-md border border-l-[3px] px-1.5 text-left outline-none",
+        "absolute z-10 overflow-hidden rounded-md border border-l-[3px] px-1.5 text-left outline-none",
         toneClasses[tone],
         cancelled && "opacity-55",
         density === "compact" ? "py-0.5" : "py-1",
@@ -65,23 +65,26 @@ export default function CourtAgendaEventBlock({
         left: `calc(${leftPct}% + 2px)`,
         width: `calc(${widthPct}% - 4px)`,
       }}
-      onClick={() => onSelect?.(event.id)}
+      onClick={(clickEvent) => {
+        clickEvent.stopPropagation();
+        onSelect?.(event.id);
+      }}
     >
       {timeLine ? (
-        <span className="block truncate text-[10px] font-semibold opacity-85">
+        <span className="block truncate text-xs font-semibold opacity-85">
           {timeLine}
         </span>
       ) : null}
       <span
         className={cn(
-          "block truncate text-[11px] font-bold leading-tight",
+          "block truncate text-[13px] font-bold leading-tight",
           cancelled && "line-through",
         )}
       >
         {title}
       </span>
       {density !== "compact" && subtitle ? (
-        <span className="block truncate text-[10px] opacity-80">{subtitle}</span>
+        <span className="block truncate text-xs opacity-80">{subtitle}</span>
       ) : null}
     </button>
   );

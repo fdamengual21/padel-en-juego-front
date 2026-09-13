@@ -11,12 +11,17 @@ function mapAgendaStatus(
 
 export function mapCourtAgendaEventToGridItem(
   event: CourtAgendaEvent,
+  options?: { courtName?: string | null },
 ): CalendarEventGridItemDto {
+  const courtName = options?.courtName?.trim() || null;
+  const baseSubtitle = event.subtitle?.trim() || null;
+  const subtitle = [courtName, baseSubtitle].filter(Boolean).join(" · ") || null;
+
   return {
     id: event.id,
     type: event.kind,
     title: event.title,
-    subtitle: event.subtitle,
+    subtitle,
     startAt: event.startAt,
     endAt: event.endAt,
     allDay: event.allDay,

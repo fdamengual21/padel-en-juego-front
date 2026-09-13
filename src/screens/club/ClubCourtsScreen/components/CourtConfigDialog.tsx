@@ -76,8 +76,6 @@ export default function CourtConfigDialog({
 }: CourtConfigDialogProps) {
   const [slotDurationMinutes, setSlotDurationMinutes] = useState(90);
   const [basePrice, setBasePrice] = useState("0");
-  const [openTime, setOpenTime] = useState("");
-  const [closeTime, setCloseTime] = useState("");
   const [rules, setRules] = useState<RuleDraft[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -87,8 +85,6 @@ export default function CourtConfigDialog({
     if (!open) return;
     setSlotDurationMinutes(court.slotDurationMinutes === 120 ? 120 : 90);
     setBasePrice(String(court.basePrice));
-    setOpenTime(court.openTime ?? "");
-    setCloseTime(court.closeTime ?? "");
     setRules(priceRules.map(toRuleDraft));
     setDeletedRuleIds([]);
     setError(null);
@@ -133,8 +129,6 @@ export default function CourtConfigDialog({
       await Api.TournamentOpsService().updateCourt(court.id, {
         slotDurationMinutes,
         basePrice: price,
-        openTime: openTime.trim() || null,
-        closeTime: closeTime.trim() || null,
       });
 
       const idsToRemove = new Set<string>([
@@ -175,8 +169,8 @@ export default function CourtConfigDialog({
         <DialogHeader>
           <DialogTitle>Configurar {court.name}</DialogTitle>
           <DialogDescription>
-            Duración del turno, precio base, override opcional de horario y
-            tarifas. El horario del club se define en Configuración.
+            Duración del turno, precio base y tarifas. El horario de apertura
+            es único del club y se edita en Configuración.
           </DialogDescription>
         </DialogHeader>
 
@@ -228,30 +222,6 @@ export default function CourtConfigDialog({
                 value={basePrice}
                 onChange={(e) => setBasePrice(e.target.value)}
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="court-open">Apertura cancha (opcional)</Label>
-              <Input
-                id="court-open"
-                type="time"
-                value={openTime}
-                onChange={(e) => setOpenTime(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Vacío = hereda del club ({club.openTime})
-              </p>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="court-close">Cierre cancha (opcional)</Label>
-              <Input
-                id="court-close"
-                type="time"
-                value={closeTime}
-                onChange={(e) => setCloseTime(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Vacío = hereda del club ({club.closeTime})
-              </p>
             </div>
           </div>
 

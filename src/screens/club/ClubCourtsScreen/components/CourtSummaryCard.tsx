@@ -3,7 +3,6 @@ import {
   CalendarPlus,
   Clock3,
   MapPin,
-  Users,
 } from "lucide-react";
 import type { Club, Court, CourtDaySummary } from "@core-api";
 import { Button } from "@/components/ui/button";
@@ -43,6 +42,7 @@ export default function CourtSummaryCard({
         ? "Ocupada"
         : "Cerrado";
   const available = liveStatus === "available";
+  const openLabel = `${club.openTime} – ${club.closeTime}`;
 
   return (
     <article
@@ -126,13 +126,13 @@ export default function CourtSummaryCard({
 
             <div className="space-y-1 px-3">
               <div className="flex items-center gap-1.5 text-muted-foreground">
-                <Users className="size-3.5" />
-                <p className="text-xs">Capacidad</p>
+                <Clock3 className="size-3.5" />
+                <p className="text-xs">Horario</p>
               </div>
-              <p className="text-base font-semibold text-foreground">
-                2 – 4 jugadores
+              <p className="text-base font-semibold tabular-nums text-foreground">
+                {openLabel}
               </p>
-              <p className="text-xs text-muted-foreground">Por turno</p>
+              <p className="text-xs text-muted-foreground">Apertura del día</p>
             </div>
 
             <div className="space-y-1 px-3">

@@ -1,38 +1,25 @@
-import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
-import Api from '@/api/Api'
-import { useMockSession } from '@/app/MockSessionProvider'
-import MatchCard from '@/components/tournaments/MatchCard'
-import { buttonVariants } from '@/components/ui/button'
-import { ROUTES } from '@/router/routes'
-import { cn } from '@/lib/utils'
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
+import Api from "@/api/Api";
+import { useMockSession } from "@/app/MockSessionProvider";
+import { buttonVariants } from "@/components/ui/button";
+import ClientDetailModal from "@/screens/club/ClubClientDetailScreen/components/ClientDetailModal";
+import { ROUTES } from "@/router/routes";
+import { cn } from "@/lib/utils";
+import DashboardMatchCard from "./components/DashboardMatchCard";
+import DashboardReservationCard from "./components/DashboardReservationCard";
 
 export default function ClubDashboardScreen() {
-  const { clubId } = useMockSession()
+  const { clubId } = useMockSession();
+  const [clientDetailId, setClientDetailId] = useState<string | null>(null);
   const { data, isLoading } = useQuery({
-    queryKey: ['dashboard', clubId],
+    queryKey: ["dashboard", clubId],
     queryFn: () => Api.TournamentOpsService().getDashboard(clubId),
-  })
-  const { data: pairs = [] } = useQuery({
-    queryKey: ['pairs', 'cat-1'],
-    queryFn: () => Api.TournamentOpsService().listPairs('cat-1'),
-  })
-  const { data: players = [] } = useQuery({
-    queryKey: ['players'],
-    queryFn: () => Api.TournamentOpsService().listPlayers(),
-  })
-
-  const pairLabel = (id: string | null) => {
-    if (!id) return 'Por definir'
-    const pair = pairs.find((p) => p.id === id)
-    if (!pair) return id
-    const p1 = players.find((p) => p.id === pair.player1Id)?.displayName ?? '?'
-    const p2 = players.find((p) => p.id === pair.player2Id)?.displayName ?? '?'
-    return `${p1} / ${p2}`
-  }
+  });
 
   if (isLoading || !data) {
-    return <p className="text-muted-foreground">Cargando dashboard…</p>
+    return <p className="text-muted-foreground">Cargando dashboard…</p>;
   }
 
   return (
@@ -54,24 +41,53 @@ export default function ClubDashboardScreen() {
       </div>
 
       <section className="space-y-3">
-        <h3 className="text-lg font-medium">Próximos partidos</h3>
-        {data.upcoming.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No hay partidos programados todavía.</p>
+        <h3 className="text-lg font-medium">Próximas reservas</h3>
+        {data.upcomingReservations.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No hay reservas próximas.
+          </p>
         ) : (
           <div className="grid gap-3 md:grid-cols-2">
-            {data.upcoming.map((match) => (
-              <MatchCard
-                key={match.id}
-                match={match}
-                pairALabel={pairLabel(match.pairAId)}
-                pairBLabel={pairLabel(match.pairBId)}
+            {data.upcomingReservations.map((item) => (
+              <DashboardReservationCard
+                key={item.reservation.id}
+                item={item}
+                onOpenClient={setClientDetailId}
               />
             ))}
           </div>
         )}
       </section>
+
+      <section className="space-y-3">
+        <h3 className="text-lg font-medium">Próximos partidos de torneo</h3>
+        {data.upcomingMatches.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No hay partidos de torneo programados.
+          </p>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2">
+            {data.upcomingMatches.map((item) => (
+              <DashboardMatchCard
+                key={item.match.id}
+                item={item}
+                onOpenClient={setClientDetailId}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <ClientDetailModal
+        open={Boolean(clientDetailId)}
+        clubId={clubId}
+        clientId={clientDetailId}
+        onOpenChange={(open) => {
+          if (!open) setClientDetailId(null);
+        }}
+      />
     </div>
-  )
+  );
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
@@ -84,5 +100,5 @@ function Stat({ label, value }: { label: string; value: string }) {
         {value}
       </p>
     </div>
-  )
+  );
 }

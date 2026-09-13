@@ -5,6 +5,7 @@ import {
   type CalendarEventGridItemDto,
 } from "@/modules/schedule";
 import CourtAgendaEventBlock from "./CourtAgendaEventBlock";
+import CourtAgendaEventGroupBlock from "./CourtAgendaEventGroupBlock";
 
 interface CourtAgendaDayColumnProps {
   events: CalendarEventGridItemDto[];
@@ -15,9 +16,8 @@ interface CourtAgendaDayColumnProps {
 }
 
 /**
- * Same slot model as concesionarias Hour/Day columns: fixed 120px rows with an
- * inner top rule. Empty-slot clicks use an overlay so the button chrome cannot
- * change the measured row height (the original `button`+`border-t` drift).
+ * Same slot model as concesionarias: fixed 120px rows + inner top rule.
+ * Same-minute starts collapse into a group chip + list.
  */
 export default function CourtAgendaDayColumn({
   events,
@@ -45,7 +45,7 @@ export default function CourtAgendaDayColumn({
             <div className="w-full border-t border-border" />
             <button
               type="button"
-              className="absolute inset-0 m-0 block w-full appearance-none border-0 bg-transparent p-0 hover:bg-muted/40"
+              className="absolute inset-0 z-0 m-0 block w-full appearance-none border-0 bg-transparent p-0 hover:bg-muted/40"
               aria-label={`Crear reserva a las ${String(hour).padStart(2, "0")}:00`}
               onClick={() => onEmptySlotClick?.(hour)}
             />
@@ -54,16 +54,10 @@ export default function CourtAgendaDayColumn({
       })}
       {items.map((item) =>
         item.kind === "group" ? (
-          <CourtAgendaEventBlock
+          <CourtAgendaEventGroupBlock
             key={item.group.id}
-            placement={{
-              event: item.group.events[0]!,
-              top: item.group.top,
-              height: item.group.height,
-              columnIndex: 0,
-              columnCount: 1,
-            }}
-            onSelect={onSelectEvent}
+            group={item.group}
+            onSelectEvent={onSelectEvent}
           />
         ) : (
           <CourtAgendaEventBlock

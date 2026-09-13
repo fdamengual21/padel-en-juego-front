@@ -77,13 +77,20 @@ function clubTournaments(db: CoreApiDb, clubId: string): Tournament[] {
   return db.tournaments.getAll().filter((t) => t.clubId === clubId);
 }
 
-function pairsForPlayerInClub(
+/** Cliente con cuenta de usuario: historial de torneos en todos los clubes. */
+function includesCrossClubTournamentHistory(client: Client): boolean {
+  return Boolean(client.userId);
+}
+
+function pairsForPlayer(
   db: CoreApiDb,
-  clubId: string,
   playerId: string | null,
+  clubIdFilter: string | null,
 ): { pair: TournamentPair; category: TournamentCategory; tournament: Tournament }[] {
   if (!playerId) return [];
-  const tournaments = clubTournaments(db, clubId);
+  const tournaments = clubIdFilter
+    ? clubTournaments(db, clubIdFilter)
+    : db.tournaments.getAll();
   const tournamentById = new Map(tournaments.map((t) => [t.id, t]));
   const categories = db.categories
     .getAll()
@@ -105,6 +112,13 @@ function pairsForPlayerInClub(
     out.push({ pair, category, tournament });
   }
   return out;
+}
+
+function participationsForClient(db: CoreApiDb, client: Client) {
+  const clubFilter = includesCrossClubTournamentHistory(client)
+    ? null
+    : client.clubId;
+  return pairsForPlayer(db, client.playerId, clubFilter);
 }
 
 function matchStatsForPair(
@@ -151,7 +165,7 @@ export function buildClubClientSummary(
     db.courtReservations.getAll().filter((r) => r.clubId === client.clubId),
     client.id,
   );
-  const participations = pairsForPlayerInClub(db, client.clubId, client.playerId);
+  const participations = participationsForClient(db, client);
   const matches = db.matches.getAll();
 
   let matchesWon = 0;
@@ -200,9 +214,10 @@ export function buildClubClientDetail(
   client: Client,
 ): ClubClientDetail {
   const summary = buildClubClientSummary(db, client);
-  const participations = pairsForPlayerInClub(db, client.clubId, client.playerId);
+  const participations = participationsForClient(db, client);
   const matches = db.matches.getAll();
   const playersById = new Map(db.players.getAll().map((p) => [p.id, p]));
+  const clubsById = new Map(db.clubs.getAll().map((c) => [c.id, c]));
 
   const tournaments: ClubClientTournamentEntry[] = participations.map(
     ({ pair, category, tournament }) => {
@@ -212,9 +227,12 @@ export function buildClubClientDetail(
       const partnerName = partnerId
         ? (playersById.get(partnerId)?.displayName ?? null)
         : null;
+      const club = clubsById.get(tournament.clubId);
       return {
         tournamentId: tournament.id,
         tournamentName: tournament.name,
+        clubId: tournament.clubId,
+        clubName: club?.name ?? "Club",
         tournamentStatus: tournament.status,
         startDate: tournament.startDate,
         endDate: tournament.endDate,
@@ -233,7 +251,11 @@ export function buildClubClientDetail(
     },
   );
 
-  tournaments.sort((a, b) => a.tournamentName.localeCompare(b.tournamentName, "es"));
+  tournaments.sort((a, b) => {
+    const byDate = b.startDate.localeCompare(a.startDate);
+    if (byDate !== 0) return byDate;
+    return a.tournamentName.localeCompare(b.tournamentName, "es");
+  });
 
   const recentReservations = activeReservations(
     db.courtReservations.getAll().filter((r) => r.clubId === client.clubId),

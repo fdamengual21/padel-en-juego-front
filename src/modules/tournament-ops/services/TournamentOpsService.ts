@@ -152,6 +152,14 @@ export class TournamentOpsService {
     return this.repository.getCourtAgendaBoard(...args);
   }
 
+  listCourtsDayOverview(clubId: string, date: string) {
+    return this.repository.listCourtsDayOverview(clubId, date);
+  }
+
+  getCourtsAgendaBoard(clubId: string, options: { from: string; to: string }) {
+    return this.repository.getCourtsAgendaBoard(clubId, options);
+  }
+
   quoteCourtSlot(courtId: string, startsAt: string) {
     return this.repository.quoteCourtSlot(courtId, startsAt);
   }

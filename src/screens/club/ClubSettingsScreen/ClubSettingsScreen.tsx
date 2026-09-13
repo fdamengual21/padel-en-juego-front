@@ -84,8 +84,8 @@ export default function ClubSettingsScreen() {
       <div>
         <h2 className="text-2xl font-semibold tracking-tight">Configuración</h2>
         <p className="text-sm text-muted-foreground">
-          Datos del club, ubicación y horario de apertura. Las canchas heredan
-          este horario.
+          Datos del club, ubicación y horario de apertura. Ese horario vale
+          para todas las canchas.
         </p>
       </div>
 

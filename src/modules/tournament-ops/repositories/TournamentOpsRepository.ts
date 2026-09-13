@@ -67,6 +67,14 @@ export interface ITournamentOpsRepository {
     courtId: string,
     options: Parameters<ReturnType<typeof coreApi>["getCourtAgendaBoard"]>[2],
   ): ReturnType<ReturnType<typeof coreApi>["getCourtAgendaBoard"]>
+  listCourtsDayOverview(
+    clubId: string,
+    date: string,
+  ): ReturnType<ReturnType<typeof coreApi>["listCourtsDayOverview"]>
+  getCourtsAgendaBoard(
+    clubId: string,
+    options: { from: string; to: string },
+  ): ReturnType<ReturnType<typeof coreApi>["getCourtsAgendaBoard"]>
   quoteCourtSlot(
     courtId: string,
     startsAt: string,
@@ -303,6 +311,14 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
     options: Parameters<ReturnType<typeof coreApi>["getCourtAgendaBoard"]>[2],
   ) {
     return coreApi().getCourtAgendaBoard(clubId, courtId, options)
+  }
+
+  listCourtsDayOverview(clubId: string, date: string) {
+    return coreApi().listCourtsDayOverview(clubId, date)
+  }
+
+  getCourtsAgendaBoard(clubId: string, options: { from: string; to: string }) {
+    return coreApi().getCourtsAgendaBoard(clubId, options)
   }
 
   quoteCourtSlot(courtId: string, startsAt: string) {

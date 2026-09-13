@@ -7,6 +7,8 @@ const labels: Record<string, string> = {
   finished: "Finalizado",
   walkover: "Walkover",
   cancelled: "Cancelado",
+  booked: "Reservada",
+  completed: "Completada",
   draft: "Borrador",
   registrationOpen: "Inscripciones abiertas",
   draftTournament: "Borrador",

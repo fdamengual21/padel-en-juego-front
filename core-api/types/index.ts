@@ -390,9 +390,6 @@ export interface Court {
   slotDurationMinutes: number;
   /** Precio base del turno (ARS). */
   basePrice: number;
-  /** Si null, hereda horario del club. */
-  openTime: string | null;
-  closeTime: string | null;
 }
 
 /** Precio especial por franja horaria de una cancha. */
@@ -487,6 +484,9 @@ export interface ClubClientSummary {
 export interface ClubClientTournamentEntry {
   tournamentId: string;
   tournamentName: string;
+  /** Club donde se jugó el torneo (puede diferir del club de la ficha). */
+  clubId: string;
+  clubName: string;
   tournamentStatus: TournamentStatus;
   /** Fecha de inicio del torneo (YYYY-MM-DD o ISO). */
   startDate: string;
@@ -597,6 +597,46 @@ export interface ParticipantsBoardView {
   notice: string | null;
 }
 
+/** Jugador enriquecido para cards del dashboard club. */
+export interface DashboardPlayerRef {
+  playerId: string | null;
+  clientId: string | null;
+  displayName: string;
+  avatarUrl: string | null;
+}
+
+export interface DashboardUpcomingMatch {
+  match: Match;
+  tournamentName: string;
+  categoryName: string;
+  courtName: string | null;
+  /** Etiqueta de fase en lenguaje de club (ej. Zonas, Semifinal). */
+  phaseLabel: string;
+  pairA: [DashboardPlayerRef, DashboardPlayerRef];
+  pairB: [DashboardPlayerRef, DashboardPlayerRef];
+}
+
+export interface DashboardUpcomingReservation {
+  reservation: CourtReservation;
+  courtName: string;
+  client: {
+    id: string;
+    displayName: string;
+    avatarUrl: string | null;
+    phone: string | null;
+  } | null;
+}
+
+export interface ClubDashboardView {
+  upcomingMatches: DashboardUpcomingMatch[];
+  upcomingReservations: DashboardUpcomingReservation[];
+  registeredPairs: number;
+  liveMatches: number;
+  courtsInUse: number;
+  courtsTotal: number;
+  tournaments: Tournament[];
+}
+
 /** Tab Partidos. */
 export interface MatchesBoardView {
   categoryId: string;
@@ -705,6 +745,38 @@ export interface CourtAgendaBoardView {
   notice: string | null;
 }
 
+/** Resumen liviano de una cancha para la vista “Todas” del día. */
+export interface CourtDayOverviewItem {
+  court: Court;
+  date: string;
+  liveStatus: CourtLiveStatus;
+  freeSlots: number;
+  totalSlots: number;
+  nextFreeAt: string | null;
+  minPrice: number | null;
+  priceBands: CourtDayPriceBand[];
+  availableSlots: CourtAvailableSlot[];
+}
+
+export interface CourtsDayOverviewView {
+  clubId: string;
+  date: string;
+  generatedAt: string;
+  items: CourtDayOverviewItem[];
+}
+
+/** Agenda global: eventos de todas las canchas del club. */
+export interface CourtsAgendaBoardView {
+  clubId: string;
+  generatedAt: string;
+  club: Club;
+  courts: Court[];
+  events: CourtAgendaEvent[];
+  /** Horario abierto/cerrado del club (para la grilla). */
+  openTime: string;
+  closeTime: string;
+}
+
 export interface CourtSlotQuote {
   price: number;
   label: string | null;
@@ -724,8 +796,6 @@ export interface CreateCourtInput {
   name: string;
   slotDurationMinutes?: number;
   basePrice?: number;
-  openTime?: string | null;
-  closeTime?: string | null;
   imageUrl?: string | null;
 }
 

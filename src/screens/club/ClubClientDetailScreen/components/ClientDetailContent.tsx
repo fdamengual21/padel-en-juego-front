@@ -79,15 +79,20 @@ export default function ClientDetailContent({
         <h3 className="text-sm font-medium text-foreground">Torneos</h3>
         {data.tournaments.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Todavía no jugó torneos en este club.
+            {data.client.userId
+              ? "Todavía no jugó torneos."
+              : "Todavía no jugó torneos en este club."}
           </p>
         ) : (
           <ul className="divide-y divide-border rounded-xl border border-border bg-card">
             {data.tournaments.map((entry) => {
+              const title = `${entry.tournamentName} - ${entry.clubName}`;
+              const canLink =
+                linkTournaments && entry.clubId === data.client.clubId;
               const body = (
                 <>
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="font-medium text-foreground">{entry.tournamentName}</p>
+                    <p className="font-medium text-foreground">{title}</p>
                     <span className="text-xs font-medium text-muted-foreground">
                       {outcomeLabel(entry.outcome)}
                     </span>
@@ -110,7 +115,7 @@ export default function ClientDetailContent({
 
               return (
                 <li key={`${entry.tournamentId}-${entry.categoryId}`}>
-                  {linkTournaments ? (
+                  {canLink ? (
                     <Link
                       to={ROUTES.club.tournamentDetail(entry.tournamentId)}
                       className="flex flex-col gap-1 px-4 py-3 transition-colors hover:bg-muted/40"

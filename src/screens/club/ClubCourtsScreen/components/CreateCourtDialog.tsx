@@ -72,7 +72,7 @@ export default function CreateCourtDialog({
         <DialogHeader>
           <DialogTitle>Agregar cancha</DialogTitle>
           <DialogDescription>
-            Creá la cancha y después configurá horarios y tarifas.
+            Creá la cancha y después configurá duración y tarifas.
           </DialogDescription>
         </DialogHeader>
 

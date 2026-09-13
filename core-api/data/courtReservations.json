@@ -4,21 +4,21 @@
     "clubId": "club-1",
     "clientId": "client-1",
     "courtId": "court-1",
-    "startsAt": "2026-09-12T15:00:00.000Z",
-    "endsAt": "2026-09-12T16:30:00.000Z",
+    "startsAt": "2026-09-12T11:00:00.000Z",
+    "endsAt": "2026-09-12T12:30:00.000Z",
     "status": "completed",
-    "price": 12000,
+    "price": 16000,
     "createdAt": "2026-09-11T10:00:00.000Z"
   },
   {
     "id": "reservation-2",
     "clubId": "club-1",
-    "clientId": "client-1",
+    "clientId": "client-12",
     "courtId": "court-1",
-    "startsAt": "2026-09-12T21:00:00.000Z",
-    "endsAt": "2026-09-12T22:30:00.000Z",
+    "startsAt": "2026-09-12T18:30:00.000Z",
+    "endsAt": "2026-09-12T20:00:00.000Z",
     "status": "booked",
-    "price": 16000,
+    "price": 18000,
     "createdAt": "2026-09-12T10:00:00.000Z"
   },
   {
@@ -26,22 +26,22 @@
     "clubId": "club-1",
     "clientId": "client-3",
     "courtId": "court-1",
-    "startsAt": "2026-09-12T18:00:00.000Z",
-    "endsAt": "2026-09-12T19:30:00.000Z",
+    "startsAt": "2026-09-12T23:00:00.000Z",
+    "endsAt": "2026-09-13T00:30:00.000Z",
     "status": "booked",
-    "price": 16000,
-    "createdAt": "2026-09-13T09:00:00.000Z"
+    "price": 18000,
+    "createdAt": "2026-09-12T11:00:00.000Z"
   },
   {
     "id": "reservation-4",
     "clubId": "club-1",
     "clientId": "client-17",
     "courtId": "court-2",
-    "startsAt": "2026-09-12T19:00:00.000Z",
-    "endsAt": "2026-09-12T20:30:00.000Z",
+    "startsAt": "2026-09-12T15:30:00.000Z",
+    "endsAt": "2026-09-12T17:00:00.000Z",
     "status": "booked",
     "price": 12000,
-    "createdAt": "2026-09-14T11:00:00.000Z"
+    "createdAt": "2026-09-12T12:00:00.000Z"
   },
   {
     "id": "reservation-5",
@@ -49,9 +49,20 @@
     "clientId": "client-3",
     "courtId": "court-3",
     "startsAt": "2026-09-13T20:00:00.000Z",
-    "endsAt": "2026-09-13T22:00:00.000Z",
+    "endsAt": "2026-09-13T21:30:00.000Z",
     "status": "booked",
-    "price": 20000,
+    "price": 18000,
     "createdAt": "2026-09-12T12:00:00.000Z"
+  },
+  {
+    "id": "reservation-6",
+    "clubId": "club-1",
+    "clientId": "client-1",
+    "courtId": "court-4",
+    "startsAt": "2026-09-12T17:00:00.000Z",
+    "endsAt": "2026-09-12T18:30:00.000Z",
+    "status": "booked",
+    "price": 11000,
+    "createdAt": "2026-09-12T13:00:00.000Z"
   }
 ]

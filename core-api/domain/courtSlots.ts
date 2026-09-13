@@ -1,4 +1,4 @@
-import type { Club, Court, WeekdayIso } from "../types";
+import type { Club, WeekdayIso } from "../types";
 
 function parseHm(hm: string): { hour: number; minute: number } {
   const [h, m] = hm.split(":").map((part) => Number(part));
@@ -26,14 +26,24 @@ export function isZeroLengthHours(openTime: string, closeTime: string): boolean 
   return hmToMinutes(openTime) === hmToMinutes(closeTime);
 }
 
-export function resolveCourtHours(
-  court: Pick<Court, "openTime" | "closeTime">,
+/**
+ * Horario de apertura/cierre del club (único para todas las canchas).
+ */
+export function resolveClubHours(
   club: Pick<Club, "openTime" | "closeTime">,
 ): { openTime: string; closeTime: string } {
   return {
-    openTime: court.openTime ?? club.openTime,
-    closeTime: court.closeTime ?? club.closeTime,
+    openTime: club.openTime,
+    closeTime: club.closeTime,
   };
+}
+
+/** @deprecated Use resolveClubHours — el horario es solo del club. */
+export function resolveCourtHours(
+  _court: unknown,
+  club: Pick<Club, "openTime" | "closeTime">,
+): { openTime: string; closeTime: string } {
+  return resolveClubHours(club);
 }
 
 /** ISO weekday 1=lunes … 7=domingo a partir de YYYY-MM-DD (mediodía local). */
@@ -63,16 +73,17 @@ export function isClubOpenOnDate(
 }
 
 /**
- * ¿La cancha está dentro del horario de apertura en el instante `at`?
+ * ¿El club está dentro del horario de apertura en el instante `at`?
  * Contempla cierre overnight (p. ej. 08:00–00:00).
+ * El horario es único del club (no por cancha).
  */
 export function isCourtOpenAt(
   club: Pick<Club, "openTime" | "closeTime" | "openDays">,
-  court: Pick<Court, "openTime" | "closeTime">,
+  _court: unknown = null,
   at: Date = new Date(),
 ): boolean {
   if (Number.isNaN(at.getTime())) return false;
-  const { openTime, closeTime } = resolveCourtHours(court, club);
+  const { openTime, closeTime } = resolveClubHours(club);
   const openMin = hmToMinutes(openTime);
   const closeMin = hmToMinutes(closeTime);
   if (openMin === closeMin) return false;
@@ -138,6 +149,43 @@ export function generateDaySlots(
     });
   }
   return slots;
+}
+
+/** True if `startsAt` is exactly one of the fixed turns from open→close. */
+export function isAlignedCourtSlotStart(
+  dateIso: string,
+  openTime: string,
+  closeTime: string,
+  slotDurationMinutes: number,
+  startsAt: string,
+): boolean {
+  const target = new Date(startsAt).getTime();
+  if (Number.isNaN(target)) return false;
+  return generateDaySlots(
+    dateIso,
+    openTime,
+    closeTime,
+    slotDurationMinutes,
+  ).some((slot) => new Date(slot.startsAt).getTime() === target);
+}
+
+/** Nearest generated slot start to `targetIso` (by absolute ms distance). */
+export function nearestCourtSlotStart(
+  slots: readonly CourtDaySlot[],
+  targetIso: string,
+): string | null {
+  const target = new Date(targetIso).getTime();
+  if (Number.isNaN(target) || slots.length === 0) return null;
+  let best: CourtDaySlot | null = null;
+  let bestDist = Number.POSITIVE_INFINITY;
+  for (const slot of slots) {
+    const dist = Math.abs(new Date(slot.startsAt).getTime() - target);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = slot;
+    }
+  }
+  return best?.startsAt ?? null;
 }
 
 export function intervalsOverlap(

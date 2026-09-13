@@ -127,12 +127,13 @@ function withClubDefaults(club: Club): Club {
 
 function withCourtDefaults(court: Court): Court {
   return {
-    ...court,
+    id: court.id,
+    clubId: court.clubId,
+    name: court.name,
+    status: court.status,
     imageUrl: court.imageUrl ?? null,
     slotDurationMinutes: court.slotDurationMinutes ?? DEFAULT_SLOT_MINUTES,
     basePrice: court.basePrice ?? DEFAULT_BASE_PRICE,
-    openTime: court.openTime ?? null,
-    closeTime: court.closeTime ?? null,
   };
 }
 

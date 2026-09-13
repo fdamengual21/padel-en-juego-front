@@ -10,5 +10,17 @@
     "maxPairs": 16,
     "circuitType": "CICUPA",
     "status": "active"
+  },
+  {
+    "id": "cat-2",
+    "tournamentId": "tournament-2",
+    "name": "6ta Masculino",
+    "gender": "male",
+    "kind": "level",
+    "level": 6,
+    "sumaTarget": null,
+    "maxPairs": 8,
+    "circuitType": "CICUPA",
+    "status": "active"
   }
 ]

@@ -77,11 +77,12 @@ import { resolvePriceForSlot, validateCourtPriceRules } from "../domain/courtPri
 import {
   generateDaySlots,
   intervalsOverlap,
+  isAlignedCourtSlotStart,
   isClubOpenOnDate,
   isCourtOpenAt,
   isZeroLengthHours,
   localDateIsoFromInstant,
-  resolveCourtHours,
+  resolveClubHours,
   weekdayIsoFromDateIso,
 } from "../domain/courtSlots";
 import type {
@@ -1415,8 +1416,6 @@ export class TournamentEngine {
       imageUrl: input.imageUrl ?? pickRandomCourtImagePath(),
       slotDurationMinutes,
       basePrice,
-      openTime: input.openTime ?? null,
-      closeTime: input.closeTime ?? null,
     };
     return this.db.courts.upsert(court);
   }
@@ -1431,32 +1430,12 @@ export class TournamentEngine {
         | "imageUrl"
         | "slotDurationMinutes"
         | "basePrice"
-        | "openTime"
-        | "closeTime"
       >
     >,
   ): Promise<Court> {
     await delay();
     const current = this.db.courts.getById(id);
     if (!current) throw new Error("Cancha no encontrada");
-
-    const openTime =
-      patch.openTime !== undefined ? patch.openTime : current.openTime;
-    const closeTime =
-      patch.closeTime !== undefined ? patch.closeTime : current.closeTime;
-    if (openTime != null || closeTime != null) {
-      if (
-        openTime == null ||
-        closeTime == null ||
-        !isValidHhMm(openTime) ||
-        !isValidHhMm(closeTime)
-      ) {
-        throw new Error("Horario de cancha inválido (usá HH:mm en ambos)");
-      }
-      if (isZeroLengthHours(openTime, closeTime)) {
-        throw new Error("La apertura y el cierre no pueden ser la misma hora");
-      }
-    }
 
     return this.db.courts.upsert({ ...current, ...patch });
   }
@@ -1572,7 +1551,7 @@ export class TournamentEngine {
     }
     if (!isClubOpenOnDate(club, dateIso)) return [];
 
-    const hours = resolveCourtHours(court, club);
+    const hours = resolveClubHours(club);
     const slots = generateDaySlots(
       dateIso,
       hours.openTime,
@@ -1623,6 +1602,7 @@ export class TournamentEngine {
       new Date(
         new Date(input.startsAt).getTime() + court.slotDurationMinutes * 60_000,
       ).toISOString();
+    this.assertCourtSlotAligned(club, court, input.startsAt);
     this.assertCourtSlotFree(input.clubId, input.courtId, input.startsAt, endsAt);
 
     const reservation: CourtReservation = {
@@ -1660,6 +1640,11 @@ export class TournamentEngine {
     }
 
     if (courtId && (patch.startsAt || patch.endsAt || patch.courtId !== undefined)) {
+      const court = this.db.courts.getById(courtId);
+      const club = this.db.clubs.getById(current.clubId);
+      if (court && club && patch.startsAt) {
+        this.assertCourtSlotAligned(club, court, startsAt);
+      }
       this.assertCourtSlotFree(
         current.clubId,
         courtId,
@@ -1743,6 +1728,80 @@ export class TournamentEngine {
     };
   }
 
+  /** Resumen del día para todas las canchas del club (vista Todas). */
+  async listCourtsDayOverview(
+    clubId: string,
+    date: string,
+  ): Promise<import("../types").CourtsDayOverviewView> {
+    await delay(120);
+    const club = this.db.clubs.getById(clubId);
+    if (!club) throw new Error("Club no encontrado");
+
+    const courts = this.db.courts
+      .find((c) => c.clubId === clubId && c.status === "active")
+      .map((c) => ({
+        ...c,
+        imageUrl: c.imageUrl ?? pickRandomCourtImagePath(),
+      }));
+
+    const items = courts.map((court) => {
+      const priceRules = this.db.courtPriceRules
+        .find((r) => r.courtId === court.id)
+        .sort((a, b) => a.startTime.localeCompare(b.startTime));
+      const summary = this.buildCourtDaySummary(club, court, priceRules, date);
+      return {
+        court,
+        date: summary.date,
+        liveStatus: summary.liveStatus,
+        freeSlots: summary.freeSlots,
+        totalSlots: summary.totalSlots,
+        nextFreeAt: summary.nextFreeAt,
+        minPrice: summary.minPrice,
+        priceBands: summary.priceBands,
+        availableSlots: summary.availableSlots,
+      };
+    });
+
+    return {
+      clubId,
+      date,
+      generatedAt: new Date().toISOString(),
+      items,
+    };
+  }
+
+  /** Eventos de agenda de todas las canchas del club en un rango. */
+  async getCourtsAgendaBoard(
+    clubId: string,
+    options: { from: string; to: string },
+  ): Promise<import("../types").CourtsAgendaBoardView> {
+    await delay(150);
+    const club = this.db.clubs.getById(clubId);
+    if (!club) throw new Error("Club no encontrado");
+
+    const courts = this.db.courts
+      .find((c) => c.clubId === clubId && c.status === "active")
+      .map((c) => ({
+        ...c,
+        imageUrl: c.imageUrl ?? pickRandomCourtImagePath(),
+      }));
+
+    const events = courts.flatMap((court) =>
+      this.buildCourtAgendaEvents(clubId, court.id, options.from, options.to),
+    );
+    events.sort((a, b) => a.startAt.localeCompare(b.startAt));
+
+    return {
+      clubId,
+      generatedAt: new Date().toISOString(),
+      club,
+      courts,
+      events,
+      openTime: club.openTime,
+      closeTime: club.closeTime,
+    };
+  }
+
   private isCourtSlotOccupied(
     clubId: string,
     courtId: string,
@@ -1772,6 +1831,31 @@ export class TournamentEngine {
       return intervalsOverlap(m.scheduledAt, matchEnd, startsAt, endsAt);
     });
     return Boolean(overlappingMatch);
+  }
+
+  private assertCourtSlotAligned(
+    club: Club,
+    court: Court,
+    startsAt: string,
+  ): void {
+    const dateIso = localDateIsoFromInstant(startsAt);
+    if (!dateIso) {
+      throw new Error("Horario de turno inválido");
+    }
+    const hours = resolveClubHours(club);
+    if (
+      !isAlignedCourtSlotStart(
+        dateIso,
+        hours.openTime,
+        hours.closeTime,
+        court.slotDurationMinutes,
+        startsAt,
+      )
+    ) {
+      throw new Error(
+        `Los turnos son de ${court.slotDurationMinutes} min desde las ${hours.openTime}`,
+      );
+    }
   }
 
   private assertCourtSlotFree(
@@ -1810,7 +1894,7 @@ export class TournamentEngine {
     priceRules: CourtPriceRule[],
     summaryDate: string,
   ): CourtDaySummary {
-    const hours = resolveCourtHours(court, club);
+    const hours = resolveClubHours(club);
     const priceBands = buildDayPriceBands(
       court,
       priceRules,
@@ -2698,36 +2782,133 @@ export class TournamentEngine {
     return { scheduledCount, suboptimalCount, pendingCount };
   }
 
-  async getDashboard(clubId: string) {
+  async getDashboard(clubId: string): Promise<import("../types").ClubDashboardView> {
     await delay();
     const tournaments = this.db.tournaments.find((t) => t.clubId === clubId);
-    const categoryIds = this.db.categories
+    const categories = this.db.categories
       .getAll()
-      .filter((c) => tournaments.some((t) => t.id === c.tournamentId))
-      .map((c) => c.id);
+      .filter((c) => tournaments.some((t) => t.id === c.tournamentId));
+    const categoryIds = categories.map((c) => c.id);
+    const categoryById = new Map(categories.map((c) => [c.id, c]));
+    const tournamentById = new Map(tournaments.map((t) => [t.id, t]));
+    const courts = this.db.courts.find((c) => c.clubId === clubId);
+    const courtName = (courtId: string | null) =>
+      courtId ? (courts.find((c) => c.id === courtId)?.name ?? null) : null;
+
+    const playerRef = (
+      playerId: string | null,
+    ): import("../types").DashboardPlayerRef => {
+      if (!playerId) {
+        return {
+          playerId: null,
+          clientId: null,
+          displayName: "Por definir",
+          avatarUrl: null,
+        };
+      }
+      const player = this.db.players.getById(playerId);
+      const client = this.db.clients.find(
+        (c) => c.clubId === clubId && c.playerId === playerId,
+      )[0];
+      return {
+        playerId,
+        clientId: client?.id ?? null,
+        displayName: player?.displayName ?? "?",
+        avatarUrl: client?.avatarUrl ?? null,
+      };
+    };
+
+    const pairPlayers = (
+      pairId: string | null,
+    ): [import("../types").DashboardPlayerRef, import("../types").DashboardPlayerRef] => {
+      if (!pairId) return [playerRef(null), playerRef(null)];
+      const pair = this.db.pairs.getById(pairId);
+      if (!pair) return [playerRef(null), playerRef(null)];
+      return [playerRef(pair.player1Id), playerRef(pair.player2Id)];
+    };
+
     const matches = this.db.matches
       .getAll()
       .filter((m) => categoryIds.includes(m.tournamentCategoryId));
-    const upcoming = matches
-      .filter((m) => m.scheduledAt && m.status !== "finished")
+
+    const upcomingMatches = matches
+      .filter(
+        (m) =>
+          m.scheduledAt &&
+          m.status !== "finished" &&
+          m.status !== "cancelled" &&
+          m.status !== "walkover",
+      )
       .sort((a, b) => (a.scheduledAt ?? "").localeCompare(b.scheduledAt ?? ""))
-      .slice(0, 8);
+      .slice(0, 8)
+      .map((match) => {
+        const category = categoryById.get(match.tournamentCategoryId);
+        const tournament = category
+          ? tournamentById.get(category.tournamentId)
+          : undefined;
+        return {
+          match,
+          tournamentName: tournament?.name ?? "Torneo",
+          categoryName: category?.name ?? "Categoría",
+          courtName: courtName(match.courtId),
+          phaseLabel: dashboardPhaseLabel(match.phase),
+          pairA: pairPlayers(match.pairAId),
+          pairB: pairPlayers(match.pairBId),
+        };
+      });
+
+    const nowIso = new Date().toISOString();
+    const upcomingReservations = this.db.courtReservations
+      .find(
+        (r) =>
+          r.clubId === clubId &&
+          r.status === "booked" &&
+          r.endsAt >= nowIso,
+      )
+      .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+      .slice(0, 8)
+      .map((reservation) => {
+        const client = this.db.clients.getById(reservation.clientId);
+        return {
+          reservation,
+          courtName: courtName(reservation.courtId) ?? "Cancha",
+          client: client
+            ? {
+                id: client.id,
+                displayName: client.displayName,
+                avatarUrl: client.avatarUrl,
+                phone: client.phone,
+              }
+            : null,
+        };
+      });
+
     const registrations = this.db.registrations
       .getAll()
-      .filter((r) => categoryIds.includes(r.tournamentCategoryId) && r.status === "ACCEPTED");
-    const courts = this.db.courts.find((c) => c.clubId === clubId);
+      .filter(
+        (r) =>
+          categoryIds.includes(r.tournamentCategoryId) &&
+          r.status === "ACCEPTED",
+      );
     const live = matches.filter((m) => m.status === "inProgress").length;
+    const reservedNow = this.db.courtReservations.find(
+      (r) =>
+        r.clubId === clubId &&
+        r.status === "booked" &&
+        r.startsAt <= nowIso &&
+        r.endsAt >= nowIso,
+    ).length;
+
     return {
-      upcoming,
+      upcomingMatches,
+      upcomingReservations,
       registeredPairs: registrations.length,
       liveMatches: live,
-      courtsInUse: matches.filter((m) => m.status === "inProgress" && m.courtId).length,
+      courtsInUse:
+        matches.filter((m) => m.status === "inProgress" && m.courtId).length +
+        reservedNow,
       courtsTotal: courts.length,
       tournaments,
-      groups: this.db.groups
-        .getAll()
-        .filter((g) => categoryIds.includes(g.tournamentCategoryId)),
-      matches,
     };
   }
 
@@ -2764,6 +2945,29 @@ function formatLocalHm(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "--:--";
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+function dashboardPhaseLabel(phase: string): string {
+  switch (phase) {
+    case "GROUP":
+      return "Zonas";
+    case "PLAY_IN":
+      return "Previas";
+    case "R32":
+      return "Dieciseisavos";
+    case "R16":
+      return "Octavos";
+    case "QF":
+      return "Cuartos";
+    case "SF":
+      return "Semifinal";
+    case "FINAL":
+      return "Final";
+    case "CONSOLATION":
+      return "Consolación";
+    default:
+      return phase;
+  }
 }
 
 function buildDayPriceBands(

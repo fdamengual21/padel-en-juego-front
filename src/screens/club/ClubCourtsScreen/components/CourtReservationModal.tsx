@@ -54,6 +54,25 @@ function formatMoney(value: number | null | undefined): string {
   }).format(value);
 }
 
+/** Snap to closest free turn when the calendar hour is not on the slot grid. */
+function nearestAvailableSlot(
+  slots: readonly { startsAt: string }[],
+  targetIso: string,
+): string | null {
+  const target = dayjs(targetIso).valueOf();
+  if (!Number.isFinite(target) || slots.length === 0) return null;
+  let best: string | null = null;
+  let bestDist = Number.POSITIVE_INFINITY;
+  for (const slot of slots) {
+    const dist = Math.abs(dayjs(slot.startsAt).valueOf() - target);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = slot.startsAt;
+    }
+  }
+  return best;
+}
+
 /** Dígitos para wa.me; null si no hay un teléfono usable. */
 function whatsappDigits(phone: string | null | undefined): string | null {
   if (!phone?.trim()) return null;
@@ -166,15 +185,32 @@ export default function CourtReservationModal({
 
   useEffect(() => {
     if (!open || readOnly || loadingSlots) return;
-    if (!selectedStartsAt) return;
+    if (!selectedStartsAt) {
+      if (availableSlots.length > 0 && presetStartsAt) {
+        const nearest = nearestAvailableSlot(availableSlots, presetStartsAt);
+        if (nearest) setSelectedStartsAt(nearest);
+      }
+      return;
+    }
     const stillAvailable = availableSlots.some(
       (slot) =>
         dayjs(slot.startsAt).valueOf() === dayjs(selectedStartsAt).valueOf(),
     );
     if (!stillAvailable) {
-      setSelectedStartsAt(null);
+      const nearest = nearestAvailableSlot(
+        availableSlots,
+        selectedStartsAt,
+      );
+      setSelectedStartsAt(nearest);
     }
-  }, [open, readOnly, loadingSlots, availableSlots, selectedStartsAt]);
+  }, [
+    open,
+    readOnly,
+    loadingSlots,
+    availableSlots,
+    selectedStartsAt,
+    presetStartsAt,
+  ]);
 
   useEffect(() => {
     if (!open || !selectedStartsAt || isTournament) {

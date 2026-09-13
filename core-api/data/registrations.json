@@ -94,5 +94,17 @@
     "rankingPointsPlayer1": 405,
     "rankingPointsPlayer2": 364,
     "tournamentPointsAwarded": null
+  },
+  {
+    "id": "reg-9",
+    "tournamentCategoryId": "cat-2",
+    "pairId": "pair-9",
+    "status": "ACCEPTED",
+    "registeredAt": "2026-08-02T12:00:00.000Z",
+    "statusNote": null,
+    "statusChangedAt": null,
+    "rankingPointsPlayer1": 300,
+    "rankingPointsPlayer2": 315,
+    "tournamentPointsAwarded": null
   }
 ]

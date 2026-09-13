@@ -54,7 +54,7 @@ export default function CourtAgendaGrid({
 
   return (
     <div
-      className="overflow-hidden rounded-xl border border-border bg-card"
+      className="overflow-x-auto rounded-xl border border-border bg-card"
       data-testid="court-agenda-grid"
     >
       <div
@@ -64,7 +64,7 @@ export default function CourtAgendaGrid({
             : "flex flex-col"
         }
       >
-        {/* Day headers stay outside the scroll body (concesionarias layout). */}
+        {/* Day headers above the hour grid. */}
         <div className="flex items-end gap-2 px-2 py-2">
           <div className="w-14 shrink-0 pb-1 text-center text-xs uppercase tracking-wide text-muted-foreground">
             Hrs.
@@ -86,7 +86,7 @@ export default function CourtAgendaGrid({
           })}
         </div>
 
-        <div className="max-h-[70vh] min-h-0 overflow-auto px-2 pb-2">
+        <div className="px-2 pb-2">
           <div className="flex items-start gap-2">
             <CourtAgendaHourColumn startHour={startHour} modules={modules} />
             {visibleIndexes.map((index) => {

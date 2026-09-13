@@ -21,12 +21,20 @@ export default function CourtAgendaDayHeader({
       <span
         className={cn(
           "flex size-8 items-center justify-center rounded-full text-sm font-semibold",
-          isToday && "bg-primary text-primary-foreground",
-          selected && !isToday && "bg-muted",
+          selected
+            ? "bg-primary text-primary-foreground"
+            : isToday
+              ? "bg-muted text-foreground"
+              : "text-foreground",
         )}
       >
         {day.format("D")}
       </span>
+      {isToday ? (
+        <span className="text-[10px] font-medium text-primary">Hoy</span>
+      ) : (
+        <span className="h-3" aria-hidden />
+      )}
     </div>
   );
 }

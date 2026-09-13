@@ -63,12 +63,15 @@ export {
 } from "./domain/courtPricing";
 export {
   generateDaySlots,
+  resolveClubHours,
   resolveCourtHours,
   intervalsOverlap,
   isClubOpenOnDate,
   isCourtOpenAt,
   isOvernightHours,
   isZeroLengthHours,
+  isAlignedCourtSlotStart,
+  nearestCourtSlotStart,
   weekdayIsoFromDateIso,
   localDateIsoFromInstant,
   type CourtDaySlot,
