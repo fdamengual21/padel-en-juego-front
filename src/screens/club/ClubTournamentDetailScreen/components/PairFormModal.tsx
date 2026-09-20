@@ -6,10 +6,11 @@ import type {
   TournamentCircuitType,
   TournamentPair,
   TournamentRegistration,
-} from "@core-api";
+} from "@/domain";
 import Api from "@/api/Api";
 import DuplicateIdentityDialog from "@/components/auth/DuplicateIdentityDialog";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Dialog,
   DialogContent,
@@ -70,11 +71,19 @@ function emptyAvailability(date: string): AvailabilityDraft {
   return { date, startTime: "10:00", endTime: "22:00" };
 }
 
-const SIDE_OPTIONS: { value: PairSidePreference; label: string }[] = [
-  { value: "drive", label: "Drive" },
-  { value: "reves", label: "Revés" },
-  { value: "any", label: "Cualquiera" },
-];
+/** Mapea la preferencia del jugador a la de pareja (inscripción solo). */
+function pairSideFromPlayerPrimary(
+  primary: Player["sidePreferencePrimary"] | null | undefined,
+): PairSidePreference {
+  return primary === "drive" || primary === "reves" ? primary : "any";
+}
+
+function sidePreferenceFromSlot(slot: PlayerSlotValue): PairSidePreference {
+  if (slot.mode === "search") {
+    return pairSideFromPlayerPrimary(slot.player?.sidePreferencePrimary);
+  }
+  return pairSideFromPlayerPrimary(slot.draft.sidePreferencePrimary);
+}
 
 async function resolveSlotPlayerId(
   slot: PlayerSlotValue,
@@ -128,8 +137,6 @@ export default function PairFormModal({
 }: PairFormModalProps) {
   const [slot1, setSlot1] = useState<PlayerSlotValue>(emptyPlayerSlot);
   const [slot2, setSlot2] = useState<PlayerSlotValue>(emptyPlayerSlot);
-  const [sidePreference, setSidePreference] =
-    useState<PairSidePreference>("any");
   const [points1, setPoints1] = useState("");
   const [points2, setPoints2] = useState("");
   const [availability, setAvailability] = useState<AvailabilityDraft[]>([]);
@@ -160,7 +167,6 @@ export default function PairFormModal({
         mode: "search",
         player: pair.player2Id ? (playersById[pair.player2Id] ?? null) : null,
       });
-      setSidePreference(pair.sidePreference ?? "any");
       setPoints1(
         registration?.rankingPointsPlayer1 != null
           ? String(registration.rankingPointsPlayer1)
@@ -176,7 +182,6 @@ export default function PairFormModal({
     }
     setSlot1(emptyPlayerSlot());
     setSlot2(emptyPlayerSlot());
-    setSidePreference("any");
     setPoints1("");
     setPoints2("");
     setAvailability(
@@ -202,7 +207,6 @@ export default function PairFormModal({
       : !slot2.draft.firstName.trim() &&
         !slot2.draft.lastName.trim() &&
         !slot2.draft.email.trim();
-  const isSolo = slot1Ready && slot2Empty;
   const availabilityOk =
     !requireAvailability ||
     mode === "edit" ||
@@ -224,8 +228,8 @@ export default function PairFormModal({
             {mode === "edit" ? "Editar pareja" : "Agregar pareja"}
           </DialogTitle>
           <DialogDescription>
-            Podés cargar uno o dos jugadores. Si se anota solo, elegí preferencia
-            de lado (Drive / Revés / Cualquiera).
+            Podés cargar uno o dos jugadores. La preferencia de lado se carga al
+            dar de alta un jugador manualmente.
           </DialogDescription>
         </DialogHeader>
 
@@ -242,25 +246,6 @@ export default function PairFormModal({
             excludeIds={exclude2}
             onChange={setSlot2}
           />
-
-          {isSolo ? (
-            <div className="space-y-2">
-              <Label>Preferencia de lado</Label>
-              <div className="flex flex-wrap gap-2">
-                {SIDE_OPTIONS.map((opt) => (
-                  <Button
-                    key={opt.value}
-                    type="button"
-                    size="sm"
-                    variant={sidePreference === opt.value ? "default" : "outline"}
-                    onClick={() => setSidePreference(opt.value)}
-                  >
-                    {opt.label}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          ) : null}
 
           {showRankingSnapshot ? (
             <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
@@ -335,20 +320,18 @@ export default function PairFormModal({
                       key={`av-${index}`}
                       className="grid gap-2 sm:grid-cols-[1fr_auto_auto_auto]"
                     >
-                      <Input
-                        type="date"
+                      <DatePicker
                         value={slot.date}
-                        min={tournamentStartDate}
-                        max={tournamentEndDate ?? undefined}
-                        onChange={(e) =>
+                        minDate={tournamentStartDate}
+                        maxDate={tournamentEndDate ?? undefined}
+                        onChange={(next) => {
+                          if (!next) return;
                           setAvailability((prev) =>
                             prev.map((item, i) =>
-                              i === index
-                                ? { ...item, date: e.target.value }
-                                : item,
+                              i === index ? { ...item, date: next } : item,
                             ),
-                          )
-                        }
+                          );
+                        }}
                       />
                       <Input
                         type="time"
@@ -461,7 +444,9 @@ export default function PairFormModal({
                   await onSubmit({
                     player1Id,
                     player2Id,
-                    sidePreference: player2Id ? null : sidePreference,
+                    sidePreference: player2Id
+                      ? null
+                      : sidePreferenceFromSlot(slot1),
                     rankingPointsPlayer1: showRankingSnapshot
                       ? parsePointsInput(points1)
                       : null,

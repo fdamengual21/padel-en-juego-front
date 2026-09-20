@@ -1,0 +1,55 @@
+---
+description: Permisos scoped (catalogo club, hook, gates) alineados con /me y la API
+globs: src/authorization/**,src/components/guards/**,src/router/**,src/layout/**,src/screens/**
+alwaysApply: false
+---
+
+# Permisos y guards (UI)
+
+Estilo concesionarias. La API es la fuente de verdad: `PermissionCode` + `RolePermissions.ForRole`. El front **no** recalcula permisos a partir del rol.
+
+## Catalogo club
+
+Codigos en `src/authorization/permissionCodes.ts` (strings iguales a `PermissionCode` del backend). Matriz por rol: `docs/identity-er.md`.
+
+- `ClubOwner` / `ClubAdmin` → `PermissionCode.ClubAll` (todo `club.*`).
+- `Organizer` / `Coach` → subconjunto (ver matriz).
+- `GET /api/users/me` con `X-Club-Id` devuelve esa lista en `scopedPermissions`.
+- CRUD de club en API valida con `ClubScopedPermissionEvaluator` + `PermissionCode`. La UI no autoriza sola.
+
+## Que usar
+
+| Caso | API |
+|------|-----|
+| Mostrar/ocultar boton o bloque | `PermissionsGuard` (alias `PermissionGate`) de `@/components/guards` |
+| Condicion en JS (`disabled`, columnas, if) | `usePermissions().can(PERMISSION_…)` |
+| Proteger un subarbol de rutas | `RequirePermission` en `src/router/guards/` |
+| Flag de producto (no permiso) | `FeatureGuard` / `RequireFeature` |
+
+Importar codigos desde `@/authorization` o `@/authorization/permissionCodes`. No hardcodear `"club.settings.update"`.
+
+```tsx
+<PermissionsGuard permission={PERMISSION_CLUB_TOURNAMENTS_WRITE}>
+  <Link to={ROUTES.club.tournamentNew}>Crear torneo</Link>
+</PermissionsGuard>
+```
+
+```ts
+const { can } = usePermissions();
+if (can(PERMISSION_CLUB_COURTS_WRITE)) { /* … */ }
+```
+
+## Jerarquia write > read
+
+`hasAccess` / `can()` usan la misma regla que la API (`PermissionRules.Grants`): pedir `*.read` pasa si hay cualquier accion no-read del **mismo** recurso (`write`, `update`, `invite`, …). Pedir write no se satisface con solo read.
+
+- Solo `read`: ver listados, fichas y **abrir modales de consulta**. Campos deshabilitados; sin Guardar/Crear/Editar/Cancelar.
+- Mutaciones: exigir el codigo de write/update/invite. No mostrar CTA de mutacion con solo read.
+
+## Reglas
+
+- Nav de club: filtrar items con `can(permission)` ademas del feature flag.
+- `treatRootPlatformAdminAsFullAccess` default **false** en club (el root no es staff). Solo true en UI de plataforma.
+- El gate **no** reemplaza el 403 de la API.
+- No inventar codigos. Si falta un permiso (p. ej. clientes), preguntar; no reutilizar otro modulo.
+- Combinar con `ConditionGuard` si el padre ya resolvio `can(...)`.

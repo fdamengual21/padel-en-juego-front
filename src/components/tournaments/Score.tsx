@@ -1,4 +1,4 @@
-import type { SetScore } from "@core-api";
+import type { SetScore } from "@/domain";
 import { cn } from "@/lib/utils";
 
 interface ScoreProps {

@@ -8,10 +8,11 @@ import type {
   CourtAgendaEvent,
   CourtReservation,
   IdentityMatch,
-} from "@core-api";
+} from "@/domain";
 import Api from "@/api/Api";
 import DuplicateIdentityDialog from "@/components/auth/DuplicateIdentityDialog";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Dialog,
   DialogContent,
@@ -20,7 +21,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import ClientPickerField, {
@@ -35,13 +35,21 @@ type ModalMode = "view" | "edit" | "create";
 interface CourtReservationModalProps {
   open: boolean;
   clubId: string;
-  court: Court;
+  /** Lista de canchas del club (selector en crear/editar). */
+  courts: Court[];
+  /**
+   * Cancha inicial. En create puede ser null (usuario debe elegir).
+   * En view/edit debe venir definida.
+   */
+  initialCourtId: string | null;
   mode: ModalMode;
   presetStartsAt?: string | null;
   event?: CourtAgendaEvent | null;
   reservation?: CourtReservation | null;
   client?: Client | null;
   isSaving?: boolean;
+  /** False si solo hay reservations.read: consulta, sin editar/guardar/cancelar. */
+  canMutate?: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }
@@ -130,13 +138,17 @@ async function resolveClientIdFromMatch(
     return created.id;
   }
   if (match.userId) {
-    const created = await createClientFromDraft(clubId, {
-      ...draft,
-      firstName: match.firstName || draft.firstName,
-      lastName: match.lastName || draft.lastName,
-      email: match.email ?? draft.email,
-      phone: match.phone ?? draft.phone,
-    }, { userId: match.userId, playerId: match.playerId });
+    const created = await createClientFromDraft(
+      clubId,
+      {
+        ...draft,
+        firstName: match.firstName || draft.firstName,
+        lastName: match.lastName || draft.lastName,
+        email: match.email ?? draft.email,
+        phone: match.phone ?? draft.phone,
+      },
+      { userId: match.userId, playerId: match.playerId },
+    );
     return created.id;
   }
   const created = await createClientFromDraft(clubId, draft);
@@ -163,17 +175,22 @@ function toDateIso(value: string | null | undefined): string {
 export default function CourtReservationModal({
   open,
   clubId,
-  court,
+  courts,
+  initialCourtId,
   mode: initialMode,
   presetStartsAt,
   event,
   reservation,
   client,
   isSaving = false,
+  canMutate = true,
   onOpenChange,
   onSaved,
 }: CourtReservationModalProps) {
   const [mode, setMode] = useState<ModalMode>(initialMode);
+  const [selectedCourtId, setSelectedCourtId] = useState<string | null>(
+    initialCourtId,
+  );
   const [clientSlot, setClientSlot] = useState<ClientSlotValue>(() =>
     emptyClientSlot(),
   );
@@ -190,8 +207,14 @@ export default function CourtReservationModal({
   } | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const court =
+    courts.find((c) => c.id === selectedCourtId) ??
+    courts.find((c) => c.id === initialCourtId) ??
+    null;
+
   const isTournament = event?.kind === "tournament_match";
-  const readOnly = isTournament || mode === "view";
+  const readOnly = isTournament || mode === "view" || !canMutate;
+  const courtSelectable = mode === "create";
   const ignoreReservationId =
     mode === "edit" && reservation ? reservation.id : undefined;
 
@@ -203,6 +226,7 @@ export default function CourtReservationModal({
     setDupOpen(false);
     setDupMatches([]);
     setAllowCreateNew(false);
+    setSelectedCourtId(initialCourtId);
 
     if (initialMode === "create") {
       const start = presetStartsAt ?? undefined;
@@ -216,24 +240,34 @@ export default function CourtReservationModal({
     setDateIso(toDateIso(startIso));
     setSelectedStartsAt(startIso ? dayjs(startIso).toISOString() : null);
     setClientSlot(client ? { mode: "search", client } : emptyClientSlot());
-  }, [open, initialMode, presetStartsAt, reservation, event, client]);
+  }, [
+    open,
+    initialMode,
+    initialCourtId,
+    presetStartsAt,
+    reservation,
+    event,
+    client,
+  ]);
 
   const { data: availableSlots = [], isFetching: loadingSlots } = useQuery({
     queryKey: [
       "court-available-slots",
-      court.id,
+      selectedCourtId,
       dateIso,
       ignoreReservationId ?? null,
     ],
     queryFn: () =>
-      Api.TournamentOpsService().listAvailableCourtSlots(court.id, dateIso, {
-        ignoreReservationId,
-      }),
-    enabled: open && !readOnly && Boolean(dateIso),
+      Api.TournamentOpsService().listAvailableCourtSlots(
+        selectedCourtId!,
+        dateIso,
+        { ignoreReservationId },
+      ),
+    enabled: open && !readOnly && Boolean(selectedCourtId) && Boolean(dateIso),
   });
 
   useEffect(() => {
-    if (!open || readOnly || loadingSlots) return;
+    if (!open || readOnly || loadingSlots || !selectedCourtId) return;
     if (!selectedStartsAt) {
       if (availableSlots.length > 0 && presetStartsAt) {
         const nearest = nearestAvailableSlot(availableSlots, presetStartsAt);
@@ -246,10 +280,7 @@ export default function CourtReservationModal({
         dayjs(slot.startsAt).valueOf() === dayjs(selectedStartsAt).valueOf(),
     );
     if (!stillAvailable) {
-      const nearest = nearestAvailableSlot(
-        availableSlots,
-        selectedStartsAt,
-      );
+      const nearest = nearestAvailableSlot(availableSlots, selectedStartsAt);
       setSelectedStartsAt(nearest);
     }
   }, [
@@ -259,16 +290,17 @@ export default function CourtReservationModal({
     availableSlots,
     selectedStartsAt,
     presetStartsAt,
+    selectedCourtId,
   ]);
 
   useEffect(() => {
-    if (!open || !selectedStartsAt || isTournament) {
+    if (!open || !selectedStartsAt || !selectedCourtId || isTournament) {
       setQuote(null);
       return;
     }
     let cancelled = false;
     void Api.TournamentOpsService()
-      .quoteCourtSlot(court.id, selectedStartsAt)
+      .quoteCourtSlot(selectedCourtId, selectedStartsAt)
       .then((result) => {
         if (!cancelled) setQuote(result);
       })
@@ -278,7 +310,7 @@ export default function CourtReservationModal({
     return () => {
       cancelled = true;
     };
-  }, [open, selectedStartsAt, court.id, isTournament]);
+  }, [open, selectedStartsAt, selectedCourtId, isTournament]);
 
   const title =
     mode === "create"
@@ -295,7 +327,7 @@ export default function CourtReservationModal({
       ? dayjs(reservation.endsAt).diff(dayjs(reservation.startsAt), "minute")
       : event
         ? dayjs(event.endAt).diff(dayjs(event.startAt), "minute")
-        : court.slotDurationMinutes;
+        : (court?.slotDurationMinutes ?? 90);
 
   const displayPrice =
     reservation?.price ?? event?.price ?? quote?.price ?? null;
@@ -305,6 +337,7 @@ export default function CourtReservationModal({
 
   const canSubmit =
     !readOnly &&
+    Boolean(selectedCourtId) &&
     isClientSlotReady(clientSlot) &&
     Boolean(selectedStartsAt) &&
     !busy &&
@@ -325,11 +358,12 @@ export default function CourtReservationModal({
   };
 
   const persistReservation = async (clientId: string) => {
+    if (!selectedCourtId) throw new Error("Elegí una cancha");
     if (!selectedStartsAt) throw new Error("Elegí un turno");
     if (mode === "create" || !reservation) {
       await Api.TournamentOpsService().createCourtReservation({
         clubId,
-        courtId: court.id,
+        courtId: selectedCourtId,
         clientId,
         startsAt: selectedStartsAt,
         price: quote?.price ?? null,
@@ -345,19 +379,19 @@ export default function CourtReservationModal({
 
   const handleSave = () =>
     run(async () => {
+      if (!selectedCourtId) throw new Error("Elegí una cancha");
       if (!selectedStartsAt) throw new Error("Elegí un turno");
 
       if (clientSlot.mode === "manual" && !allowCreateNew) {
         const draft = clientSlot.draft;
-        const hasContact = Boolean(
-          draft.email.trim() || draft.phone.trim(),
-        );
+        const hasContact = Boolean(draft.email.trim() || draft.phone.trim());
         if (hasContact) {
-          const { matches } = await Api.TournamentOpsService().findIdentityMatches({
-            clubId,
-            email: draft.email || null,
-            phone: draft.phone || null,
-          });
+          const { matches } =
+            await Api.TournamentOpsService().findIdentityMatches({
+              clubId,
+              email: draft.email || null,
+              phone: draft.phone || null,
+            });
           if (matches.length > 0) {
             setDupMatches(matches);
             setDupOpen(true);
@@ -387,7 +421,6 @@ export default function CourtReservationModal({
   const handleCreateNewDespiteMatch = () => {
     setDupOpen(false);
     setAllowCreateNew(true);
-    // Re-run save after state updates: use microtask with forced create.
     void run(async () => {
       const clientId = await resolveClientId(clubId, clientSlot);
       setAllowCreateNew(false);
@@ -411,251 +444,286 @@ export default function CourtReservationModal({
     });
   };
 
+  const handleCourtChange = (nextCourtId: string) => {
+    setSelectedCourtId(nextCourtId || null);
+    setSelectedStartsAt(null);
+    setQuote(null);
+    setError(null);
+  };
+
   return (
     <>
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="max-w-lg gap-0 overflow-hidden p-0"
-        data-testid="court-reservation-modal"
-      >
-        <DialogHeader className="gap-2 border-b border-border px-4 py-4">
-          <div className="flex items-start gap-3">
-            <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-sidebar">
-              <CalendarClock className="size-5" />
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent
+          className="max-w-lg gap-0 overflow-hidden p-0"
+          data-testid="court-reservation-modal"
+        >
+          <DialogHeader className="gap-2 border-b border-border px-4 py-4">
+            <div className="flex items-start gap-3">
+              <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-sidebar">
+                <CalendarClock className="size-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <DialogTitle>{title}</DialogTitle>
+                <DialogDescription>
+                  {court
+                    ? `Turno de ${court.slotDurationMinutes} min`
+                    : "Elegí cancha, cliente y turno"}
+                </DialogDescription>
+              </div>
             </div>
-            <div className="min-w-0 flex-1">
-              <DialogTitle>{title}</DialogTitle>
-              <DialogDescription>
-                {court.name} · turno de {court.slotDurationMinutes} min
-              </DialogDescription>
-            </div>
-          </div>
-        </DialogHeader>
+          </DialogHeader>
 
-        <div className="space-y-4 px-4 py-4">
-          {readOnly ? (
-            <dl className="grid gap-3 text-sm sm:grid-cols-2">
-              <div>
-                <dt className="text-muted-foreground">Cancha</dt>
-                <dd className="font-medium">{court.name}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Estado</dt>
-                <dd className="font-medium">
-                  {statusLabels[reservation?.status ?? event?.status ?? ""] ??
-                    event?.status ??
-                    "—"}
-                </dd>
-              </div>
-              <div className="sm:col-span-2">
-                <dt className="text-muted-foreground">Horario</dt>
-                <dd className="font-medium">
-                  {dayjs(reservation?.startsAt ?? event?.startAt).format(
-                    "ddd D MMM · HH:mm",
-                  )}
-                  {" – "}
-                  {dayjs(reservation?.endsAt ?? event?.endAt).format("HH:mm")}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Duración</dt>
-                <dd className="font-medium">{durationMinutes} min</dd>
-              </div>
-              {!isTournament ? (
-                <>
-                  <div>
-                    <dt className="text-muted-foreground">Cliente</dt>
-                    <dd className="font-medium">
-                      {client?.displayName ?? event?.title ?? "—"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground">Precio</dt>
-                    <dd className="font-medium">{formatMoney(displayPrice)}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground">Teléfono</dt>
-                    <dd className="flex items-center gap-2 font-medium">
-                      <span>{clientPhone || "_"}</span>
-                      {waDigits ? (
-                        <a
-                          href={`https://wa.me/${waDigits}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex size-8 items-center justify-center rounded-md text-[#25D366] transition-colors hover:bg-[#25D366]/15"
-                          aria-label="Escribir por WhatsApp"
-                          title="WhatsApp"
-                        >
-                          <WhatsAppIcon className="size-5" />
-                        </a>
-                      ) : null}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground">Tarifa</dt>
-                    <dd className="font-medium">{displayLabel ?? "Base"}</dd>
-                  </div>
-                </>
-              ) : (
-                <div className="sm:col-span-2">
-                  <dt className="text-muted-foreground">Detalle</dt>
+          <div className="space-y-4 px-4 py-4">
+            {readOnly ? (
+              <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                <div>
+                  <dt className="text-muted-foreground">Cancha</dt>
+                  <dd className="font-medium">{court?.name ?? "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Estado</dt>
                   <dd className="font-medium">
-                    {event?.title}
-                    {event?.subtitle ? ` · ${event.subtitle}` : ""}
+                    {statusLabels[reservation?.status ?? event?.status ?? ""] ??
+                      event?.status ??
+                      "—"}
                   </dd>
                 </div>
-              )}
-            </dl>
-          ) : (
-            <div className="space-y-4">
-              <ClientPickerField
-                clubId={clubId}
-                value={clientSlot}
-                onChange={setClientSlot}
-              />
-
-              <div className="space-y-1.5">
-                <Label htmlFor="reservation-date">Fecha</Label>
-                <Input
-                  id="reservation-date"
-                  type="date"
-                  value={dateIso}
-                  onChange={(e) => {
-                    setDateIso(e.target.value);
-                    setSelectedStartsAt(null);
-                  }}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Turno</Label>
-                {loadingSlots ? (
-                  <p className="text-sm text-muted-foreground">
-                    Cargando turnos…
-                  </p>
-                ) : availableSlots.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    No hay turnos libres este día (cerrado u ocupados).
-                  </p>
+                <div className="sm:col-span-2">
+                  <dt className="text-muted-foreground">Horario</dt>
+                  <dd className="font-medium">
+                    {dayjs(reservation?.startsAt ?? event?.startAt).format(
+                      "ddd D MMM · HH:mm",
+                    )}
+                    {" – "}
+                    {dayjs(reservation?.endsAt ?? event?.endAt).format("HH:mm")}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Duración</dt>
+                  <dd className="font-medium">{durationMinutes} min</dd>
+                </div>
+                {!isTournament ? (
+                  <>
+                    <div>
+                      <dt className="text-muted-foreground">Cliente</dt>
+                      <dd className="font-medium">
+                        {client?.displayName ?? event?.title ?? "—"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Precio</dt>
+                      <dd className="font-medium">
+                        {formatMoney(displayPrice)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Teléfono</dt>
+                      <dd className="flex items-center gap-2 font-medium">
+                        <span>{clientPhone || "—"}</span>
+                        {waDigits ? (
+                          <a
+                            href={`https://wa.me/${waDigits}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex size-8 items-center justify-center rounded-md text-[#25D366] transition-colors hover:bg-[#25D366]/15"
+                            aria-label="Escribir por WhatsApp"
+                            title="WhatsApp"
+                          >
+                            <WhatsAppIcon className="size-5" />
+                          </a>
+                        ) : null}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Tarifa</dt>
+                      <dd className="font-medium">{displayLabel ?? "Base"}</dd>
+                    </div>
+                  </>
                 ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {availableSlots.map((slot) => {
-                      const selected =
-                        selectedStartsAt != null &&
-                        dayjs(slot.startsAt).valueOf() ===
-                          dayjs(selectedStartsAt).valueOf();
-                      return (
-                        <button
-                          key={slot.startsAt}
-                          type="button"
-                          className={cn(
-                            "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
-                            selected
-                              ? "border-primary bg-primary text-primary-foreground"
-                              : "border-border bg-card text-sidebar hover:bg-muted",
-                          )}
-                          onClick={() => setSelectedStartsAt(slot.startsAt)}
-                        >
-                          {slot.label}
-                        </button>
-                      );
-                    })}
+                  <div className="sm:col-span-2">
+                    <dt className="text-muted-foreground">Detalle</dt>
+                    <dd className="font-medium">
+                      {event?.title}
+                      {event?.subtitle ? ` · ${event.subtitle}` : ""}
+                    </dd>
                   </div>
                 )}
-              </div>
+              </dl>
+            ) : (
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="reservation-court">Cancha</Label>
+                  <select
+                    id="reservation-court"
+                    className="h-8 w-full rounded-lg border border-border bg-background px-2 text-sm"
+                    value={selectedCourtId ?? ""}
+                    disabled={!courtSelectable}
+                    onChange={(e) => handleCourtChange(e.target.value)}
+                    data-testid="reservation-court-select"
+                  >
+                    <option value="">Elegí una cancha</option>
+                    {courts.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name} · {item.slotDurationMinutes} min
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-              <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 text-sm">
-                <p>
-                  Fin estimado:{" "}
-                  <span className="font-medium">
-                    {quote ? dayjs(quote.endsAt).format("HH:mm") : "—"}
-                  </span>
-                </p>
-                <p className="mt-1">
-                  Precio:{" "}
-                  <span className="font-medium">
-                    {formatMoney(quote?.price ?? null)}
-                  </span>
-                  {quote?.label ? (
-                    <span className="text-muted-foreground">
-                      {" "}
-                      · {quote.label}
+                <ClientPickerField
+                  clubId={clubId}
+                  value={clientSlot}
+                  onChange={setClientSlot}
+                />
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="reservation-date">Fecha</Label>
+                  <DatePicker
+                    id="reservation-date"
+                    value={dateIso}
+                    onChange={(next) => {
+                      if (!next) return;
+                      setDateIso(next);
+                      setSelectedStartsAt(null);
+                    }}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Turno</Label>
+                  {!selectedCourtId ? (
+                    <p className="text-sm text-muted-foreground">
+                      Elegí una cancha para ver los turnos.
+                    </p>
+                  ) : loadingSlots ? (
+                    <p className="text-sm text-muted-foreground">
+                      Cargando turnos…
+                    </p>
+                  ) : availableSlots.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No hay turnos libres este día (cerrado u ocupados).
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {availableSlots.map((slot) => {
+                        const selected =
+                          selectedStartsAt != null &&
+                          dayjs(slot.startsAt).valueOf() ===
+                            dayjs(selectedStartsAt).valueOf();
+                        return (
+                          <button
+                            key={slot.startsAt}
+                            type="button"
+                            className={cn(
+                              "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
+                              selected
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-border bg-card text-sidebar hover:bg-muted",
+                            )}
+                            onClick={() => setSelectedStartsAt(slot.startsAt)}
+                          >
+                            {slot.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 text-sm">
+                  <p>
+                    Fin estimado:{" "}
+                    <span className="font-medium">
+                      {quote ? dayjs(quote.endsAt).format("HH:mm") : "—"}
                     </span>
-                  ) : null}
-                </p>
+                  </p>
+                  <p className="mt-1">
+                    Precio:{" "}
+                    <span className="font-medium">
+                      {formatMoney(quote?.price ?? null)}
+                    </span>
+                    {quote?.label ? (
+                      <span className="text-muted-foreground">
+                        {" "}
+                        · {quote.label}
+                      </span>
+                    ) : null}
+                  </p>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        </div>
+            {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          </div>
 
-        <DialogFooter className="border-t border-border px-4 py-3 sm:justify-between">
-          <div className="flex flex-wrap gap-2">
-            {mode === "view" && reservation && !isTournament ? (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => setMode("edit")}
-              >
-                <Pencil className="size-3.5" />
-                Editar
-              </Button>
-            ) : null}
-            {reservation &&
-            reservation.status === "booked" &&
-            mode !== "create" ? (
-              <>
+          <DialogFooter className="border-t border-border px-4 py-3 sm:justify-between">
+            <div className="flex flex-wrap gap-2">
+              {canMutate && mode === "view" && reservation && !isTournament ? (
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
-                  disabled={busy || isSaving}
-                  onClick={handleComplete}
+                  onClick={() => setMode("edit")}
                 >
-                  Marcar completada
+                  <Pencil className="size-3.5" />
+                  Editar
                 </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="destructive"
-                  disabled={busy || isSaving}
-                  onClick={handleCancelReservation}
-                >
-                  Cancelar reserva
-                </Button>
-              </>
-            ) : null}
-          </div>
-          <div className="flex flex-wrap justify-end gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => onOpenChange(false)}
-            >
-              Cerrar
-            </Button>
-            {!readOnly ? (
+              ) : null}
+              {canMutate &&
+              reservation &&
+              reservation.status === "booked" &&
+              mode !== "create" ? (
+                <>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={busy || isSaving}
+                    onClick={handleComplete}
+                  >
+                    Marcar completada
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="destructive"
+                    disabled={busy || isSaving}
+                    onClick={handleCancelReservation}
+                  >
+                    Cancelar reserva
+                  </Button>
+                </>
+              ) : null}
+            </div>
+            <div className="flex flex-wrap justify-end gap-2">
               <Button
                 type="button"
-                disabled={!canSubmit}
-                onClick={() => void handleSave()}
+                variant="ghost"
+                onClick={() => onOpenChange(false)}
               >
-                {busy || isSaving ? "Guardando…" : "Guardar"}
+                Cerrar
               </Button>
-            ) : null}
-          </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-    <DuplicateIdentityDialog
-      open={dupOpen}
-      matches={dupMatches}
-      onOpenChange={setDupOpen}
-      onUseMatch={(match) => void handleUseIdentityMatch(match)}
-      onCreateNew={handleCreateNewDespiteMatch}
-    />
+              {!readOnly ? (
+                <Button
+                  type="button"
+                  disabled={!canSubmit}
+                  onClick={() => void handleSave()}
+                >
+                  {busy || isSaving ? "Guardando…" : "Guardar"}
+                </Button>
+              ) : null}
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <DuplicateIdentityDialog
+        open={dupOpen}
+        matches={dupMatches}
+        onOpenChange={setDupOpen}
+        onUseMatch={(match) => void handleUseIdentityMatch(match)}
+        onCreateNew={handleCreateNewDespiteMatch}
+      />
     </>
   );
 }

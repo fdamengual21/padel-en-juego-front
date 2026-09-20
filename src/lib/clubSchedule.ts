@@ -1,4 +1,4 @@
-import type { WeekdayIso } from "@core-api";
+import type { WeekdayIso } from "@/domain";
 
 const WEEKDAY_LABELS: Record<WeekdayIso, string> = {
   1: "Lun",

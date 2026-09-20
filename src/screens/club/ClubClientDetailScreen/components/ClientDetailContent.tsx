@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import type { ClubClientDetail, ClientTournamentOutcome } from "@core-api";
+import type { ClubClientDetail, ClientTournamentOutcome } from "@/domain";
 import {
   formatScheduleShortEs,
   formatTournamentDayEs,

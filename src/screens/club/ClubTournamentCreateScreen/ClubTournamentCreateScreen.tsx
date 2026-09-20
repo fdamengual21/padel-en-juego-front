@@ -7,7 +7,7 @@ import {
   buildMatchRulesFromForm,
   type TournamentFormValues,
 } from "@/modules/tournaments/types";
-import { createId } from "@core-api";
+import { createId } from "@/domain";
 import { ROUTES } from "@/router/routes";
 import { toastError, toastSuccess } from "@/lib/toast";
 

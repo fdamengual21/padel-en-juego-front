@@ -1,4 +1,4 @@
-import { coreApi } from "@/config/coreApiClient";
+import { notConnectedError } from "@/domain";
 import type { CreateTournamentRequest, Tournament } from "../types";
 
 export interface ITournamentRepository {
@@ -12,22 +12,22 @@ export interface ITournamentRepository {
 }
 
 export class TournamentRepository implements ITournamentRepository {
-  list(clubId?: string) {
-    return coreApi().listTournaments(clubId);
+  async list(_clubId?: string): Promise<Tournament[]> {
+    return [];
   }
 
-  getById(id: string) {
-    return coreApi().getTournament(id);
+  async getById(_id: string): Promise<Tournament | null> {
+    return null;
   }
 
-  create(input: CreateTournamentRequest) {
-    return coreApi().createTournament(input);
+  async create(_input: CreateTournamentRequest): Promise<Tournament> {
+    return notConnectedError();
   }
 
-  update(
-    id: string,
-    patch: Partial<Omit<Tournament, "id" | "createdAt" | "clubId">>,
-  ) {
-    return coreApi().updateTournament(id, patch);
+  async update(
+    _id: string,
+    _patch: Partial<Omit<Tournament, "id" | "createdAt" | "clubId">>,
+  ): Promise<Tournament> {
+    return notConnectedError();
   }
 }

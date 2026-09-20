@@ -2,6 +2,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import Api from "@/api/Api";
 import { useMockSession } from "@/app/MockSessionProvider";
+import { emptyPlayerDashboard } from "@/modules/auth";
 import RequirePlayerAuth from "@/components/auth/RequirePlayerAuth";
 import MatchCard from "@/components/tournaments/MatchCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -19,12 +20,14 @@ function parseTab(value: string | null): ProfileTab {
 export default function UserProfileScreen() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = parseTab(searchParams.get("tab"));
-  const { playerId } = useMockSession();
+  const { playerId, player, hasApiSession } = useMockSession();
   const { data, isLoading } = useQuery({
     queryKey: ["player-home", playerId],
     queryFn: () => Api.TournamentOpsService().getPlayerHome(playerId!),
-    enabled: Boolean(playerId),
+    enabled: Boolean(playerId) && !hasApiSession,
   });
+  const dashboard =
+    hasApiSession && player ? emptyPlayerDashboard(player) : data;
 
   const setTab = (tab: string | number | null) => {
     const next = parseTab(tab == null ? null : String(tab));
@@ -43,12 +46,12 @@ export default function UserProfileScreen() {
         nextPath={ROUTES.player.profile}
         actionLabel="Ver tu perfil"
       >
-        {isLoading || !data ? (
+        {isLoading || !dashboard ? (
           <p className="text-sm text-muted-foreground">Cargando perfil…</p>
         ) : (
           <>
             <div className="sticky top-0 z-20 -mx-4 bg-background px-4 pb-3 md:mx-0 md:px-0 md:pb-4">
-              <PlayerHomeHeader data={data} />
+              <PlayerHomeHeader data={dashboard} />
             </div>
 
             <Tabs value={activeTab} onValueChange={setTab}>
@@ -63,11 +66,11 @@ export default function UserProfileScreen() {
 
               <TabsContent value="resumen" className="mt-4 space-y-4">
                 <PlayerHomeStats
-                  matchesPlayed={data.matchesPlayed}
-                  tournamentsCount={data.tournamentsCount}
-                  tournamentsWon={data.tournamentsWon}
-                  matchesWon={data.matchesWon}
-                  matchesLost={data.matchesLost}
+                  matchesPlayed={dashboard.matchesPlayed}
+                  tournamentsCount={dashboard.tournamentsCount}
+                  tournamentsWon={dashboard.tournamentsWon}
+                  matchesWon={dashboard.matchesWon}
+                  matchesLost={dashboard.matchesLost}
                 />
 
                 <section className="space-y-2">
@@ -82,13 +85,13 @@ export default function UserProfileScreen() {
                       Ver historial
                     </Link>
                   </div>
-                  {data.nextMatch ? (
+                  {dashboard.nextMatch ? (
                     <MatchCard
-                      match={data.nextMatch.match}
-                      pairALabel={data.nextMatch.pairALabel}
-                      pairBLabel={data.nextMatch.pairBLabel}
-                      courtLabel={data.nextMatch.courtLabel}
-                      phaseLabel={data.nextMatch.phaseLabel}
+                      match={dashboard.nextMatch.match}
+                      pairALabel={dashboard.nextMatch.pairALabel}
+                      pairBLabel={dashboard.nextMatch.pairBLabel}
+                      courtLabel={dashboard.nextMatch.courtLabel}
+                      phaseLabel={dashboard.nextMatch.phaseLabel}
                     />
                   ) : (
                     <p className="text-sm text-muted-foreground">
@@ -109,12 +112,12 @@ export default function UserProfileScreen() {
                       Ver torneos
                     </Link>
                   </div>
-                  {data.recentMatches.length === 0 ? (
+                  {dashboard.recentMatches.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
                       Todavía no hay partidos finalizados.
                     </p>
                   ) : (
-                    data.recentMatches.map((item) => (
+                    dashboard.recentMatches.map((item) => (
                       <MatchCard
                         key={item.match.id}
                         match={item.match}
@@ -129,7 +132,7 @@ export default function UserProfileScreen() {
               </TabsContent>
 
               <TabsContent value="cuenta" className="mt-4">
-                <PlayerAccountPanel player={data.player} />
+                <PlayerAccountPanel player={dashboard.player} />
               </TabsContent>
             </Tabs>
           </>

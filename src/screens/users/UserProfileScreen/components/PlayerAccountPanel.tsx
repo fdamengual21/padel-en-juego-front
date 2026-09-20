@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -8,12 +8,17 @@ import {
   formatCategoryLevel,
   type CategoryLevel,
   type Player,
-} from "@core-api";
+  type SidePosition,
+} from "@/domain";
 import Api from "@/api/Api";
 import { useMockSession } from "@/app/MockSessionProvider";
+import { useAuthStore } from "@/stores/authStore";
+import SidePreferenceFields from "@/components/players/SidePreferenceFields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toastError, toastSuccess } from "@/lib/toast";
+import ApiPlayerAccountForm from "./ApiPlayerAccountForm";
 import CategoryHistoryList from "./CategoryHistoryList";
 
 interface ProfileFormValues {
@@ -22,6 +27,8 @@ interface ProfileFormValues {
   phone: string;
   email: string;
   categoryLevel: CategoryLevel;
+  sidePreferencePrimary: SidePosition | null;
+  sidePreferenceSecondary: SidePosition | null;
 }
 
 const profileSchema: yup.ObjectSchema<ProfileFormValues> = yup.object({
@@ -39,6 +46,16 @@ const profileSchema: yup.ObjectSchema<ProfileFormValues> = yup.object({
     .mixed<CategoryLevel>()
     .oneOf([...CATEGORY_LEVELS])
     .required("Elegí tu categoría"),
+  sidePreferencePrimary: yup
+    .mixed<SidePosition>()
+    .nullable()
+    .oneOf(["drive", "reves", null])
+    .default(null),
+  sidePreferenceSecondary: yup
+    .mixed<SidePosition>()
+    .nullable()
+    .oneOf(["drive", "reves", null])
+    .default(null),
 });
 
 function toFormValues(player: Player): ProfileFormValues {
@@ -48,6 +65,8 @@ function toFormValues(player: Player): ProfileFormValues {
     phone: player.phone ?? "",
     email: player.email ?? "",
     categoryLevel: player.categoryLevel,
+    sidePreferencePrimary: player.sidePreferencePrimary ?? null,
+    sidePreferenceSecondary: player.sidePreferenceSecondary ?? null,
   };
 }
 
@@ -57,12 +76,14 @@ interface PlayerAccountPanelProps {
 
 export default function PlayerAccountPanel({ player }: PlayerAccountPanelProps) {
   const queryClient = useQueryClient();
-  const { playerId, loginSession, user } = useMockSession();
+  const { playerId, loginSession, user, hasApiSession } = useMockSession();
+  const apiUser = useAuthStore((state) => state.user);
 
   const {
     register,
     handleSubmit,
     reset,
+    control,
     formState: { errors, isSubmitting, isValid, isDirty },
   } = useForm<ProfileFormValues>({
     resolver: yupResolver(profileSchema),
@@ -82,15 +103,34 @@ export default function PlayerAccountPanel({ player }: PlayerAccountPanelProps) 
         phone: values.phone.trim() || null,
         email: values.email.trim() || null,
         categoryLevel: values.categoryLevel,
+        sidePreferencePrimary: values.sidePreferencePrimary,
+        sidePreferenceSecondary: values.sidePreferenceSecondary,
       }),
     onSuccess: (updated) => {
+      toastSuccess("Perfil actualizado");
       void queryClient.invalidateQueries({ queryKey: ["players"] });
       void queryClient.invalidateQueries({ queryKey: ["player-home", playerId] });
       if (user) {
         loginSession({ user, player: updated });
       }
     },
+    onError: (err: Error) => {
+      toastError("No se pudo guardar", err.message);
+    },
   });
+
+  if (hasApiSession) {
+    if (!apiUser) {
+      return (
+        <p className="text-sm text-muted-foreground">Cargando tu cuenta…</p>
+      );
+    }
+    return (
+      <div data-testid="player-account-panel">
+        <ApiPlayerAccountForm user={apiUser} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5" data-testid="player-account-panel">
@@ -147,19 +187,37 @@ export default function PlayerAccountPanel({ player }: PlayerAccountPanelProps) 
           </p>
         </div>
 
-        {saveMutation.isError ? (
-          <p className="text-xs text-destructive">
-            No se pudo guardar. Probá de nuevo.
-          </p>
-        ) : null}
-        {saveMutation.isSuccess && !isDirty ? (
-          <p className="text-xs text-muted-foreground">Perfil actualizado.</p>
-        ) : null}
+        <Controller
+          control={control}
+          name="sidePreferencePrimary"
+          render={({ field: primaryField }) => (
+            <Controller
+              control={control}
+              name="sidePreferenceSecondary"
+              render={({ field: secondaryField }) => (
+                <SidePreferenceFields
+                  idPrefix="profile-side"
+                  value={{
+                    primary: primaryField.value,
+                    secondary: secondaryField.value,
+                  }}
+                  onChange={(next) => {
+                    primaryField.onChange(next.primary);
+                    secondaryField.onChange(next.secondary);
+                  }}
+                />
+              )}
+            />
+          )}
+        />
 
         <Button
           type="submit"
           disabled={
-            isSubmitting || saveMutation.isPending || !isValid || !isDirty
+            isSubmitting ||
+            saveMutation.isPending ||
+            !isValid ||
+            !isDirty
           }
         >
           {saveMutation.isPending ? "Guardando…" : "Guardar cambios"}

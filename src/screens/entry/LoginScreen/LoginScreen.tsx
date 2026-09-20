@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { useForm } from "react-hook-form";
+import { FormProvider, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
-import Api from "@/api/Api";
-import { useMockSession } from "@/app/MockSessionProvider";
+import { useUser } from "@/app/UserProvider";
+import { InputField } from "@/components/Form";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { ApiHttpError } from "@/lib/apiClient";
+import { toastError, toastSuccess } from "@/lib/toast";
+import { isPlayerHomePath, resolvePostAuthPath } from "@/modules/auth";
 import { ROUTES } from "@/router/routes";
 
 interface LoginFormValues {
@@ -27,28 +28,48 @@ const schema: yup.ObjectSchema<LoginFormValues> = yup.object({
 export default function LoginScreen() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { loginSession } = useMockSession();
+  const { loginAndResolveUser } = useUser();
   const [error, setError] = useState<string | null>(null);
-  const redirectTo = searchParams.get("next") || ROUTES.player.home;
+  const nextParam = searchParams.get("next");
+  const redirectTo = nextParam && !isPlayerHomePath(nextParam) ? nextParam : "";
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting, isValid },
-  } = useForm<LoginFormValues>({
+  const methods = useForm<LoginFormValues>({
     resolver: yupResolver(schema),
     mode: "onChange",
-    defaultValues: { email: "juan@padel.test", password: "12345678" },
+    defaultValues: {
+      email: "",
+      password: "",
+    },
   });
+  const {
+    control,
+    handleSubmit,
+    getValues,
+    formState: { isSubmitting, isValid },
+  } = methods;
+
+  const checkEmailHref = (email: string) => {
+    const params = new URLSearchParams();
+    if (email) params.set("email", email);
+    if (redirectTo) params.set("next", redirectTo);
+    const qs = params.toString();
+    return qs ? `${ROUTES.auth.checkEmail}?${qs}` : ROUTES.auth.checkEmail;
+  };
 
   const onSubmit = handleSubmit(async (values) => {
     setError(null);
     try {
-      const session = await Api.TournamentOpsService().login(values);
-      loginSession(session);
-      navigate(redirectTo, { replace: true });
+      const me = await loginAndResolveUser(values);
+      toastSuccess("Sesión iniciada");
+      navigate(resolvePostAuthPath(me, nextParam), { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo ingresar");
+      const message =
+        err instanceof Error ? err.message : "No se pudo ingresar";
+      setError(message);
+      toastError("No se pudo ingresar", message);
+      if (err instanceof ApiHttpError && err.status === 403) {
+        navigate(checkEmailHref(getValues("email")), { replace: false });
+      }
     }
   });
 
@@ -59,50 +80,61 @@ export default function LoginScreen() {
     >
       <div className="w-full max-w-md space-y-6">
         <div className="text-center">
-          <p className="text-sm text-muted-foreground">StartPadel</p>
+          <p className="text-sm text-muted-foreground">Padel en juego</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">Ingresar</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Demo: juan@padel.test / 12345678
+            Usá el email y la contraseña de tu cuenta.
           </p>
         </div>
 
-        <form
-          className="space-y-4 rounded-xl border border-border bg-card p-5"
-          onSubmit={onSubmit}
-          noValidate
-        >
-          <div className="space-y-1.5">
-            <Label htmlFor="login-email">Email</Label>
-            <Input id="login-email" type="email" {...register("email")} />
-            {errors.email ? (
-              <p className="text-xs text-destructive">{errors.email.message}</p>
-            ) : null}
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="login-password">Contraseña</Label>
-            <Input
-              id="login-password"
-              type="password"
-              {...register("password")}
-            />
-            {errors.password ? (
-              <p className="text-xs text-destructive">{errors.password.message}</p>
-            ) : null}
-          </div>
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={isSubmitting || !isValid}
+        <FormProvider {...methods}>
+          <form
+            className="space-y-4 rounded-xl border border-border bg-card p-5"
+            onSubmit={onSubmit}
+            noValidate
           >
-            {isSubmitting ? "Ingresando…" : "Ingresar"}
-          </Button>
-        </form>
+            <InputField
+              control={control}
+              name="email"
+              label="Email"
+              type="email"
+              autoComplete="email"
+              id="login-email"
+              required
+            />
+            <InputField
+              control={control}
+              name="password"
+              label="Contraseña"
+              type="password"
+              autoComplete="current-password"
+              id="login-password"
+              required
+            />
+            {error ? <p className="text-sm text-destructive">{error}</p> : null}
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={isSubmitting || !isValid}
+            >
+              {isSubmitting ? "Ingresando…" : "Ingresar"}
+            </Button>
+          </form>
+        </FormProvider>
 
+        <p className="text-center text-sm text-muted-foreground">
+          ¿No verificaste el correo?{" "}
+          <Link
+            to={checkEmailHref("")}
+            className="font-medium text-foreground underline-offset-4 hover:underline"
+          >
+            Reenviar enlace
+          </Link>
+        </p>
         <p className="text-center text-sm text-muted-foreground">
           ¿No tenés cuenta?{" "}
           <Link
-            to={`${ROUTES.auth.register}${redirectTo !== ROUTES.player.home ? `?next=${encodeURIComponent(redirectTo)}` : ""}`}
+            to={`${ROUTES.auth.register}${redirectTo ? `?next=${encodeURIComponent(redirectTo)}` : ""}`}
             className="font-medium text-foreground underline-offset-4 hover:underline"
           >
             Registrate
@@ -110,10 +142,25 @@ export default function LoginScreen() {
         </p>
         <p className="text-center text-sm">
           <Link
-            to={ROUTES.player.home}
+            to={ROUTES.home}
             className="text-muted-foreground underline-offset-4 hover:underline"
           >
             Seguir sin cuenta
+          </Link>
+        </p>
+        <p className="text-center text-xs text-muted-foreground">
+          <Link
+            to={ROUTES.legal.privacy}
+            className="underline-offset-4 hover:underline"
+          >
+            Privacidad
+          </Link>
+          {" · "}
+          <Link
+            to={ROUTES.legal.terms}
+            className="underline-offset-4 hover:underline"
+          >
+            Términos
           </Link>
         </p>
       </div>

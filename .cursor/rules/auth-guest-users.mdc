@@ -7,13 +7,14 @@ alwaysApply: true
 
 ## Principio
 
-La **vista de jugador** (`/player/*`) es usable **sin sesión**. El guest puede explorar; las acciones que mutan o son personales requieren cuenta.
+La **vista de jugador** (`/` inicio, `/torneos`, etc.) es usable **sin sesión**. El guest puede explorar; las acciones que mutan o son personales requieren cuenta. `/player/*` redirige a esas mismas rutas.
 
 ## Permitido sin login
 
 - Ver inicio (mensaje de exploración), listado de torneos, detalle de torneo (cuadro/info).
 - Ver ranking (si el feature está on).
-- Navegar la app jugador y volver a Entry / vista club.
+- Ver el catálogo de clubes (`/clubes`): búsqueda, ubicación, precios, horario y turnos de hoy.
+- Navegar la app jugador. Tras login, si hay club asociado se elige modo en `/elegir`.
 - Buscar/mirar información pública de clubes y torneos.
 
 ## Requiere login (o registro)
@@ -27,10 +28,10 @@ La **vista de jugador** (`/player/*`) es usable **sin sesión**. El guest puede 
 
 1. Mostrar gate (`RequirePlayerAuth`) o redirigir a `/ingresar?next=…`.
 2. Ofrecer **Ingresar** y **Crear cuenta** (mismo destino `next` al terminar).
-3. El formulario de **registro** (nombre, apellido, edad, email, contraseña, repetir, categoría) es la fuente de verdad de identidad de la **cuenta app**.
+3. El formulario de **registro** (nombre, apellido, DNI, sexo, fecha de nacimiento, email, contraseña, repetir, categoría y **aceptación de privacidad + términos vigentes**) es la fuente de verdad de identidad de la **cuenta app**. El texto legal sale de `GET /api/legal/current`; no se hardcodea en el front. El sexo sale de `GET /api/sexes`.
 4. El alta **manual** de participante/cliente en el club reutiliza los **mismos campos**, con reglas distintas:
    - Obligatorios: **solo nombre y apellido**.
-   - Opcionales: edad, categoría, email, teléfono.
+   - Opcionales: DNI, sexo, fecha de nacimiento, categoría, email, teléfono.
    - Si se carga email o teléfono y ya hay cliente / jugador / usuario app → modal para **reutilizar** o **dar de alta nuevo**.
 
 ## Fuentes de identidad
@@ -40,11 +41,11 @@ La **vista de jugador** (`/player/*`) es usable **sin sesión**. El guest puede 
 
 Al registrarse en la app, si existe un cliente de club con el mismo email (o teléfono coincidente), se **asocia** ese cliente al `userId` / `playerId` nuevos.
 
-## Mock demo
+## Híbrido
 
-- Contraseña de prueba: `12345678`.
-- Emails ficticios (ej. `juan@padel.test`, `ana@padel.test`).
-- Sesión en `localStorage` (`startpadel.auth-session.v1`); datos en core-api mock.
+- Login y registro de cuenta van a la **API** (`POST /api/auth/*`).
+- Torneos y canchas: repositorios vacíos hasta cablear esos módulos. Settings de club van por HTTP (`GET /api/club/settings`) con `X-Club-Id` solo si hay un club elegido.
+- Sesión API en zustand persist (`padel-en-juego.auth`): JWT + club elegido. El `UserMeDto` de `GET /api/users/me` no se persiste; se vuelve a pedir al refrescar. El mock/guest usa `padel-en-juego.mock-session`. Logout borra ambas keys.
 
 ## Modelo
 

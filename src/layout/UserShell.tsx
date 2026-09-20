@@ -1,5 +1,6 @@
-import { Link, NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
+  Building2,
   History,
   Home,
   LogOut,
@@ -27,6 +28,7 @@ interface NavItem {
 
 const items: NavItem[] = [
   { to: ROUTES.player.home, label: "Inicio", icon: Home, end: true, feature: "home" },
+  { to: ROUTES.player.clubs, label: "Clubes", icon: Building2, feature: "clubs" },
   {
     to: ROUTES.player.tournaments,
     label: "Torneos",
@@ -46,6 +48,7 @@ const items: NavItem[] = [
     label: "Perfil",
     icon: User,
     feature: "profile",
+    authOnly: true,
   },
 ];
 
@@ -55,10 +58,19 @@ const gridColsClass: Record<number, string> = {
   3: "grid-cols-3",
   4: "grid-cols-4",
   5: "grid-cols-5",
+  6: "grid-cols-6",
 };
 
 export default function UserShell() {
-  const { isAuthenticated, player, logout } = useMockSession();
+  const navigate = useNavigate();
+  const {
+    isAuthenticated,
+    player,
+    logout,
+    hasAssociatedClub,
+    clubs,
+    enterClub,
+  } = useMockSession();
   const visibleItems = filterByFeature(items).filter(
     (item) => !item.authOnly || isAuthenticated,
   );
@@ -66,6 +78,15 @@ export default function UserShell() {
   const displayName = isAuthenticated
     ? player?.displayName ?? "Jugador"
     : "Explorar";
+
+  const goToClub = () => {
+    if (clubs.length === 1 && clubs[0]) {
+      enterClub(clubs[0].id);
+      navigate(ROUTES.club.dashboard);
+      return;
+    }
+    navigate(ROUTES.chooseMode);
+  };
 
   return (
     <div className="min-h-svh bg-background text-foreground flex">
@@ -76,7 +97,7 @@ export default function UserShell() {
       >
         <div className="border-b border-border px-4 py-5">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            StartPadel
+            Padel en juego
           </p>
           <h1 className="mt-1 text-xl font-semibold tracking-tight">Jugador</h1>
         </div>
@@ -115,12 +136,15 @@ export default function UserShell() {
               </p>
             </div>
           </div>
-          <NavLink
-            to={ROUTES.club.dashboard}
-            className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            Vista club
-          </NavLink>
+          {hasAssociatedClub ? (
+            <button
+              type="button"
+              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+              onClick={goToClub}
+            >
+              Vista club
+            </button>
+          ) : null}
           {isAuthenticated ? (
             <Button
               type="button"
@@ -148,7 +172,7 @@ export default function UserShell() {
         <header className="flex items-center justify-between gap-3 border-b border-border bg-card px-4 py-3 md:hidden">
           <div className="min-w-0">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              StartPadel
+              Padel en juego
             </p>
             <h1 className="truncate text-lg font-semibold tracking-tight">
               {displayName}
@@ -171,12 +195,15 @@ export default function UserShell() {
                 Ingresar
               </Link>
             )}
-            <NavLink
-              to={ROUTES.club.dashboard}
-              className="font-medium text-foreground underline-offset-4 hover:underline"
-            >
-              Vista club
-            </NavLink>
+            {hasAssociatedClub ? (
+              <button
+                type="button"
+                className="font-medium text-foreground underline-offset-4 hover:underline"
+                onClick={goToClub}
+              >
+                Vista club
+              </button>
+            ) : null}
           </div>
         </header>
 

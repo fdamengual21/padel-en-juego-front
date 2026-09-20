@@ -1,18 +1,27 @@
 export const ROUTES = {
   home: "/",
+  /** Selector jugador / club, post-login si hay membresía de club. */
+  chooseMode: "/elegir",
   auth: {
     login: "/ingresar",
     register: "/registro",
+    checkEmail: "/revisar-correo",
+    verifyEmail: "/verificar-email",
+  },
+  legal: {
+    privacy: "/privacidad",
+    terms: "/terminos",
   },
   player: {
-    root: "/player",
-    home: "/player",
-    tournaments: "/player/torneos",
-    tournamentDetail: (id: string) => `/player/torneos/${id}`,
-    ranking: "/player/ranking",
-    history: "/player/historial",
-    profile: "/player/perfil",
-    match: (id: string) => `/player/partidos/${id}`,
+    root: "/",
+    home: "/",
+    tournaments: "/torneos",
+    tournamentDetail: (id: string) => `/torneos/${id}`,
+    ranking: "/ranking",
+    history: "/historial",
+    profile: "/perfil",
+    clubs: "/clubes",
+    match: (id: string) => `/partidos/${id}`,
   },
   club: {
     root: "/club",

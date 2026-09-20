@@ -15,8 +15,8 @@ import type {
   MatchSlot,
   TournamentGroup,
   TournamentRound,
-} from "@core-api";
-import { scoreboardSlotCount } from "@core-api";
+} from "@/domain";
+import { scoreboardSlotCount } from "@/domain";
 import "@xyflow/react/dist/style.css";
 import RoundMatchesTable, {
   type MatchTableRow,

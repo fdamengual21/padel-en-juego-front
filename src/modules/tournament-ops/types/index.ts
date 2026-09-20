@@ -25,4 +25,4 @@ export type {
   PaginatedResult,
   GroupConfigValidation,
   TournamentRuleset,
-} from '@core-api'
+} from '@/domain'

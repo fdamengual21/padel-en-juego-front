@@ -1,4 +1,4 @@
-import type { Match } from "@core-api";
+import type { Match } from "@/domain";
 import MatchPlayStatusChip from "@/components/tournaments/MatchPlayStatusChip";
 import MatchScoreBoxes from "@/components/tournaments/MatchScoreBoxes";
 import PairVsBlock from "@/components/tournaments/PairVsBlock";

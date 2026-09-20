@@ -14,7 +14,7 @@ interface ProvinceCityFieldsProps {
   idPrefix?: string;
 }
 
-/** Par provincia + localidad con select searchable (core-api). */
+/** Par provincia + localidad con select searchable. */
 export default function ProvinceCityFields({
   province,
   city,

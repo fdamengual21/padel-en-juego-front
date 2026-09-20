@@ -1,4 +1,4 @@
-# StartPadel
+# Padel en juego
 
 App de gestión de torneos y club de pádel (React + Vite + TypeScript).
 

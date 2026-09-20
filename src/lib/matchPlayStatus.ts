@@ -3,7 +3,7 @@ import {
   matchPlayStatusLabel,
   resolveMatchPlayStatus,
   type MatchPlayStatus,
-} from "@core-api";
+} from "@/domain";
 
 export type { MatchPlayStatus };
 export {

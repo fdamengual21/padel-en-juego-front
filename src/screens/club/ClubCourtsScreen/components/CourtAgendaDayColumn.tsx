@@ -43,12 +43,14 @@ export default function CourtAgendaDayColumn({
             data-agenda-slot={hour}
           >
             <div className="w-full border-t border-border" />
-            <button
-              type="button"
-              className="absolute inset-0 z-0 m-0 block w-full appearance-none border-0 bg-transparent p-0 hover:bg-muted/40"
-              aria-label={`Crear reserva a las ${String(hour).padStart(2, "0")}:00`}
-              onClick={() => onEmptySlotClick?.(hour)}
-            />
+            {onEmptySlotClick ? (
+              <button
+                type="button"
+                className="absolute inset-0 z-0 m-0 block w-full appearance-none border-0 bg-transparent p-0 hover:bg-muted/40"
+                aria-label={`Crear reserva a las ${String(hour).padStart(2, "0")}:00`}
+                onClick={() => onEmptySlotClick(hour)}
+              />
+            ) : null}
           </div>
         );
       })}

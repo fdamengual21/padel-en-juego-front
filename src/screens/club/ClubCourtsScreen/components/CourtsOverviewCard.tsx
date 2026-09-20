@@ -1,11 +1,11 @@
-import type { CourtDayOverviewItem, CourtLiveStatus } from "@core-api";
+import type { CourtDayOverviewItem, CourtLiveStatus } from "@/domain";
 import { cn } from "@/lib/utils";
 
 interface CourtsOverviewCardProps {
   items: CourtDayOverviewItem[];
   selectedCourtId: string | null;
   onSelectCourt: (courtId: string) => void;
-  onSelectSlot: (courtId: string, startsAt: string) => void;
+  onSelectSlot?: (courtId: string, startsAt: string) => void;
   onOpenDetail: (courtId: string) => void;
 }
 
@@ -52,10 +52,24 @@ export default function CourtsOverviewCard({
           <article
             key={item.court.id}
             className={cn(
-              "rounded-2xl border border-border bg-card p-4 transition-colors",
+              "overflow-hidden rounded-2xl border border-border bg-card transition-colors",
               selected && "border-primary bg-primary/5 ring-1 ring-primary/30",
             )}
           >
+            <div className="relative aspect-[16/9] bg-muted">
+              {item.court.imageUrl ? (
+                <img
+                  src={item.court.imageUrl}
+                  alt=""
+                  className="size-full object-cover"
+                />
+              ) : (
+                <div className="flex size-full items-center justify-center text-sm text-muted-foreground">
+                  Sin imagen
+                </div>
+              )}
+            </div>
+            <div className="p-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <button
                 type="button"
@@ -66,6 +80,11 @@ export default function CourtsOverviewCard({
                   <p className="text-base font-semibold text-foreground">
                     {item.court.name}
                   </p>
+                  {item.court.status === "inactive" ? (
+                    <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                      Inactiva
+                    </span>
+                  ) : null}
                   <span
                     className={cn(
                       "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium",
@@ -116,20 +135,30 @@ export default function CourtsOverviewCard({
                 </p>
               ) : (
                 <div className="flex flex-wrap gap-1.5">
-                  {item.availableSlots.map((slot) => (
-                    <button
-                      key={slot.startsAt}
-                      type="button"
-                      className="rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium text-sidebar transition-colors hover:bg-muted"
-                      onClick={() =>
-                        onSelectSlot(item.court.id, slot.startsAt)
-                      }
-                    >
-                      {slot.label}
-                    </button>
-                  ))}
+                  {item.availableSlots.map((slot) =>
+                    onSelectSlot ? (
+                      <button
+                        key={slot.startsAt}
+                        type="button"
+                        className="rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium text-sidebar transition-colors hover:bg-muted"
+                        onClick={() =>
+                          onSelectSlot(item.court.id, slot.startsAt)
+                        }
+                      >
+                        {slot.label}
+                      </button>
+                    ) : (
+                      <span
+                        key={slot.startsAt}
+                        className="rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium text-muted-foreground"
+                      >
+                        {slot.label}
+                      </span>
+                    ),
+                  )}
                 </div>
               )}
+            </div>
             </div>
           </article>
         );

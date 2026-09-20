@@ -1,4 +1,4 @@
-import type { DashboardUpcomingMatch } from "@core-api";
+import type { DashboardUpcomingMatch } from "@/domain";
 import StatusBadge from "@/components/tournaments/StatusBadge";
 import DashboardPlayerChip from "./DashboardPlayerChip";
 

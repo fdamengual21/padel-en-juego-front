@@ -38,3 +38,15 @@ export function sidePreferenceLabel(
       return "Cualquiera";
   }
 }
+
+export function playerSidePreferenceShortLabel(
+  primary: "drive" | "reves" | null | undefined,
+  secondary?: "drive" | "reves" | null,
+): string {
+  if (!primary) return "Sin preferencia";
+  const primaryLabel = primary === "drive" ? "Drive" : "Revés";
+  if (secondary && secondary !== primary) {
+    return `${primaryLabel} + ${secondary === "drive" ? "Drive" : "Revés"}`;
+  }
+  return primaryLabel;
+}

@@ -1,14 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Trash2 } from "lucide-react";
-import type { Match, MatchResultInput, MatchRules, TournamentPair } from "@core-api";
+import type { Match, MatchResultInput, MatchRules, TournamentPair } from "@/domain";
 import {
   createId,
   isMatchResultComplete,
   isQualityPreset,
   resolveMatchDurationMinutes,
-} from "@core-api";
+} from "@/domain";
 import Api from "@/api/Api";
 import { useMockSession } from "@/app/MockSessionProvider";
 import RequirePlayerAuth from "@/components/auth/RequirePlayerAuth";
@@ -169,6 +169,26 @@ export default function TournamentDetailView({
     enabled: Boolean(categoryId) && activeTab === "participantes",
     refetchOnMount: "always",
   });
+
+  const toastedAutoMatchKeys = useRef(new Set<string>());
+
+  useEffect(() => {
+    const matches = participantsBoard?.autoMatches ?? [];
+    if (!participantsBoard || matches.length === 0) return;
+    const key = `${participantsBoard.generatedAt}:${matches
+      .map((m) => m.survivingPairId)
+      .join(",")}`;
+    if (toastedAutoMatchKeys.current.has(key)) return;
+    toastedAutoMatchKeys.current.add(key);
+    for (const match of matches) {
+      toastSuccess(
+        "Pareja armada automáticamente",
+        `${match.player1Name} y ${match.player2Name} se unieron por preferencia de lado`,
+      );
+    }
+    void qc.invalidateQueries({ queryKey: ["pairs", categoryId] });
+    void qc.invalidateQueries({ queryKey: ["registrations", categoryId] });
+  }, [participantsBoard, categoryId, qc]);
   const {
     data: cuadroBoard,
     isFetching: cuadroFetching,
@@ -234,7 +254,7 @@ export default function TournamentDetailView({
       pairId?: string;
       player1Id: string;
       player2Id: string | null;
-      sidePreference: import("@core-api").PairSidePreference | null;
+      sidePreference: import("@/domain").PairSidePreference | null;
       rankingPointsPlayer1?: number | null;
       rankingPointsPlayer2?: number | null;
       availability?: Array<{
@@ -244,15 +264,19 @@ export default function TournamentDetailView({
       }>;
     }) => {
       if (input.mode === "edit" && input.pairId) {
-        return Api.TournamentOpsService().updatePairPlayers(input.pairId, {
-          player1Id: input.player1Id,
-          player2Id: input.player2Id,
-          sidePreference: input.sidePreference,
-          rankingPointsPlayer1: input.rankingPointsPlayer1,
-          rankingPointsPlayer2: input.rankingPointsPlayer2,
-        });
+        return {
+          kind: "edit" as const,
+          pair: await Api.TournamentOpsService().updatePairPlayers(input.pairId, {
+            player1Id: input.player1Id,
+            player2Id: input.player2Id,
+            sidePreference: input.sidePreference,
+            rankingPointsPlayer1: input.rankingPointsPlayer1,
+            rankingPointsPlayer2: input.rankingPointsPlayer2,
+          }),
+          autoMatch: null as import("@/domain").SoloPairAutoMatchResult | null,
+        };
       }
-      return Api.TournamentOpsService().registerPair({
+      const result = await Api.TournamentOpsService().registerPairByAdmin({
         tournamentCategoryId: categoryId,
         player1Id: input.player1Id,
         player2Id: input.player2Id,
@@ -261,19 +285,32 @@ export default function TournamentDetailView({
         rankingPointsPlayer2: input.rankingPointsPlayer2,
         availability: input.availability,
       });
+      return {
+        kind: "create" as const,
+        pair: result.pair,
+        autoMatch: result.autoMatch,
+      };
     },
-    onSuccess: async (_data, vars) => {
-      toastSuccess(
-        vars.mode === "edit"
-          ? "Pareja actualizada"
-          : "Inscripción cargada",
-        vars.mode === "edit"
-          ? undefined
-          : "Queda pendiente de aceptación",
-      );
+    onSuccess: async (data, vars) => {
+      if (data.autoMatch) {
+        toastSuccess(
+          "Pareja armada automáticamente",
+          `${data.autoMatch.player1Name} y ${data.autoMatch.player2Name} se unieron por preferencia de lado`,
+        );
+      } else {
+        toastSuccess(
+          vars.mode === "edit"
+            ? "Pareja actualizada"
+            : "Inscripción cargada",
+          vars.mode === "edit"
+            ? undefined
+            : "Queda aceptada (alta de club)",
+        );
+      }
       await invalidateOps();
       const shouldSyncStructure =
-        vars.mode === "edit" && Boolean(vars.player2Id);
+        (vars.mode === "edit" && Boolean(vars.player2Id)) ||
+        Boolean(data.autoMatch);
       if (shouldSyncStructure) {
         const result =
           await Api.TournamentOpsService().syncCategoryStructure(categoryId);
@@ -481,13 +518,20 @@ export default function TournamentDetailView({
   const acceptMutation = useMutation({
     mutationFn: (registrationId: string) =>
       Api.TournamentOpsService().acceptRegistration(registrationId),
-    onSuccess: async () => {
-      toastSuccess("Inscripción aceptada");
+    onSuccess: async (result) => {
+      if (result.autoMatch) {
+        toastSuccess(
+          "Inscripción aceptada y pareja armada",
+          `${result.autoMatch.player1Name} y ${result.autoMatch.player2Name} se unieron por preferencia de lado`,
+        );
+      } else {
+        toastSuccess("Inscripción aceptada");
+      }
       await invalidateOps();
       if (categoryId) {
-        const result =
+        const sync =
           await Api.TournamentOpsService().syncCategoryStructure(categoryId);
-        if (result.message) toastInfo("Estructura actualizada", result.message);
+        if (sync.message) toastInfo("Estructura actualizada", sync.message);
         await invalidateOps();
       }
     },
@@ -1381,6 +1425,8 @@ export default function TournamentDetailView({
             email: draft.email.trim() || null,
             age: Number.isFinite(ageNum) && draft.age.trim() ? ageNum : null,
             categoryLevel: draft.categoryLevel,
+            sidePreferencePrimary: draft.sidePreferencePrimary,
+            sidePreferenceSecondary: draft.sidePreferenceSecondary,
           });
           await qc.invalidateQueries({ queryKey: ["players"] });
           return player;

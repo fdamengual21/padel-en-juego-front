@@ -10,7 +10,7 @@ alwaysApply: false
 
 **Theme default: light.** No activar dark por `prefers-color-scheme`. `.dark` solo con toggle explícito futuro. Diseñar y verificar siempre en light primero.
 
-## Marca (referencia StartPadel)
+## Marca (referencia Padel en juego)
 
 - **Acento lima** (`--primary`): CTAs, item activo de nav, ranking, campeón de bracket, estados “activos”.
 - **Texto / navy** (`--foreground`, `--primary-foreground` sobre lima): contraste alto sobre botones y chips activos.

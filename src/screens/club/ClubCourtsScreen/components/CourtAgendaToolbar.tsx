@@ -2,7 +2,7 @@ import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   formatAgendaWeekRangeLabel,
   shiftAgendaDate,
@@ -89,13 +89,12 @@ export default function CourtAgendaToolbar({
           </Button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Input
-            type="date"
-            className="w-auto"
+          <DatePicker
+            className="w-40"
             value={date.format("YYYY-MM-DD")}
-            onChange={(e) => {
-              if (!e.target.value) return;
-              onDateChange(dayjs(e.target.value).hour(12));
+            onChange={(next) => {
+              if (!next) return;
+              onDateChange(dayjs(next).hour(12));
             }}
           />
           <p className="text-sm font-medium capitalize text-foreground">{label}</p>

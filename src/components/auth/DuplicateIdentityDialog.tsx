@@ -1,5 +1,5 @@
-import { formatCategoryLevel } from "@core-api";
-import type { IdentityMatch } from "@core-api";
+import { formatCategoryLevel } from "@/domain";
+import type { IdentityMatch } from "@/domain";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,

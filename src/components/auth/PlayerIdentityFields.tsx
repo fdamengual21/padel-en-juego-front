@@ -2,7 +2,7 @@ import {
   CATEGORY_LEVELS,
   formatCategoryLevel,
   type CategoryLevel,
-} from "@core-api";
+} from "@/domain";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";

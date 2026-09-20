@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import type { ClubClientSummary } from "@core-api";
+import type { ClubClientSummary } from "@/domain";
 import Avatar from "@/components/Avatar";
 import { formatLocationEs } from "@/lib/dates";
 import { ROUTES } from "@/router/routes";

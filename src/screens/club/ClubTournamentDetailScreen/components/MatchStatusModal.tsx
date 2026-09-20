@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Match, MatchStatus } from "@core-api";
+import type { Match, MatchStatus } from "@/domain";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,

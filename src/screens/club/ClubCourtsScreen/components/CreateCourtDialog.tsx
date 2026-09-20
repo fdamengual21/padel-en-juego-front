@@ -11,10 +11,10 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toastError, toastSuccess } from "@/lib/toast";
 
 interface CreateCourtDialogProps {
   open: boolean;
-  clubId: string;
   suggestedName: string;
   onOpenChange: (open: boolean) => void;
   onCreated: (courtId: string) => void;
@@ -22,7 +22,6 @@ interface CreateCourtDialogProps {
 
 export default function CreateCourtDialog({
   open,
-  clubId,
   suggestedName,
   onOpenChange,
   onCreated,
@@ -30,6 +29,7 @@ export default function CreateCourtDialog({
   const [name, setName] = useState(suggestedName);
   const [slotDurationMinutes, setSlotDurationMinutes] = useState(90);
   const [basePrice, setBasePrice] = useState("12000");
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -38,6 +38,7 @@ export default function CreateCourtDialog({
     setName(suggestedName);
     setSlotDurationMinutes(90);
     setBasePrice("12000");
+    setPhotoFile(null);
     setError(null);
     setBusy(false);
   }, [open, suggestedName]);
@@ -51,16 +52,22 @@ export default function CreateCourtDialog({
       if (!Number.isFinite(price) || price < 0) {
         throw new Error("Precio base inválido");
       }
-      const court = await Api.TournamentOpsService().createCourt({
-        clubId,
+      const court = await Api.CourtService().create({
         name: name.trim(),
         slotDurationMinutes,
         basePrice: price,
       });
+      if (photoFile) {
+        await Api.CourtService().uploadPhoto(court.id, photoFile);
+      }
+      toastSuccess("Cancha creada");
       onCreated(court.id);
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo crear la cancha");
+      const message =
+        err instanceof Error ? err.message : "No se pudo crear la cancha";
+      setError(message);
+      toastError("No se pudo crear la cancha", message);
     } finally {
       setBusy(false);
     }
@@ -72,7 +79,8 @@ export default function CreateCourtDialog({
         <DialogHeader>
           <DialogTitle>Agregar cancha</DialogTitle>
           <DialogDescription>
-            Creá la cancha y después configurá duración y tarifas.
+            Nombre, duración, precio base y una foto opcional. Las tarifas por
+            horario se configuran después.
           </DialogDescription>
         </DialogHeader>
 
@@ -110,6 +118,15 @@ export default function CreateCourtDialog({
                 onChange={(e) => setBasePrice(e.target.value)}
               />
             </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="new-court-photo">Foto (opcional)</Label>
+            <Input
+              id="new-court-photo"
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)}
+            />
           </div>
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
         </div>

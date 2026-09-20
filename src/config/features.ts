@@ -23,6 +23,8 @@ export const FEATURES = {
   history: envFlag(import.meta.env.VITE_FEATURE_HISTORY, true),
   /** Perfil del jugador (resumen + cuenta) */
   profile: envFlag(import.meta.env.VITE_FEATURE_PROFILE, true),
+  /** Catalogo publico de clubes */
+  clubs: envFlag(import.meta.env.VITE_FEATURE_CLUBS, true),
   /** Dashboard club */
   clubDashboard: envFlag(import.meta.env.VITE_FEATURE_CLUB_DASHBOARD, true),
   /** Clientes del club */

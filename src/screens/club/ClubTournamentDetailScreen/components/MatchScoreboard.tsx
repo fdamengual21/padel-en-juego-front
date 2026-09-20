@@ -1,4 +1,4 @@
-import type { SetScore } from "@core-api";
+import type { SetScore } from "@/domain";
 import { parseIntegerFromForm } from "@/lib/latamNumberInput";
 import { cn } from "@/lib/utils";
 

@@ -17,8 +17,9 @@ import {
   type RulesetPreset,
   type TournamentCircuitType,
   type TournamentFormat,
-} from "@core-api";
+} from "@/domain";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -151,19 +152,22 @@ export default function TournamentForm({
             </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Inicio" htmlFor="start">
-                <Input
+                <DatePicker
                   id="start"
-                  type="date"
                   value={values.startDate}
-                  onChange={(e) => patch("startDate", e.target.value)}
+                  onChange={(next) => {
+                    if (next) patch("startDate", next);
+                  }}
                 />
               </Field>
               <Field label="Fin" htmlFor="end">
-                <Input
+                <DatePicker
                   id="end"
-                  type="date"
                   value={values.endDate}
-                  onChange={(e) => patch("endDate", e.target.value)}
+                  minDate={values.startDate}
+                  onChange={(next) => {
+                    if (next) patch("endDate", next);
+                  }}
                 />
               </Field>
             </div>

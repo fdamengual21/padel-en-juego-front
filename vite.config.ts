@@ -8,12 +8,17 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      "@core-api": path.resolve(__dirname, "./core-api"),
     },
   },
   server: {
     port: 5180,
     strictPort: true,
+    proxy: {
+      "/api": {
+        target: "http://localhost:5250",
+        changeOrigin: true,
+      },
+    },
   },
   preview: {
     port: 5180,

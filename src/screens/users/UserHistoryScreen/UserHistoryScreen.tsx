@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import Api from "@/api/Api";
 import { useMockSession } from "@/app/MockSessionProvider";
+import { emptyPlayerDashboard } from "@/modules/auth";
 import RequirePlayerAuth from "@/components/auth/RequirePlayerAuth";
 import MatchCard from "@/components/tournaments/MatchCard";
 import { buttonVariants } from "@/components/ui/button";
@@ -11,12 +12,14 @@ import { cn } from "@/lib/utils";
 import TournamentHistoryCard from "./components/TournamentHistoryCard";
 
 export default function UserHistoryScreen() {
-  const { playerId } = useMockSession();
+  const { playerId, player, hasApiSession } = useMockSession();
   const { data, isLoading } = useQuery({
     queryKey: ["player-home", playerId],
     queryFn: () => Api.TournamentOpsService().getPlayerHome(playerId!),
-    enabled: Boolean(playerId),
+    enabled: Boolean(playerId) && !hasApiSession,
   });
+  const dashboard =
+    hasApiSession && player ? emptyPlayerDashboard(player) : data;
 
   return (
     <div className="space-y-4 p-4" data-testid="player-history">
@@ -26,7 +29,7 @@ export default function UserHistoryScreen() {
         nextPath={ROUTES.player.history}
         actionLabel="Ver tu historial"
       >
-        {isLoading || !data ? (
+        {isLoading || !dashboard ? (
           <p className="text-sm text-muted-foreground">Cargando historial…</p>
         ) : (
           <Tabs defaultValue="tournaments">
@@ -40,7 +43,7 @@ export default function UserHistoryScreen() {
             </TabsList>
 
             <TabsContent value="tournaments" className="mt-3 space-y-3">
-              {data.tournaments.length === 0 ? (
+              {dashboard.tournaments.length === 0 ? (
                 <div className="space-y-3">
                   <p className="text-sm text-muted-foreground">
                     Todavía no jugaste torneos.
@@ -53,7 +56,7 @@ export default function UserHistoryScreen() {
                   </Link>
                 </div>
               ) : (
-                data.tournaments.map((entry) => (
+                dashboard.tournaments.map((entry) => (
                   <TournamentHistoryCard
                     key={`${entry.tournamentId}-${entry.categoryId}-${entry.pairId}`}
                     entry={entry}
@@ -63,12 +66,12 @@ export default function UserHistoryScreen() {
             </TabsContent>
 
             <TabsContent value="matches" className="mt-3 space-y-3">
-              {data.recentMatches.length === 0 ? (
+              {dashboard.recentMatches.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   Sin partidos finalizados.
                 </p>
               ) : (
-                data.recentMatches.map((item) => (
+                dashboard.recentMatches.map((item) => (
                   <MatchCard
                     key={item.match.id}
                     match={item.match}

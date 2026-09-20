@@ -1,5 +1,5 @@
-import type { PlayerCategoryHistoryEntry } from "@core-api";
-import { formatCategoryLevel } from "@core-api";
+import type { PlayerCategoryHistoryEntry } from "@/domain";
+import { formatCategoryLevel } from "@/domain";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 import { CATEGORY_CHANGE_REASON_LABEL } from "../categoryLabels";

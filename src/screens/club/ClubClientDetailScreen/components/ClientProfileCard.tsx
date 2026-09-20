@@ -1,5 +1,5 @@
-import type { CategoryLevel, Client } from "@core-api";
-import { formatCategoryLevel } from "@core-api";
+import type { CategoryLevel, Client } from "@/domain";
+import { formatCategoryLevel } from "@/domain";
 import Avatar from "@/components/Avatar";
 import WhatsAppLink from "@/components/WhatsAppLink";
 import { formatLocationEs } from "@/lib/dates";

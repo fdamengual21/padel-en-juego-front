@@ -8,7 +8,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { formatScheduleShortEs } from "@/lib/dates";
 import { ROUTES } from "@/router/routes";
 import { cn } from "@/lib/utils";
-import type { PlayerUpcomingReservation } from "@core-api";
+import type { PlayerUpcomingReservation } from "@/domain";
 
 function ReservationCard({ item }: { item: PlayerUpcomingReservation }) {
   const { reservation, courtName, clubName } = item;

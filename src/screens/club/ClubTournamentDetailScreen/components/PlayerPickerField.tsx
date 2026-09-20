@@ -1,11 +1,14 @@
 import { useCallback, useState } from "react";
-import type { CategoryLevel, Player } from "@core-api";
+import type { CategoryLevel, Player, SidePosition } from "@/domain";
 import Api from "@/api/Api";
 import PlayerIdentityFields, {
   emptyPlayerIdentityValues,
   isClubManualIdentityValid,
   type PlayerIdentityValues,
 } from "@/components/auth/PlayerIdentityFields";
+import SidePreferenceFields, {
+  emptySidePreference,
+} from "@/components/players/SidePreferenceFields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,6 +22,8 @@ export interface ManualPlayerDraft {
   email: string;
   age: string;
   categoryLevel: CategoryLevel;
+  sidePreferencePrimary: SidePosition | null;
+  sidePreferenceSecondary: SidePosition | null;
 }
 
 export type PlayerSlotValue =
@@ -49,7 +54,10 @@ function draftToIdentity(draft: ManualPlayerDraft): PlayerIdentityValues {
   };
 }
 
-function identityToDraft(values: PlayerIdentityValues): ManualPlayerDraft {
+function identityToDraft(
+  values: PlayerIdentityValues,
+  side = emptySidePreference(),
+): ManualPlayerDraft {
   return {
     firstName: values.firstName,
     lastName: values.lastName,
@@ -57,6 +65,24 @@ function identityToDraft(values: PlayerIdentityValues): ManualPlayerDraft {
     email: values.email,
     categoryLevel: values.categoryLevel,
     phone: values.phone ?? "",
+    sidePreferencePrimary: side.primary,
+    sidePreferenceSecondary: side.secondary,
+  };
+}
+
+function emptyManualDraft(
+  partial?: Partial<ManualPlayerDraft>,
+): ManualPlayerDraft {
+  return {
+    firstName: "",
+    lastName: "",
+    phone: "",
+    email: "",
+    age: "",
+    categoryLevel: 6 as CategoryLevel,
+    sidePreferencePrimary: null,
+    sidePreferenceSecondary: null,
+    ...partial,
   };
 }
 
@@ -78,16 +104,7 @@ export default function PlayerPickerField({
   const selected = value.mode === "search" ? value.player : null;
   const manualOpen = value.mode === "manual";
   const manual =
-    value.mode === "manual"
-      ? value.draft
-      : {
-          firstName: "",
-          lastName: "",
-          phone: "",
-          email: "",
-          age: "",
-          categoryLevel: 6 as CategoryLevel,
-        };
+    value.mode === "manual" ? value.draft : emptyManualDraft();
 
   const searchFn = useCallback(
     (q: string, signal: AbortSignal) =>
@@ -160,7 +177,33 @@ export default function PlayerPickerField({
             idPrefix={`player-${label}`}
             values={draftToIdentity(manual)}
             onChange={(next) =>
-              onChange({ mode: "manual", draft: identityToDraft(next) })
+              onChange({
+                mode: "manual",
+                draft: {
+                  ...identityToDraft(next, {
+                    primary: manual.sidePreferencePrimary,
+                    secondary: manual.sidePreferenceSecondary,
+                  }),
+                },
+              })
+            }
+          />
+          <SidePreferenceFields
+            compact
+            idPrefix={`player-side-${label}`}
+            value={{
+              primary: manual.sidePreferencePrimary,
+              secondary: manual.sidePreferenceSecondary,
+            }}
+            onChange={(side) =>
+              onChange({
+                mode: "manual",
+                draft: {
+                  ...manual,
+                  sidePreferencePrimary: side.primary,
+                  sidePreferenceSecondary: side.secondary,
+                },
+              })
             }
           />
           <p className="text-xs text-muted-foreground">

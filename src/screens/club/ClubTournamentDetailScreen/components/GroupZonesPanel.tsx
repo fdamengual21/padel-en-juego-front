@@ -1,6 +1,6 @@
 import { useState } from "react";
-import type { Court, GroupStanding, Match, MatchRules, TournamentGroup } from "@core-api";
-import { scoreboardSlotCount } from "@core-api";
+import type { Court, GroupStanding, Match, MatchRules, TournamentGroup } from "@/domain";
+import { scoreboardSlotCount } from "@/domain";
 import MatchCourtSelect, {
   MatchHorarioButton,
   MatchScheduleTimeModal,
@@ -26,7 +26,7 @@ import {
 import { resolveMatchPlayStatus } from "@/lib/matchPlayStatus";
 import { formatScheduleShortEs } from "@/lib/dates";
 import { cn } from "@/lib/utils";
-import { groupQualificationTargetLabel } from "@core-api";
+import { groupQualificationTargetLabel } from "@/domain";
 
 interface StandingColumnHeadProps {
   label: string;
@@ -60,7 +60,7 @@ interface GroupZonesPanelProps {
   matchRules: MatchRules;
   courts?: Court[];
   allMatches?: Match[];
-  reservations?: import("@core-api").CourtReservation[];
+  reservations?: import("@/domain").CourtReservation[];
   matchDurationMinutes?: number;
   scheduleSavingMatchId?: string | null;
   /** Torneo finalizado/cancelado: sin editar agenda, cancha ni resultado. */

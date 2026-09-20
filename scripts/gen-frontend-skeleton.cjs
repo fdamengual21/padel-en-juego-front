@@ -20,7 +20,6 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      '@core-api': path.resolve(__dirname, './core-api'),
     },
   },
 })
@@ -43,8 +42,6 @@ write(
         baseUrl: ".",
         paths: {
           "@/*": ["./src/*"],
-          "@core-api": ["./core-api/index.ts"],
-          "@core-api/*": ["./core-api/*"],
         },
         moduleResolution: "bundler",
         allowImportingTsExtensions: true,
@@ -58,7 +55,7 @@ write(
         erasableSyntaxOnly: true,
         noFallthroughCasesInSwitch: true,
       },
-      include: ["src", "core-api"],
+      include: ["src"],
     },
     null,
     2,
@@ -82,25 +79,14 @@ export interface Response<T> {
 );
 
 write(
-  "src/config/coreApiClient.ts",
-  `import { getTournamentEngine } from '@core-api'
-
-export function coreApi() {
-  return getTournamentEngine()
-}
-`,
-);
-
-write(
   "src/modules/clubs/types/index.ts",
-  `export type { Club } from '@core-api'
+  `export type { Club } from '@/domain'
 `,
 );
 
 write(
   "src/modules/clubs/repositories/ClubRepository.ts",
-  `import { coreApi } from '@/config/coreApiClient'
-import type { Club } from '../types'
+  `import type { Club } from '../types'
 
 export interface IClubRepository {
   list(): Promise<Club[]>
@@ -109,11 +95,11 @@ export interface IClubRepository {
 
 export class ClubRepository implements IClubRepository {
   async list(): Promise<Club[]> {
-    return coreApi().listClubs()
+    return []
   }
 
-  async getById(id: string): Promise<Club | null> {
-    return coreApi().getClub(id)
+  async getById(_id: string): Promise<Club | null> {
+    return null
   }
 }
 `,
@@ -148,7 +134,7 @@ export { ClubService } from './services/ClubService'
 
 write(
   "src/modules/tournaments/types/index.ts",
-  `export type { Tournament, TournamentFormat, TournamentStatus } from '@core-api'
+  `export type { Tournament, TournamentFormat, TournamentStatus } from '@/domain'
 
 export interface CreateTournamentRequest {
   clubId: string
@@ -156,15 +142,15 @@ export interface CreateTournamentRequest {
   description: string | null
   startDate: string
   endDate: string | null
-  status: import('@core-api').TournamentStatus
-  format: import('@core-api').TournamentFormat
+  status: import('@/domain').TournamentStatus
+  format: import('@/domain').TournamentFormat
 }
 `,
 );
 
 write(
   "src/modules/tournaments/repositories/TournamentRepository.ts",
-  `import { coreApi } from '@/config/coreApiClient'
+  `import { notConnectedError } from '@/domain'
 import type { CreateTournamentRequest, Tournament } from '../types'
 
 export interface ITournamentRepository {
@@ -174,16 +160,16 @@ export interface ITournamentRepository {
 }
 
 export class TournamentRepository implements ITournamentRepository {
-  list(clubId?: string) {
-    return coreApi().listTournaments(clubId)
+  async list(_clubId?: string) {
+    return []
   }
 
-  getById(id: string) {
-    return coreApi().getTournament(id)
+  async getById(_id: string) {
+    return null
   }
 
-  create(input: CreateTournamentRequest) {
-    return coreApi().createTournament(input)
+  async create(_input: CreateTournamentRequest) {
+    throw notConnectedError()
   }
 }
 `,
@@ -239,111 +225,24 @@ write(
   Player,
   GroupConfigValidation,
   TournamentRuleset,
-} from '@core-api'
+} from '@/domain'
 `,
 );
 
 write(
   "src/modules/tournament-ops/repositories/TournamentOpsRepository.ts",
-  `import { coreApi } from '@/config/coreApiClient'
-import type { GenerateGroupsConfig, MatchResultInput } from '../types'
-
-export interface ITournamentOpsRepository {
-  listCategories(tournamentId: string): ReturnType<ReturnType<typeof coreApi>['listCategories']>
-  createCategory: ReturnType<typeof coreApi>['createCategory']
-  listPairs(categoryId: string): ReturnType<ReturnType<typeof coreApi>['listPairs']>
-  listRegistrations(categoryId: string): ReturnType<ReturnType<typeof coreApi>['listRegistrations']>
-  getRuleset(categoryId: string): ReturnType<ReturnType<typeof coreApi>['getRuleset']>
-  listGroups(categoryId: string): ReturnType<ReturnType<typeof coreApi>['listGroups']>
-  listStandings(categoryId: string): ReturnType<ReturnType<typeof coreApi>['listStandings']>
-  listMatches(categoryId: string): ReturnType<ReturnType<typeof coreApi>['listMatches']>
-  getBracket(categoryId: string): ReturnType<ReturnType<typeof coreApi>['getBracket']>
-  generateGroups(categoryId: string, config: GenerateGroupsConfig): ReturnType<ReturnType<typeof coreApi>['generateGroupsForCategory']>
-  generateGroupMatches(categoryId: string): ReturnType<ReturnType<typeof coreApi>['generateGroupMatches']>
-  submitMatchResult(matchId: string, input: MatchResultInput): ReturnType<ReturnType<typeof coreApi>['submitMatchResult']>
-  generateBracket(categoryId: string): ReturnType<ReturnType<typeof coreApi>['generateBracket']>
-  scheduleCategory(categoryId: string): ReturnType<ReturnType<typeof coreApi>['scheduleCategory']>
-  listCourts(clubId: string): ReturnType<ReturnType<typeof coreApi>['listCourts']>
-  getDashboard(clubId: string): ReturnType<ReturnType<typeof coreApi>['getDashboard']>
-  getRanking(categoryId?: string): ReturnType<ReturnType<typeof coreApi>['getRanking']>
-  getPlayerHome(playerId: string): ReturnType<ReturnType<typeof coreApi>['getPlayerHome']>
-  listPlayers(): ReturnType<ReturnType<typeof coreApi>['listPlayers']>
+  `export interface ITournamentOpsRepository {
+  listCategories(tournamentId: string): Promise<unknown[]>
+  listPlayers(): Promise<unknown[]>
 }
 
 export class TournamentOpsRepository implements ITournamentOpsRepository {
-  listCategories(tournamentId: string) {
-    return coreApi().listCategories(tournamentId)
+  async listCategories(_tournamentId: string) {
+    return []
   }
 
-  createCategory: ITournamentOpsRepository['createCategory'] = (input) =>
-    coreApi().createCategory(input)
-
-  listPairs(categoryId: string) {
-    return coreApi().listPairs(categoryId)
-  }
-
-  listRegistrations(categoryId: string) {
-    return coreApi().listRegistrations(categoryId)
-  }
-
-  getRuleset(categoryId: string) {
-    return coreApi().getRuleset(categoryId)
-  }
-
-  listGroups(categoryId: string) {
-    return coreApi().listGroups(categoryId)
-  }
-
-  listStandings(categoryId: string) {
-    return coreApi().listStandings(categoryId)
-  }
-
-  listMatches(categoryId: string) {
-    return coreApi().listMatches(categoryId)
-  }
-
-  getBracket(categoryId: string) {
-    return coreApi().getBracket(categoryId)
-  }
-
-  generateGroups(categoryId: string, config: GenerateGroupsConfig) {
-    return coreApi().generateGroupsForCategory(categoryId, config)
-  }
-
-  generateGroupMatches(categoryId: string) {
-    return coreApi().generateGroupMatches(categoryId)
-  }
-
-  submitMatchResult(matchId: string, input: MatchResultInput) {
-    return coreApi().submitMatchResult(matchId, input)
-  }
-
-  generateBracket(categoryId: string) {
-    return coreApi().generateBracket(categoryId)
-  }
-
-  scheduleCategory(categoryId: string) {
-    return coreApi().scheduleCategory(categoryId)
-  }
-
-  listCourts(clubId: string) {
-    return coreApi().listCourts(clubId)
-  }
-
-  getDashboard(clubId: string) {
-    return coreApi().getDashboard(clubId)
-  }
-
-  getRanking(categoryId?: string) {
-    return coreApi().getRanking(categoryId)
-  }
-
-  getPlayerHome(playerId: string) {
-    return coreApi().getPlayerHome(playerId)
-  }
-
-  listPlayers() {
-    return coreApi().listPlayers()
+  async listPlayers() {
+    return []
   }
 }
 `,

@@ -1,15 +1,18 @@
 ---
-description: Carpetas, capas, core-api mock, modules y tipos
-globs: src/**/*.{ts,tsx},core-api/**/*.ts
+description: Carpetas, capas, domain, modules y tipos
+globs: src/**/*.{ts,tsx}
 alwaysApply: false
 ---
 
 # Arquitectura y organizacion
 
 ```text
-core-api/                 # mock: JSON + memoria (+ localStorage)
-src/api/Api.ts            # fachada lazy
+src/domain/               # tipos y helpers de dominio (sin motor de torneo)
+src/api/Api.ts            # fachada lazy (inyecta axiosInstance a repositories HTTP)
+src/config/axiosInstance.ts  # axios + interceptor JWT desde zustand
 src/modules/              # repositories + services
+src/stores/               # zustand persist (auth tokens; /me en memoria)
+src/authorization/        # permissionCodes, hasAccess, usePermissions
 src/layout/               # shells de modo (ClubShell, UserShell)
 src/screens/
   entry/                  # landing / elegir modo
@@ -17,16 +20,18 @@ src/screens/
   users/                  # modo usuario/jugador
 src/components/
   ui/                     # primitivos shadcn
+  Form/                   # InputField, SelectField, DateField (RHF + yup, useController)
+  guards/                 # PermissionsGuard, FeatureGuard, ConditionGuard
   tournaments/            # dominio reutilizable (club + users)
-src/router/
-src/app/                  # providers de app (sesion mock, etc.)
+src/router/               # AppRouter + RequireAuth / RequireClubContext / RequirePermission
+src/app/                  # UserProvider (login + /me) y MockSessionProvider (guest / mock)
 ```
 
 ## Modos UI
 
 - **club** y **users** viven en folders separados bajo `src/screens/`.
 - Shells en `src/layout/` (nav lateral club, bottom nav users).
-- Rutas URL pueden seguir en espanol (`/club`, `/player`); el codigo de carpetas esta en ingles (`users`).
+- Rutas URL en espanol: jugador en `/` (`/torneos`, `/perfil`); club en `/club`; auth en `/ingresar`. El codigo de carpetas esta en ingles (`users`). `/player` redirige al jugador en raiz.
 
 ## Screens y componentes
 
@@ -40,10 +45,13 @@ src/app/                  # providers de app (sesion mock, etc.)
 ## Dependencias
 
 ```text
-UI (screens/layout/components) → Api.XxxService() → Service → Repository → @core-api
+UI (screens/layout/components) → Api.XxxService() → Service → Repository → HTTP o stub
 ```
 
-- Logica de torneo en `core-api` (`syncCategoryStructure`, AutoMatch, bracket).
+- Auth, geography, sexes, legal, users y catálogo público de clubes: HTTP real via `axiosInstance` (`/api/auth/*`, `/api/geography/*`, `/api/sexes`, `/api/legal/current`, `GET`/`PATCH /api/users/me`, `GET /api/public/clubs`). El interceptor pone `Authorization` desde zustand y `X-Club-Id` **solo** si el usuario eligió un club (`isClubMode`) y ese id está en `clubs[]` de `/me`.
+- Tras login o confirmar email, `AuthService` exige token+refresh+expires, `UserProvider` los guarda en zustand y pide `/me` (no usa el `user` del login). `UserService.me()` no llama si no hay JWT. Al refrescar, si hay JWT **siempre** se vuelve a pedir `/me`. El persist de `padel-en-juego.auth` guarda tokens + club elegido, **no** el DTO de `/me`. Logout limpia persist, mock-session y la cache de queries.
+- Settings de club: `GET/PATCH /api/club/settings` e imagenes `POST/DELETE /api/club/settings/avatar|cover` (la API valida staff + permiso). Canchas: `GET/POST /api/club/courts`, `GET/PATCH/DELETE /api/club/courts/{id}` y foto `POST/DELETE /api/club/courts/{id}/photo` (`club.courts.read` / `club.courts.write`). Torneos y reservas siguen stub.
+- Permisos UI: `src/authorization/` + `PermissionsGuard` / `usePermissions()` contra `scopedPermissions` de `/me`. No recalcular por rol en el cliente. Ver **permissions-and-guards.mdc**.
 - Grupos/partidos/bracket: **automaticos** al sincronizar inscripciones (sin botones Generar en UI).
 - Horario manual: `match.scheduleManual = true` (AutoMatch no lo pisa).
 - Categorias: `kind=level` (1ra–8va) o `kind=suma` (+ `sumaTarget`); gender male/female/mixed.

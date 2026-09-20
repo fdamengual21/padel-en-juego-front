@@ -1,86 +1,125 @@
-import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
-import { formatCategoryLevel } from "@core-api";
-import Api from "@/api/Api";
+import { useEffect } from "react";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useMockSession } from "@/app/MockSessionProvider";
-import { FeatureGuard } from "@/components/guards";
-import TournamentCard from "@/components/tournaments/TournamentCard";
+import { useUser } from "@/app/UserProvider";
+import Avatar from "@/components/Avatar";
 import { buttonVariants } from "@/components/ui/button";
+import { clubRoleLabel } from "@/modules/auth/clubContext";
 import { ROUTES } from "@/router/routes";
 import { cn } from "@/lib/utils";
 
 export default function EntryScreen() {
-  const { clubId, enterAsGuest } = useMockSession();
-  const { data: club } = useQuery({
-    queryKey: ["club", clubId],
-    queryFn: () => Api.ClubService().getById(clubId),
-  });
+  const navigate = useNavigate();
+  const { isResolvingUser } = useUser();
+  const {
+    isAuthenticated,
+    hasAssociatedClub,
+    clubs,
+    selectedClubId,
+    enterClub,
+    exitClubMode,
+  } = useMockSession();
+
+  useEffect(() => {
+    exitClubMode();
+  }, [exitClubMode]);
+
+  if (isResolvingUser) {
+    return (
+      <div className="flex min-h-svh items-center justify-center bg-background p-6">
+        <p className="text-sm text-muted-foreground">Cargando sesión…</p>
+      </div>
+    );
+  }
+
+  if (isAuthenticated && !hasAssociatedClub) {
+    return <Navigate to={ROUTES.home} replace />;
+  }
+
+  const continueAsPlayer = () => {
+    exitClubMode();
+    navigate(ROUTES.home);
+  };
+
+  const enterAsClub = (clubId: string) => {
+    enterClub(clubId);
+    navigate(ROUTES.club.dashboard);
+  };
 
   return (
-    <div className="min-h-svh flex items-center justify-center p-6 bg-background">
+    <div className="flex min-h-svh items-center justify-center bg-background p-6">
       <div className="w-full max-w-lg space-y-8 text-center">
         <div>
-          <p className="text-sm text-muted-foreground mb-2">StartPadel</p>
-          <h1 className="text-4xl font-semibold tracking-tight">Torneos de pádel</h1>
+          <p className="mb-2 text-sm text-muted-foreground">Padel en juego</p>
+          <h1 className="text-4xl font-semibold tracking-tight">
+            {isAuthenticated ? "¿Cómo querés entrar?" : "Torneos de pádel"}
+          </h1>
           <p className="mt-3 text-muted-foreground">
-            {club?.name ?? "Club demo"} · MVP en memoria
+            {isAuthenticated
+              ? "Elegí vista de jugador o un club donde sos staff."
+              : "Explorá torneos y clubes. Para el backoffice tenés que ingresar."}
           </p>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Link
-            to={ROUTES.player.home}
-            className={cn(buttonVariants(), "h-12")}
-            onClick={() => enterAsGuest()}
+
+        <div className="space-y-3">
+          <button
+            type="button"
+            className={cn(buttonVariants(), "h-12 w-full")}
             data-testid="entry-player-guest"
+            onClick={continueAsPlayer}
           >
-            Explorar como jugador
-          </Link>
-          <Link
-            to={ROUTES.club.dashboard}
-            className={cn(buttonVariants({ variant: "outline" }), "h-12")}
-          >
-            Entrar como club
-          </Link>
+            {isAuthenticated ? "Continuar como jugador" : "Explorar como jugador"}
+          </button>
+
+          {isAuthenticated
+            ? clubs.map((club) => (
+                <button
+                  key={club.id}
+                  type="button"
+                  className={cn(
+                    buttonVariants({ variant: "outline" }),
+                    "h-auto w-full justify-start gap-3 px-3 py-3 text-left",
+                    selectedClubId === club.id && "ring-2 ring-primary",
+                  )}
+                  onClick={() => enterAsClub(club.id)}
+                >
+                  <Avatar
+                    name={club.name}
+                    imageUrl={club.avatarUrl}
+                    size="sm"
+                    alt={club.name}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium">{club.name}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {clubRoleLabel(club.role)}
+                    </span>
+                  </span>
+                </button>
+              ))
+            : null}
         </div>
-        <div className="flex flex-wrap justify-center gap-3 text-sm">
-          <Link
-            to={ROUTES.auth.login}
-            className="font-medium underline-offset-4 hover:underline"
-            data-testid="entry-login"
-          >
-            Ingresar
-          </Link>
-          <span className="text-muted-foreground">·</span>
-          <Link
-            to={ROUTES.auth.register}
-            className="font-medium underline-offset-4 hover:underline"
-            data-testid="entry-register"
-          >
-            Crear cuenta
-          </Link>
-        </div>
-        <FeatureGuard feature="tournaments">
-          <TournamentPreview />
-        </FeatureGuard>
+
+        {isAuthenticated ? null : (
+          <div className="flex flex-wrap justify-center gap-3 text-sm">
+            <Link
+              to={ROUTES.auth.login}
+              className="font-medium underline-offset-4 hover:underline"
+              data-testid="entry-login"
+            >
+              Ingresar
+            </Link>
+            <span className="text-muted-foreground">·</span>
+            <Link
+              to={ROUTES.auth.register}
+              className="font-medium underline-offset-4 hover:underline"
+              data-testid="entry-register"
+            >
+              Crear cuenta
+            </Link>
+          </div>
+        )}
       </div>
     </div>
-  );
-}
-
-function TournamentPreview() {
-  const { clubId } = useMockSession();
-  const { data: tournaments = [] } = useQuery({
-    queryKey: ["tournaments", clubId],
-    queryFn: () => Api.TournamentService().list(clubId),
-  });
-  const first = tournaments[0];
-  if (!first) return null;
-  return (
-    <TournamentCard
-      tournament={first}
-      categoryLabel={`${formatCategoryLevel(6)} Masculino`}
-      pairsCount={8}
-      to={ROUTES.club.tournamentDetail(first.id)}
-    />
   );
 }

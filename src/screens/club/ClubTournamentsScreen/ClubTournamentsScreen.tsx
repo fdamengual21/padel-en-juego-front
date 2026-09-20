@@ -2,6 +2,8 @@ import { useQueries, useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import Api from "@/api/Api";
 import { useMockSession } from "@/app/MockSessionProvider";
+import { PERMISSION_CLUB_TOURNAMENTS_WRITE } from "@/authorization/permissionCodes";
+import { PermissionsGuard } from "@/components/guards";
 import TournamentCard from "@/components/tournaments/TournamentCard";
 import { buttonVariants } from "@/components/ui/button";
 import { ROUTES } from "@/router/routes";
@@ -25,9 +27,11 @@ export default function ClubTournamentsScreen() {
     <div className="space-y-6" data-testid="club-tournaments">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-semibold tracking-tight">Torneos</h2>
-        <Link to={ROUTES.club.tournamentNew} className={cn(buttonVariants())}>
-          Crear torneo
-        </Link>
+        <PermissionsGuard permission={PERMISSION_CLUB_TOURNAMENTS_WRITE}>
+          <Link to={ROUTES.club.tournamentNew} className={cn(buttonVariants())}>
+            Crear torneo
+          </Link>
+        </PermissionsGuard>
       </div>
       {isLoading ? <p>Cargando…</p> : null}
       <div className="grid gap-4 md:grid-cols-2">

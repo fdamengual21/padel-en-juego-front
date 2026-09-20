@@ -1,4 +1,4 @@
-import type { DashboardUpcomingReservation } from "@core-api";
+import type { DashboardUpcomingReservation } from "@/domain";
 import StatusBadge from "@/components/tournaments/StatusBadge";
 import DashboardPlayerChip from "./DashboardPlayerChip";
 

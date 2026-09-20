@@ -17,12 +17,6 @@
     "paths": {
       "@/*": [
         "./src/*"
-      ],
-      "@core-api": [
-        "./core-api/index.ts"
-      ],
-      "@core-api/*": [
-        "./core-api/*"
       ]
     },
     "moduleResolution": "bundler",
@@ -38,7 +32,6 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": [
-    "src",
-    "core-api"
+    "src"
   ]
 }

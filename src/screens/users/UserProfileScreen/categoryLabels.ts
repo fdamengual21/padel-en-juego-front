@@ -1,4 +1,4 @@
-import type { PlayerCategoryChangeReason } from "@core-api";
+import type { PlayerCategoryChangeReason } from "@/domain";
 
 export const CATEGORY_CHANGE_REASON_LABEL: Record<
   PlayerCategoryChangeReason,

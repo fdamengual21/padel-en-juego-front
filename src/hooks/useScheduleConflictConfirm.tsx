@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Court, CourtReservation, Match, ScheduleConflict } from "@core-api";
+import type { Court, CourtReservation, Match, ScheduleConflict } from "@/domain";
 import {
   listAvailableCourtsAt,
   pairLabelForMatch,
-} from "@core-api";
+} from "@/domain";
 import WarningDialog from "@/components/ui/warning-dialog";
 import { Label } from "@/components/ui/label";
 import { formatScheduleShortEs } from "@/lib/dates";

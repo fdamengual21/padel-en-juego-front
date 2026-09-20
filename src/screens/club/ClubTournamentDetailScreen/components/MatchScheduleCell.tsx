@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import type { Court, CourtReservation, Match } from "@core-api";
-import { findScheduleConflicts } from "@core-api";
+import type { Court, CourtReservation, Match } from "@/domain";
+import { findScheduleConflicts } from "@/domain";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Dialog,
   DialogContent,
@@ -160,12 +161,12 @@ export function MatchScheduleTimeModal({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="match-schedule-date">Fecha</Label>
-              <Input
+              <DatePicker
                 id="match-schedule-date"
-                type="date"
                 value={date}
                 disabled={isSaving || !match}
-                onChange={(e) => setDate(e.target.value)}
+                allowClear
+                onChange={(next) => setDate(next ?? "")}
               />
             </div>
             <div className="space-y-2">

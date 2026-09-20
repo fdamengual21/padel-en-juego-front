@@ -1,489 +1,550 @@
-import { coreApi } from '@/config/coreApiClient'
-import type { GenerateGroupsConfig, MatchResultInput } from '../types'
+import {
+  PLAYER_COVER_PATHS,
+  emptyClubDashboard,
+  emptyCourtsAgendaBoard,
+  emptyCourtsDayOverview,
+  emptyCuadroBoard,
+  emptyMatchesBoard,
+  emptyPaginated,
+  emptyParticipantsBoard,
+  emptyPlayer,
+  emptyPlayerDashboard,
+  emptyPlayerFeed,
+  emptyZonesBoard,
+  notConnectedError,
+  type AuthSession,
+  type Club,
+  type ClubClientDetail,
+  type ClubClientSummary,
+  type ClubDashboardView,
+  type ConfigBoardView,
+  type Court,
+  type CourtAgendaBoardView,
+  type CourtAvailableSlot,
+  type CourtPriceRule,
+  type CourtReservation,
+  type CourtSlotQuote,
+  type CourtsAgendaBoardView,
+  type CourtsDayOverviewView,
+  type CreateClientInput,
+  type CreateCourtInput,
+  type CreateCourtReservationInput,
+  type CreatePlayerInput,
+  type CuadroBoardView,
+  type FindIdentityMatchesInput,
+  type FindIdentityMatchesResult,
+  type GenerateGroupsConfig,
+  type GroupStanding,
+  type LoginInput,
+  type Match,
+  type MatchResultInput,
+  type MatchSlot,
+  type MatchStatus,
+  type MatchesBoardView,
+  type PageQuery,
+  type PaginatedResult,
+  type PairAvailability,
+  type ParticipantsBoardView,
+  type Player,
+  type PlayerDashboard,
+  type PlayerFeed,
+  type RegisterAccountInput,
+  type RegisterPairInput,
+  type RegisterPairResult,
+  type ScheduleResult,
+  type SyncCategoryStructureOptions,
+  type AcceptRegistrationResult,
+  type TournamentCategory,
+  type TournamentGroup,
+  type TournamentPair,
+  type TournamentRegistration,
+  type TournamentRound,
+  type TournamentRuleset,
+  type UpdateClubInput,
+  type UpdateCourtReservationInput,
+  type UpdatePairPlayersInput,
+  type UpdatePlayerInput,
+  type ZonesBoardView,
+  type Client,
+  type GroupConfigValidation,
+} from "@/domain";
 
 export interface ITournamentOpsRepository {
-  listCategories(tournamentId: string): ReturnType<ReturnType<typeof coreApi>['listCategories']>
-  createCategory: ReturnType<typeof coreApi>['createCategory']
-  listPairs(categoryId: string): ReturnType<ReturnType<typeof coreApi>['listPairs']>
-  listRegistrations(categoryId: string): ReturnType<ReturnType<typeof coreApi>['listRegistrations']>
-  getRuleset(categoryId: string): ReturnType<ReturnType<typeof coreApi>['getRuleset']>
-  listGroups(categoryId: string): ReturnType<ReturnType<typeof coreApi>['listGroups']>
-  listStandings(categoryId: string): ReturnType<ReturnType<typeof coreApi>['listStandings']>
-  listMatches(categoryId: string): ReturnType<ReturnType<typeof coreApi>['listMatches']>
-  getBracket(categoryId: string): ReturnType<ReturnType<typeof coreApi>['getBracket']>
-  getCuadroBoard(categoryId: string): ReturnType<ReturnType<typeof coreApi>['getCuadroBoard']>
-  getZonesBoard(categoryId: string): ReturnType<ReturnType<typeof coreApi>['getZonesBoard']>
-  getParticipantsBoard(categoryId: string): ReturnType<ReturnType<typeof coreApi>['getParticipantsBoard']>
-  getMatchesBoard(categoryId: string): ReturnType<ReturnType<typeof coreApi>['getMatchesBoard']>
-  getConfigBoard(categoryId: string): ReturnType<ReturnType<typeof coreApi>['getConfigBoard']>
-  generateGroups(categoryId: string, config: GenerateGroupsConfig): ReturnType<ReturnType<typeof coreApi>['generateGroupsForCategory']>
-  generateGroupMatches(categoryId: string): ReturnType<ReturnType<typeof coreApi>['generateGroupMatches']>
-  submitMatchResult(matchId: string, input: MatchResultInput): ReturnType<ReturnType<typeof coreApi>['submitMatchResult']>
-  generateBracket(categoryId: string): ReturnType<ReturnType<typeof coreApi>['generateBracket']>
-  scheduleCategory(categoryId: string): ReturnType<ReturnType<typeof coreApi>['scheduleCategory']>
-  listCourts(clubId: string): ReturnType<ReturnType<typeof coreApi>['listCourts']>
-  createCourt(
-    input: Parameters<ReturnType<typeof coreApi>["createCourt"]>[0],
-  ): ReturnType<ReturnType<typeof coreApi>["createCourt"]>
-  updateClub(
-    id: string,
-    patch: Parameters<ReturnType<typeof coreApi>["updateClub"]>[1],
-  ): ReturnType<ReturnType<typeof coreApi>["updateClub"]>
+  listCategories(tournamentId: string): Promise<TournamentCategory[]>;
+  createCategory(
+    input: Omit<TournamentCategory, "id">,
+  ): Promise<TournamentCategory>;
+  listPairs(categoryId: string): Promise<TournamentPair[]>;
+  listRegistrations(categoryId: string): Promise<TournamentRegistration[]>;
+  getRuleset(categoryId: string): Promise<TournamentRuleset | null>;
+  listGroups(categoryId: string): Promise<TournamentGroup[]>;
+  listStandings(categoryId: string): Promise<GroupStanding[]>;
+  listMatches(categoryId: string): Promise<Match[]>;
+  getBracket(categoryId: string): Promise<{
+    rounds: TournamentRound[];
+    matches: Match[];
+    slots: MatchSlot[];
+  }>;
+  getCuadroBoard(categoryId: string): Promise<CuadroBoardView>;
+  getZonesBoard(categoryId: string): Promise<ZonesBoardView>;
+  getParticipantsBoard(categoryId: string): Promise<ParticipantsBoardView>;
+  getMatchesBoard(categoryId: string): Promise<MatchesBoardView>;
+  getConfigBoard(categoryId: string): Promise<ConfigBoardView>;
+  generateGroups(
+    categoryId: string,
+    config: GenerateGroupsConfig,
+  ): Promise<{ groups: TournamentGroup[]; validation: GroupConfigValidation }>;
+  generateGroupMatches(categoryId: string): Promise<Match[]>;
+  submitMatchResult(matchId: string, input: MatchResultInput): Promise<Match>;
+  generateBracket(categoryId: string): Promise<{
+    rounds: TournamentRound[];
+    matches: Match[];
+    slots: MatchSlot[];
+  }>;
+  scheduleCategory(categoryId: string): Promise<ScheduleResult>;
+  listCourts(clubId: string): Promise<Court[]>;
+  createCourt(input: CreateCourtInput): Promise<Court>;
+  updateClub(id: string, patch: UpdateClubInput): Promise<Club>;
   updateCourt(
     id: string,
-    patch: Parameters<ReturnType<typeof coreApi>["updateCourt"]>[1],
-  ): ReturnType<ReturnType<typeof coreApi>["updateCourt"]>
-  listCourtPriceRules(
-    courtId: string,
-  ): ReturnType<ReturnType<typeof coreApi>["listCourtPriceRules"]>
+    patch: Partial<Omit<Court, "id" | "clubId">>,
+  ): Promise<Court>;
+  listCourtPriceRules(courtId: string): Promise<CourtPriceRule[]>;
   upsertCourtPriceRule(
-    rule: Parameters<ReturnType<typeof coreApi>["upsertCourtPriceRule"]>[0],
-  ): ReturnType<ReturnType<typeof coreApi>["upsertCourtPriceRule"]>
-  deleteCourtPriceRule(
-    id: string,
-  ): ReturnType<ReturnType<typeof coreApi>["deleteCourtPriceRule"]>
+    rule: Omit<CourtPriceRule, "id"> & { id?: string },
+  ): Promise<CourtPriceRule>;
+  deleteCourtPriceRule(id: string): Promise<boolean>;
   listCourtReservations(
     clubId: string,
-    options?: Parameters<ReturnType<typeof coreApi>["listCourtReservations"]>[1],
-  ): ReturnType<ReturnType<typeof coreApi>["listCourtReservations"]>
-  listPairAvailability(
-    pairId: string,
-  ): ReturnType<ReturnType<typeof coreApi>["listPairAvailability"]>
+    options?: { from?: string; to?: string; courtId?: string },
+  ): Promise<CourtReservation[]>;
+  listPairAvailability(pairId: string): Promise<PairAvailability[]>;
   setPairAvailability(
-    items: Parameters<ReturnType<typeof coreApi>["setPairAvailability"]>[0],
-  ): ReturnType<ReturnType<typeof coreApi>["setPairAvailability"]>
+    items: Omit<PairAvailability, "id">[],
+  ): Promise<PairAvailability[]>;
   createCourtReservation(
-    input: Parameters<ReturnType<typeof coreApi>["createCourtReservation"]>[0],
-  ): ReturnType<ReturnType<typeof coreApi>["createCourtReservation"]>
+    input: CreateCourtReservationInput,
+  ): Promise<CourtReservation>;
   updateCourtReservation(
     id: string,
-    patch: Parameters<ReturnType<typeof coreApi>["updateCourtReservation"]>[1],
-  ): ReturnType<ReturnType<typeof coreApi>["updateCourtReservation"]>
-  cancelCourtReservation(
-    id: string,
-  ): ReturnType<ReturnType<typeof coreApi>["cancelCourtReservation"]>
+    patch: UpdateCourtReservationInput,
+  ): Promise<CourtReservation>;
+  cancelCourtReservation(id: string): Promise<CourtReservation>;
   getCourtAgendaBoard(
     clubId: string,
     courtId: string,
-    options: Parameters<ReturnType<typeof coreApi>["getCourtAgendaBoard"]>[2],
-  ): ReturnType<ReturnType<typeof coreApi>["getCourtAgendaBoard"]>
+    options: { from: string; to: string; summaryDate: string },
+  ): Promise<CourtAgendaBoardView>;
   listCourtsDayOverview(
     clubId: string,
     date: string,
-  ): ReturnType<ReturnType<typeof coreApi>["listCourtsDayOverview"]>
+  ): Promise<CourtsDayOverviewView>;
   getCourtsAgendaBoard(
     clubId: string,
     options: { from: string; to: string },
-  ): ReturnType<ReturnType<typeof coreApi>["getCourtsAgendaBoard"]>
-  quoteCourtSlot(
-    courtId: string,
-    startsAt: string,
-  ): ReturnType<ReturnType<typeof coreApi>["quoteCourtSlot"]>
+  ): Promise<CourtsAgendaBoardView>;
+  quoteCourtSlot(courtId: string, startsAt: string): Promise<CourtSlotQuote>;
   listAvailableCourtSlots(
     courtId: string,
     dateIso: string,
     options?: { ignoreReservationId?: string },
-  ): ReturnType<ReturnType<typeof coreApi>["listAvailableCourtSlots"]>
+  ): Promise<CourtAvailableSlot[]>;
   searchClubClients(
     clubId: string,
     query: string,
     options?: { signal?: AbortSignal },
-  ): ReturnType<ReturnType<typeof coreApi>["searchClubClients"]>
-  createClient(
-    input: Parameters<ReturnType<typeof coreApi>["createClient"]>[0],
-  ): ReturnType<ReturnType<typeof coreApi>["createClient"]>
-  getDashboard(clubId: string): ReturnType<ReturnType<typeof coreApi>['getDashboard']>
-  getRanking(categoryId?: string): ReturnType<ReturnType<typeof coreApi>['getRanking']>
-  getPlayerHome(playerId: string): ReturnType<ReturnType<typeof coreApi>['getPlayerHome']>
+  ): Promise<Client[]>;
+  createClient(input: CreateClientInput): Promise<Client>;
+  getDashboard(clubId: string): Promise<ClubDashboardView>;
+  getRanking(categoryId?: string): Promise<GroupStanding[]>;
+  getPlayerHome(playerId: string): Promise<PlayerDashboard>;
   getPlayerFeed(
     clubId: string,
     playerId: string | null,
-  ): ReturnType<ReturnType<typeof coreApi>['getPlayerFeed']>
-  listProvinces(): ReturnType<ReturnType<typeof coreApi>['listProvinces']>
+  ): Promise<PlayerFeed>;
+  listProvinces(): Promise<Array<{ id: string; name: string }>>;
   listCities(
     provinceIdOrName: string,
-  ): ReturnType<ReturnType<typeof coreApi>['listCities']>
-  listPlayerCoverImages(): ReturnType<ReturnType<typeof coreApi>['listPlayerCoverImages']>
-  listPlayers(): ReturnType<ReturnType<typeof coreApi>["listPlayers"]>;
+  ): Promise<Array<{ id: string; name: string; provinceId: string }>>;
+  listPlayerCoverImages(): string[];
+  listPlayers(): Promise<Player[]>;
   listClubClients(
     clubId: string,
-    query?: import("@core-api").PageQuery,
-  ): ReturnType<ReturnType<typeof coreApi>["listClubClients"]>;
+    query?: PageQuery,
+  ): Promise<PaginatedResult<ClubClientSummary>>;
   getClubClientDetail(
     clubId: string,
     clientId: string,
-  ): ReturnType<ReturnType<typeof coreApi>["getClubClientDetail"]>;
+  ): Promise<ClubClientDetail | null>;
   searchPlayers(
     query: string,
     options?: { signal?: AbortSignal },
-  ): ReturnType<ReturnType<typeof coreApi>["searchPlayers"]>;
+  ): Promise<Player[]>;
   findIdentityMatches(
-    input: import("@core-api").FindIdentityMatchesInput,
-  ): ReturnType<ReturnType<typeof coreApi>["findIdentityMatches"]>;
-  createPlayer(
-    input: import("@core-api").CreatePlayerInput,
-  ): ReturnType<ReturnType<typeof coreApi>["createPlayer"]>;
-  login(
-    input: import("@core-api").LoginInput,
-  ): ReturnType<ReturnType<typeof coreApi>["login"]>;
-  registerAccount(
-    input: import("@core-api").RegisterAccountInput,
-  ): ReturnType<ReturnType<typeof coreApi>["registerAccount"]>;
-  updatePlayer(
-    playerId: string,
-    input: import("@core-api").UpdatePlayerInput,
-  ): ReturnType<ReturnType<typeof coreApi>["updatePlayer"]>;
-  registerPair(
-    input: import("@core-api").RegisterPairInput,
-  ): ReturnType<ReturnType<typeof coreApi>["registerPair"]>;
+    input: FindIdentityMatchesInput,
+  ): Promise<FindIdentityMatchesResult>;
+  createPlayer(input: CreatePlayerInput): Promise<Player>;
+  login(input: LoginInput): Promise<AuthSession>;
+  registerAccount(input: RegisterAccountInput): Promise<AuthSession>;
+  updatePlayer(playerId: string, input: UpdatePlayerInput): Promise<Player>;
+  registerPair(input: RegisterPairInput): Promise<RegisterPairResult>;
+  registerPairByAdmin(input: RegisterPairInput): Promise<RegisterPairResult>;
+  registerPairByPlayer(input: RegisterPairInput): Promise<RegisterPairResult>;
   updatePairPlayers(
     pairId: string,
-    input: import("@core-api").UpdatePairPlayersInput,
-  ): ReturnType<ReturnType<typeof coreApi>["updatePairPlayers"]>;
+    input: UpdatePairPlayersInput,
+  ): Promise<TournamentPair>;
   syncCategoryStructure(
     categoryId: string,
-    options?: import("@core-api").SyncCategoryStructureOptions,
-  ): ReturnType<ReturnType<typeof coreApi>["syncCategoryStructure"]>;
-  acceptRegistration(
-    registrationId: string,
-  ): ReturnType<ReturnType<typeof coreApi>["acceptRegistration"]>;
+    options?: SyncCategoryStructureOptions,
+  ): Promise<{
+    synced: boolean;
+    message: string;
+    groups: TournamentGroup[];
+    matches: Match[];
+  }>;
+  acceptRegistration(registrationId: string): Promise<AcceptRegistrationResult>;
   rejectRegistration(
     registrationId: string,
     note?: string | null,
-  ): ReturnType<ReturnType<typeof coreApi>["rejectRegistration"]>;
+  ): Promise<TournamentRegistration>;
   disqualifyRegistration(
     registrationId: string,
     note: string,
-  ): ReturnType<ReturnType<typeof coreApi>["disqualifyRegistration"]>;
+  ): Promise<TournamentRegistration>;
   removeRegistration(
     registrationId: string,
     note: string,
-  ): ReturnType<ReturnType<typeof coreApi>["removeRegistration"]>;
+  ): Promise<TournamentRegistration>;
   updateMatchSchedule(
     matchId: string,
     input: { scheduledAt: string | null; courtId: string | null },
     options?: { force?: boolean; pairLabels?: Record<string, string> },
-  ): ReturnType<ReturnType<typeof coreApi>["updateMatchSchedule"]>;
-  setMatchStatus(
-    matchId: string,
-    status: import("@core-api").MatchStatus,
-  ): ReturnType<ReturnType<typeof coreApi>["setMatchStatus"]>;
+  ): Promise<Match>;
+  setMatchStatus(matchId: string, status: MatchStatus): Promise<Match>;
   updateCategory(
     id: string,
-    patch: Partial<Omit<import("@core-api").TournamentCategory, "id" | "tournamentId">>,
-  ): ReturnType<ReturnType<typeof coreApi>["updateCategory"]>;
-  upsertRuleset(
-    ruleset: import("@core-api").TournamentRuleset,
-  ): ReturnType<ReturnType<typeof coreApi>["upsertRuleset"]>;
+    patch: Partial<Omit<TournamentCategory, "id" | "tournamentId">>,
+  ): Promise<TournamentCategory>;
+  upsertRuleset(ruleset: TournamentRuleset): Promise<TournamentRuleset>;
 }
 
 export class TournamentOpsRepository implements ITournamentOpsRepository {
-  listCategories(tournamentId: string) {
-    return coreApi().listCategories(tournamentId)
+  async listCategories(_tournamentId: string) {
+    return [];
   }
 
-  createCategory: ITournamentOpsRepository['createCategory'] = (input) =>
-    coreApi().createCategory(input)
-
-  listPairs(categoryId: string) {
-    return coreApi().listPairs(categoryId)
+  async createCategory(_input: Omit<TournamentCategory, "id">) {
+    return notConnectedError();
   }
 
-  listRegistrations(categoryId: string) {
-    return coreApi().listRegistrations(categoryId)
+  async listPairs(_categoryId: string) {
+    return [];
   }
 
-  getRuleset(categoryId: string) {
-    return coreApi().getRuleset(categoryId)
+  async listRegistrations(_categoryId: string) {
+    return [];
   }
 
-  listGroups(categoryId: string) {
-    return coreApi().listGroups(categoryId)
+  async getRuleset(_categoryId: string) {
+    return null;
   }
 
-  listStandings(categoryId: string) {
-    return coreApi().listStandings(categoryId)
+  async listGroups(_categoryId: string) {
+    return [];
   }
 
-  listMatches(categoryId: string) {
-    return coreApi().listMatches(categoryId)
+  async listStandings(_categoryId: string) {
+    return [];
   }
 
-  getBracket(categoryId: string) {
-    return coreApi().getBracket(categoryId)
+  async listMatches(_categoryId: string) {
+    return [];
   }
 
-  getCuadroBoard(categoryId: string) {
-    return coreApi().getCuadroBoard(categoryId)
+  async getBracket(_categoryId: string) {
+    return { rounds: [], matches: [], slots: [] };
   }
 
-  getZonesBoard(categoryId: string) {
-    return coreApi().getZonesBoard(categoryId)
+  async getCuadroBoard(categoryId: string) {
+    return emptyCuadroBoard(categoryId);
   }
 
-  getParticipantsBoard(categoryId: string) {
-    return coreApi().getParticipantsBoard(categoryId)
+  async getZonesBoard(categoryId: string) {
+    return emptyZonesBoard(categoryId);
   }
 
-  getMatchesBoard(categoryId: string) {
-    return coreApi().getMatchesBoard(categoryId)
+  async getParticipantsBoard(categoryId: string) {
+    return emptyParticipantsBoard(categoryId);
   }
 
-  getConfigBoard(categoryId: string) {
-    return coreApi().getConfigBoard(categoryId)
+  async getMatchesBoard(categoryId: string) {
+    return emptyMatchesBoard(categoryId);
   }
 
-  generateGroups(categoryId: string, config: GenerateGroupsConfig) {
-    return coreApi().generateGroupsForCategory(categoryId, config)
+  async getConfigBoard(_categoryId: string): Promise<ConfigBoardView> {
+    return notConnectedError();
   }
 
-  generateGroupMatches(categoryId: string) {
-    return coreApi().generateGroupMatches(categoryId)
-  }
-
-  submitMatchResult(matchId: string, input: MatchResultInput) {
-    return coreApi().submitMatchResult(matchId, input)
-  }
-
-  generateBracket(categoryId: string) {
-    return coreApi().generateBracket(categoryId)
-  }
-
-  scheduleCategory(categoryId: string) {
-    return coreApi().scheduleCategory(categoryId)
-  }
-
-  listCourts(clubId: string) {
-    return coreApi().listCourts(clubId)
-  }
-
-  createCourt(input: Parameters<ReturnType<typeof coreApi>["createCourt"]>[0]) {
-    return coreApi().createCourt(input)
-  }
-
-  updateClub(
-    id: string,
-    patch: Parameters<ReturnType<typeof coreApi>["updateClub"]>[1],
+  async generateGroups(
+    _categoryId: string,
+    _config: GenerateGroupsConfig,
   ) {
-    return coreApi().updateClub(id, patch)
+    return notConnectedError();
   }
 
-  updateCourt(
-    id: string,
-    patch: Parameters<ReturnType<typeof coreApi>["updateCourt"]>[1],
+  async generateGroupMatches(_categoryId: string) {
+    return notConnectedError();
+  }
+
+  async submitMatchResult(_matchId: string, _input: MatchResultInput) {
+    return notConnectedError();
+  }
+
+  async generateBracket(_categoryId: string) {
+    return notConnectedError();
+  }
+
+  async scheduleCategory(_categoryId: string) {
+    return notConnectedError();
+  }
+
+  async listCourts(_clubId: string) {
+    return [];
+  }
+
+  async createCourt(_input: CreateCourtInput) {
+    return notConnectedError();
+  }
+
+  async updateClub(_id: string, _patch: UpdateClubInput) {
+    return notConnectedError();
+  }
+
+  async updateCourt(
+    _id: string,
+    _patch: Partial<Omit<Court, "id" | "clubId">>,
   ) {
-    return coreApi().updateCourt(id, patch)
+    return notConnectedError();
   }
 
-  listCourtPriceRules(courtId: string) {
-    return coreApi().listCourtPriceRules(courtId)
+  async listCourtPriceRules(_courtId: string) {
+    return [];
   }
 
-  upsertCourtPriceRule(
-    rule: Parameters<ReturnType<typeof coreApi>["upsertCourtPriceRule"]>[0],
+  async upsertCourtPriceRule(_rule: Omit<CourtPriceRule, "id"> & { id?: string }) {
+    return notConnectedError();
+  }
+
+  async deleteCourtPriceRule(_id: string) {
+    return notConnectedError();
+  }
+
+  async listCourtReservations(
+    _clubId: string,
+    _options?: { from?: string; to?: string; courtId?: string },
   ) {
-    return coreApi().upsertCourtPriceRule(rule)
+    return [];
   }
 
-  deleteCourtPriceRule(id: string) {
-    return coreApi().deleteCourtPriceRule(id)
+  async listPairAvailability(_pairId: string) {
+    return [];
   }
 
-  listCourtReservations(
+  async setPairAvailability(_items: Omit<PairAvailability, "id">[]) {
+    return notConnectedError();
+  }
+
+  async createCourtReservation(_input: CreateCourtReservationInput) {
+    return notConnectedError();
+  }
+
+  async updateCourtReservation(
+    _id: string,
+    _patch: UpdateCourtReservationInput,
+  ) {
+    return notConnectedError();
+  }
+
+  async cancelCourtReservation(_id: string) {
+    return notConnectedError();
+  }
+
+  async getCourtAgendaBoard(
+    _clubId: string,
+    _courtId: string,
+    _options: { from: string; to: string; summaryDate: string },
+  ): Promise<CourtAgendaBoardView> {
+    return notConnectedError();
+  }
+
+  async listCourtsDayOverview(clubId: string, date: string) {
+    return emptyCourtsDayOverview(clubId, date);
+  }
+
+  async getCourtsAgendaBoard(
     clubId: string,
-    options?: Parameters<ReturnType<typeof coreApi>["listCourtReservations"]>[1],
+    _options: { from: string; to: string },
   ) {
-    return coreApi().listCourtReservations(clubId, options)
+    return emptyCourtsAgendaBoard(clubId);
   }
 
-  listPairAvailability(pairId: string) {
-    return coreApi().listPairAvailability(pairId)
+  async quoteCourtSlot(_courtId: string, _startsAt: string) {
+    return notConnectedError();
   }
 
-  setPairAvailability(
-    items: Parameters<ReturnType<typeof coreApi>["setPairAvailability"]>[0],
+  async listAvailableCourtSlots(
+    _courtId: string,
+    _dateIso: string,
+    _options?: { ignoreReservationId?: string },
   ) {
-    return coreApi().setPairAvailability(items)
+    return [];
   }
 
-  createCourtReservation(
-    input: Parameters<ReturnType<typeof coreApi>["createCourtReservation"]>[0],
+  async searchClubClients(
+    _clubId: string,
+    _query: string,
+    _options?: { signal?: AbortSignal },
   ) {
-    return coreApi().createCourtReservation(input)
+    return [];
   }
 
-  updateCourtReservation(
-    id: string,
-    patch: Parameters<ReturnType<typeof coreApi>["updateCourtReservation"]>[1],
-  ) {
-    return coreApi().updateCourtReservation(id, patch)
+  async createClient(_input: CreateClientInput) {
+    return notConnectedError();
   }
 
-  cancelCourtReservation(id: string) {
-    return coreApi().cancelCourtReservation(id)
+  async getDashboard(_clubId: string) {
+    return emptyClubDashboard();
   }
 
-  getCourtAgendaBoard(
-    clubId: string,
-    courtId: string,
-    options: Parameters<ReturnType<typeof coreApi>["getCourtAgendaBoard"]>[2],
-  ) {
-    return coreApi().getCourtAgendaBoard(clubId, courtId, options)
+  async getRanking(_categoryId?: string) {
+    return [];
   }
 
-  listCourtsDayOverview(clubId: string, date: string) {
-    return coreApi().listCourtsDayOverview(clubId, date)
+  async getPlayerHome(playerId: string) {
+    return emptyPlayerDashboard(emptyPlayer(playerId));
   }
 
-  getCourtsAgendaBoard(clubId: string, options: { from: string; to: string }) {
-    return coreApi().getCourtsAgendaBoard(clubId, options)
+  async getPlayerFeed(_clubId: string, _playerId: string | null) {
+    return emptyPlayerFeed();
   }
 
-  quoteCourtSlot(courtId: string, startsAt: string) {
-    return coreApi().quoteCourtSlot(courtId, startsAt)
+  async listProvinces() {
+    return [];
   }
 
-  listAvailableCourtSlots(
-    courtId: string,
-    dateIso: string,
-    options?: { ignoreReservationId?: string },
-  ) {
-    return coreApi().listAvailableCourtSlots(courtId, dateIso, options)
-  }
-
-  searchClubClients(
-    clubId: string,
-    query: string,
-    options?: { signal?: AbortSignal },
-  ) {
-    return coreApi().searchClubClients(clubId, query, options)
-  }
-
-  createClient(input: Parameters<ReturnType<typeof coreApi>["createClient"]>[0]) {
-    return coreApi().createClient(input)
-  }
-
-  getDashboard(clubId: string) {
-    return coreApi().getDashboard(clubId)
-  }
-
-  getRanking(categoryId?: string) {
-    return coreApi().getRanking(categoryId)
-  }
-
-  getPlayerHome(playerId: string) {
-    return coreApi().getPlayerHome(playerId)
-  }
-
-  getPlayerFeed(clubId: string, playerId: string | null) {
-    return coreApi().getPlayerFeed(clubId, playerId)
-  }
-
-  listProvinces() {
-    return coreApi().listProvinces()
-  }
-
-  listCities(provinceIdOrName: string) {
-    return coreApi().listCities(provinceIdOrName)
+  async listCities(_provinceIdOrName: string) {
+    return [];
   }
 
   listPlayerCoverImages() {
-    return coreApi().listPlayerCoverImages()
+    return [...PLAYER_COVER_PATHS];
   }
 
-  listPlayers() {
-    return coreApi().listPlayers()
+  async listPlayers() {
+    return [];
   }
 
-  listClubClients(clubId: string, query?: import("@core-api").PageQuery) {
-    return coreApi().listClubClients(clubId, query)
+  async listClubClients(_clubId: string, _query?: PageQuery) {
+    return emptyPaginated<ClubClientSummary>();
   }
 
-  getClubClientDetail(clubId: string, clientId: string) {
-    return coreApi().getClubClientDetail(clubId, clientId)
+  async getClubClientDetail(_clubId: string, _clientId: string) {
+    return null;
   }
 
-  searchPlayers(query: string, options?: { signal?: AbortSignal }) {
-    return coreApi().searchPlayers(query, options)
-  }
-
-  findIdentityMatches(input: import("@core-api").FindIdentityMatchesInput) {
-    return coreApi().findIdentityMatches(input)
-  }
-
-  createPlayer(input: import("@core-api").CreatePlayerInput) {
-    return coreApi().createPlayer(input)
-  }
-
-  login(input: import("@core-api").LoginInput) {
-    return coreApi().login(input)
-  }
-
-  registerAccount(input: import("@core-api").RegisterAccountInput) {
-    return coreApi().registerAccount(input)
-  }
-
-  updatePlayer(
-    playerId: string,
-    input: import("@core-api").UpdatePlayerInput,
+  async searchPlayers(
+    _query: string,
+    _options?: { signal?: AbortSignal },
   ) {
-    return coreApi().updatePlayer(playerId, input)
+    return [];
   }
 
-  registerPair(input: import("@core-api").RegisterPairInput) {
-    return coreApi().registerPair(input)
+  async findIdentityMatches(_input: FindIdentityMatchesInput) {
+    return { matches: [] };
   }
 
-  updatePairPlayers(
-    pairId: string,
-    input: import("@core-api").UpdatePairPlayersInput,
+  async createPlayer(_input: CreatePlayerInput) {
+    return notConnectedError();
+  }
+
+  async login(_input: LoginInput) {
+    return notConnectedError();
+  }
+
+  async registerAccount(_input: RegisterAccountInput) {
+    return notConnectedError();
+  }
+
+  async updatePlayer(_playerId: string, _input: UpdatePlayerInput) {
+    return notConnectedError();
+  }
+
+  async registerPair(_input: RegisterPairInput) {
+    return notConnectedError();
+  }
+
+  async registerPairByAdmin(_input: RegisterPairInput) {
+    return notConnectedError();
+  }
+
+  async registerPairByPlayer(_input: RegisterPairInput) {
+    return notConnectedError();
+  }
+
+  async updatePairPlayers(
+    _pairId: string,
+    _input: UpdatePairPlayersInput,
   ) {
-    return coreApi().updatePairPlayers(pairId, input)
+    return notConnectedError();
   }
 
-  syncCategoryStructure(
-    categoryId: string,
-    options?: import("@core-api").SyncCategoryStructureOptions,
+  async syncCategoryStructure(
+    _categoryId: string,
+    _options?: SyncCategoryStructureOptions,
   ) {
-    return coreApi().syncCategoryStructure(categoryId, options)
+    return notConnectedError();
   }
 
-  acceptRegistration(registrationId: string) {
-    return coreApi().acceptRegistration(registrationId)
+  async acceptRegistration(_registrationId: string) {
+    return notConnectedError();
   }
 
-  rejectRegistration(registrationId: string, note?: string | null) {
-    return coreApi().rejectRegistration(registrationId, note)
-  }
-
-  disqualifyRegistration(registrationId: string, note: string) {
-    return coreApi().disqualifyRegistration(registrationId, note)
-  }
-
-  removeRegistration(registrationId: string, note: string) {
-    return coreApi().removeRegistration(registrationId, note)
-  }
-
-  updateMatchSchedule(
-    matchId: string,
-    input: { scheduledAt: string | null; courtId: string | null },
-    options?: { force?: boolean; pairLabels?: Record<string, string> },
+  async rejectRegistration(
+    _registrationId: string,
+    _note?: string | null,
   ) {
-    return coreApi().updateMatchSchedule(matchId, input, options)
+    return notConnectedError();
   }
 
-  setMatchStatus(matchId: string, status: import("@core-api").MatchStatus) {
-    return coreApi().setMatchStatus(matchId, status)
+  async disqualifyRegistration(_registrationId: string, _note: string) {
+    return notConnectedError();
   }
 
-  updateCategory(
-    id: string,
-    patch: Partial<Omit<import("@core-api").TournamentCategory, "id" | "tournamentId">>,
+  async removeRegistration(_registrationId: string, _note: string) {
+    return notConnectedError();
+  }
+
+  async updateMatchSchedule(
+    _matchId: string,
+    _input: { scheduledAt: string | null; courtId: string | null },
+    _options?: { force?: boolean; pairLabels?: Record<string, string> },
   ) {
-    return coreApi().updateCategory(id, patch)
+    return notConnectedError();
   }
 
-  upsertRuleset(ruleset: import("@core-api").TournamentRuleset) {
-    return coreApi().upsertRuleset(ruleset)
+  async setMatchStatus(_matchId: string, _status: MatchStatus) {
+    return notConnectedError();
+  }
+
+  async updateCategory(
+    _id: string,
+    _patch: Partial<Omit<TournamentCategory, "id" | "tournamentId">>,
+  ) {
+    return notConnectedError();
+  }
+
+  async upsertRuleset(_ruleset: TournamentRuleset) {
+    return notConnectedError();
   }
 }

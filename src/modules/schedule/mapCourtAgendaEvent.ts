@@ -1,4 +1,4 @@
-import type { CourtAgendaEvent } from "@core-api";
+import type { CourtAgendaEvent } from "@/domain";
 import type { CalendarEventGridItemDto, CalendarEventStatusApi } from "./types";
 
 function mapAgendaStatus(

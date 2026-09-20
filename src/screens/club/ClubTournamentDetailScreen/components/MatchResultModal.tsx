@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import type { Match, MatchResultInput, MatchRules, SetScore } from "@core-api";
+import type { Match, MatchResultInput, MatchRules, SetScore } from "@/domain";
 import {
   deriveWinnerPairIdFromSets,
   scoreboardSlotCount,
   setWinnerSide,
   validateMatchResultSets,
-} from "@core-api";
+} from "@/domain";
 import MatchScoreboard from "./MatchScoreboard";
 import { Button } from "@/components/ui/button";
 import {

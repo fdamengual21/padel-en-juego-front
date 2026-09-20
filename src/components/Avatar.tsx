@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
@@ -56,6 +56,10 @@ export default function Avatar({
 }: AvatarProps) {
   const [failed, setFailed] = useState(false);
   const showImage = Boolean(imageUrl) && !failed;
+
+  useEffect(() => {
+    setFailed(false);
+  }, [imageUrl]);
 
   return (
     <div

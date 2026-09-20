@@ -4,14 +4,14 @@ import type {
   RulesetPreset,
   TournamentCircuitType,
   TournamentFormat,
-} from "@core-api";
+} from "@/domain";
 
 export type {
   Tournament,
   TournamentCircuitType,
   TournamentFormat,
   TournamentStatus,
-} from "@core-api";
+} from "@/domain";
 
 export interface CreateTournamentRequest {
   clubId: string;
@@ -21,7 +21,7 @@ export interface CreateTournamentRequest {
   endDate: string | null;
   dailyStartTime: string;
   dailyEndTime: string;
-  status: import("@core-api").TournamentStatus;
+  status: import("@/domain").TournamentStatus;
   format: TournamentFormat;
   registrationFee: number;
 }
@@ -45,9 +45,9 @@ export interface TournamentFormValues {
   setsToWin: number;
   /** Puntos del tie-break (Personalizado; default 7). */
   tiebreakPoints: number;
-  categoryKind: import("@core-api").CategoryKind;
-  categoryLevel: import("@core-api").CategoryLevel | null;
-  categoryGender: import("@core-api").CategoryGender;
+  categoryKind: import("@/domain").CategoryKind;
+  categoryLevel: import("@/domain").CategoryLevel | null;
+  categoryGender: import("@/domain").CategoryGender;
   sumaTarget: number | null;
   categoryName: string;
   maxPairs: number;

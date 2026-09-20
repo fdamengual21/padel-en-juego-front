@@ -1,4 +1,4 @@
-import type { CuadroBoardView, Match } from "@core-api";
+import type { CuadroBoardView, Match } from "@/domain";
 import BracketView from "@/components/tournaments/BracketView";
 import { Button } from "@/components/ui/button";
 import { roundSectionLabel } from "@/lib/tournamentLabels";

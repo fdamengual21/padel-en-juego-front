@@ -3,12 +3,13 @@ description: Stack, idioma, naming y formularios (siempre)
 alwaysApply: true
 ---
 
-# StartPadel — base
+# Padel en juego — base
 
-- Stack: React + Vite + TS + Tailwind + shadcn (Base UI) + Lucide + TanStack Query + RHF + Yup + `@xyflow/react` + dagre.
+- Stack: React + Vite + TS + Tailwind + shadcn (Base UI) + Lucide + TanStack Query + RHF + Yup + zustand + axios + `@xyflow/react` + dagre.
 - Codigo en **ingles**. UI / validaciones / errores en **espanol**.
 - UX: lenguaje de club/jugador — nunca enums tecnicos (`MATCH_WINNER`, `GROUP_POSITION`).
 - Imports con `@/`. Componente unico → `export default`. Barrels → named exports.
 - Naming: componentes/tipos `PascalCase`; vars/fns `camelCase`; hooks `useX.ts`; screens en `src/screens/club|users|entry`; dominio reutilizable en `src/components/`.
 - Forms: RHF + `yupResolver` + `mode: "onChange"`; submit `disabled={isSubmitting || !isValid}`; `FormProvider` si hay context hijos.
+- UI: primitivos **shadcn** (`src/components/ui/`). En formularios, usar el wrapper de `src/components/Form/` (`InputField`, `SelectField`, `DateField`, …) en vez de inputs nativos sueltos. Fecha: `DatePicker` / `DateField` (Calendar + Popover); **no** `input type="date"`.
 - Theme default: **light** (no dark automatico). Marca: acento lima + navy; sidebar club navy (ver `look-and-feel`). Capas/UI: rules `architecture-and-organization`, `screens-and-components` y `look-and-feel`.

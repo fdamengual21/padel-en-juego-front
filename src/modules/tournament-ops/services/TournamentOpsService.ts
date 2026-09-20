@@ -214,7 +214,7 @@ export class TournamentOpsService {
     return this.repository.listPlayers();
   }
 
-  listClubClients(clubId: string, query?: import("@core-api").PageQuery) {
+  listClubClients(clubId: string, query?: import("@/domain").PageQuery) {
     return this.repository.listClubClients(clubId, query);
   }
 
@@ -226,43 +226,51 @@ export class TournamentOpsService {
     return this.repository.searchPlayers(query, options);
   }
 
-  findIdentityMatches(input: import("@core-api").FindIdentityMatchesInput) {
+  findIdentityMatches(input: import("@/domain").FindIdentityMatchesInput) {
     return this.repository.findIdentityMatches(input);
   }
 
-  createPlayer(input: import("@core-api").CreatePlayerInput) {
+  createPlayer(input: import("@/domain").CreatePlayerInput) {
     return this.repository.createPlayer(input);
   }
 
-  login(input: import("@core-api").LoginInput) {
+  login(input: import("@/domain").LoginInput) {
     return this.repository.login(input);
   }
 
-  registerAccount(input: import("@core-api").RegisterAccountInput) {
+  registerAccount(input: import("@/domain").RegisterAccountInput) {
     return this.repository.registerAccount(input);
   }
 
   updatePlayer(
     playerId: string,
-    input: import("@core-api").UpdatePlayerInput,
+    input: import("@/domain").UpdatePlayerInput,
   ) {
     return this.repository.updatePlayer(playerId, input);
   }
 
-  registerPair(input: import("@core-api").RegisterPairInput) {
-    return this.repository.registerPair(input);
+  registerPair(input: import("@/domain").RegisterPairInput) {
+    return this.repository.registerPairByAdmin(input);
+  }
+
+  registerPairByAdmin(input: import("@/domain").RegisterPairInput) {
+    return this.repository.registerPairByAdmin(input);
+  }
+
+  registerPairByPlayer(input: import("@/domain").RegisterPairInput) {
+    return this.repository.registerPairByPlayer(input);
   }
 
   updatePairPlayers(
     pairId: string,
-    input: import("@core-api").UpdatePairPlayersInput,
+    input: import("@/domain").UpdatePairPlayersInput,
   ) {
     return this.repository.updatePairPlayers(pairId, input);
   }
 
   syncCategoryStructure(
     categoryId: string,
-    options?: import("@core-api").SyncCategoryStructureOptions,
+    options?: import("@/domain").SyncCategoryStructureOptions,
   ) {
     return this.repository.syncCategoryStructure(categoryId, options);
   }
@@ -291,18 +299,18 @@ export class TournamentOpsService {
     return this.repository.updateMatchSchedule(matchId, input, options);
   }
 
-  setMatchStatus(matchId: string, status: import("@core-api").MatchStatus) {
+  setMatchStatus(matchId: string, status: import("@/domain").MatchStatus) {
     return this.repository.setMatchStatus(matchId, status);
   }
 
   updateCategory(
     id: string,
-    patch: Partial<Omit<import("@core-api").TournamentCategory, "id" | "tournamentId">>,
+    patch: Partial<Omit<import("@/domain").TournamentCategory, "id" | "tournamentId">>,
   ) {
     return this.repository.updateCategory(id, patch);
   }
 
-  upsertRuleset(ruleset: import("@core-api").TournamentRuleset) {
+  upsertRuleset(ruleset: import("@/domain").TournamentRuleset) {
     return this.repository.upsertRuleset(ruleset);
   }
 }

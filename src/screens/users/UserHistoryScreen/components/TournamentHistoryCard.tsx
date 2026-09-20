@@ -3,7 +3,7 @@ import { ChevronDown } from "lucide-react";
 import type {
   ClientTournamentOutcome,
   PlayerTournamentHistoryEntry,
-} from "@core-api";
+} from "@/domain";
 import MatchCard from "@/components/tournaments/MatchCard";
 import {
   formatTournamentDayEs,

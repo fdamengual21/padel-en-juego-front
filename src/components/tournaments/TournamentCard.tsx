@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import type { Tournament } from "@core-api";
+import type { Tournament } from "@/domain";
 import StatusBadge from "@/components/tournaments/StatusBadge";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";

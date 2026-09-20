@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import type { CategoryLevel, Client } from "@core-api";
+import type { CategoryLevel, Client } from "@/domain";
 import Api from "@/api/Api";
 import PlayerIdentityFields, {
   emptyPlayerIdentityValues,

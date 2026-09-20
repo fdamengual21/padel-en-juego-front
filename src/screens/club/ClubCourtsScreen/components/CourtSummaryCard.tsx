@@ -4,7 +4,7 @@ import {
   Clock3,
   MapPin,
 } from "lucide-react";
-import type { Club, Court, CourtDaySummary } from "@core-api";
+import type { Club, Court, CourtDaySummary } from "@/domain";
 import { Button } from "@/components/ui/button";
 import { formatLocationEs } from "@/lib/dates";
 import { cn } from "@/lib/utils";
@@ -14,7 +14,7 @@ interface CourtSummaryCardProps {
   court: Court;
   daySummary: CourtDaySummary;
   onConfigure: () => void;
-  onSelectSlot: (startsAt: string) => void;
+  onSelectSlot?: (startsAt: string) => void;
 }
 
 function formatMoney(value: number | null | undefined): string {
@@ -57,7 +57,11 @@ export default function CourtSummaryCard({
               alt={court.name}
               className="absolute inset-0 size-full object-cover"
             />
-          ) : null}
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
+              Sin imagen
+            </div>
+          )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-black/20" />
 
           <span
@@ -173,16 +177,25 @@ export default function CourtSummaryCard({
               </p>
             ) : (
               <div className="flex flex-wrap gap-1.5">
-                {daySummary.availableSlots.map((slot) => (
-                  <button
-                    key={slot.startsAt}
-                    type="button"
-                    className="rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-sidebar transition-colors hover:bg-muted"
-                    onClick={() => onSelectSlot(slot.startsAt)}
-                  >
-                    {slot.label}
-                  </button>
-                ))}
+                {daySummary.availableSlots.map((slot) =>
+                  onSelectSlot ? (
+                    <button
+                      key={slot.startsAt}
+                      type="button"
+                      className="rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-sidebar transition-colors hover:bg-muted"
+                      onClick={() => onSelectSlot(slot.startsAt)}
+                    >
+                      {slot.label}
+                    </button>
+                  ) : (
+                    <span
+                      key={slot.startsAt}
+                      className="rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground"
+                    >
+                      {slot.label}
+                    </span>
+                  ),
+                )}
               </div>
             )}
           </div>

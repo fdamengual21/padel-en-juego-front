@@ -22,11 +22,21 @@ alwaysApply: false
 | Club + users (o entry) / UI generica | `src/components/<dominio>/` |
 | Primitivos shadcn | `src/components/ui/` |
 | Shells / navegacion de modo | `src/layout/` |
+| Gates reutilizables | `src/components/guards/` (`PermissionsGuard` / `PermissionGate`, `FeatureGuard`, `ConditionGuard`) |
+
+## Permisos y visibilidad
+
+- Catalogo y hook: `src/authorization/` (`permissionCodes`, `usePermissions`, `hasAccess`). Detalle en **permissions-and-guards.mdc**.
+- Botones y bloques de backoffice: envolver con `PermissionsGuard` (mismo criterio que concesionarias `PermissionGate`).
+- Condiciones en codigo: `const { can } = usePermissions(); can(PERMISSION_CLUB_…)`.
+- No mostrar un CTA de mutacion si el usuario no tiene el `write`/`update` correspondiente. Con solo `read` se puede ver e abrir modales; no editar ni guardar.
+- El guard de UI no sustituye la validacion en la API.
 
 ## Reglas
 
 - Un archivo, un componente default export.
 - Props tipadas con `interface [Component]Props`.
 - Copy de UI en espanol; codigo/identifiers en ingles.
+- Primitivos de UI: `src/components/ui/` (shadcn). Campos de formulario: wrappers en `src/components/Form/` (`InputField`, `SelectField`, `DateField`). No usar `input type="date"`; usar `DatePicker`/`DateField`.
 - No duplicar en screens lo que ya existe en `src/components/`.
 - Hooks solo de una screen: `screens/<Screen>/hooks/` si hace falta.

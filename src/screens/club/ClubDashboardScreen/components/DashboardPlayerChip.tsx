@@ -1,4 +1,4 @@
-import type { DashboardPlayerRef } from "@core-api";
+import type { DashboardPlayerRef } from "@/domain";
 import Avatar from "@/components/Avatar";
 import { cn } from "@/lib/utils";
 

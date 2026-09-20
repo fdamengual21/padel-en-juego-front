@@ -1,4 +1,4 @@
-import type { Match } from "@core-api";
+import type { Match } from "@/domain";
 import Score from "@/components/tournaments/Score";
 import StatusBadge from "@/components/tournaments/StatusBadge";
 
