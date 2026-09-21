@@ -8,7 +8,8 @@ import {
 } from "@/domain";
 import Api from "@/api/Api";
 import { useMockSession } from "@/app/MockSessionProvider";
-import Avatar from "@/components/Avatar";
+import AvatarField from "@/components/AvatarField";
+import CoverField from "@/components/CoverField";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,9 +22,6 @@ import { formatLocationEs } from "@/lib/dates";
 import { toastError, toastSuccess } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/authStore";
-import ImageViewerDialog, {
-  type ImageViewerMode,
-} from "@/components/ImageViewerDialog";
 
 interface PlayerHomeHeaderProps {
   data: PlayerDashboard;
@@ -34,7 +32,6 @@ export default function PlayerHomeHeader({ data }: PlayerHomeHeaderProps) {
   const { loginSession, user, hasApiSession } = useMockSession();
   const setUserProfile = useAuthStore((state) => state.setUserProfile);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [viewer, setViewer] = useState<ImageViewerMode | null>(null);
   const player = data.player;
   const location = formatLocationEs(data.city, data.province);
   const coverUrl = player.coverUrl;
@@ -61,7 +58,7 @@ export default function PlayerHomeHeader({ data }: PlayerHomeHeaderProps) {
   });
 
   const uploadMutation = useMutation({
-    mutationFn: ({ kind, file }: { kind: ImageViewerMode; file: File }) =>
+    mutationFn: ({ kind, file }: { kind: "avatar" | "cover"; file: File }) =>
       kind === "avatar"
         ? Api.UserService().uploadAvatar(file)
         : Api.UserService().uploadCover(file),
@@ -78,11 +75,6 @@ export default function PlayerHomeHeader({ data }: PlayerHomeHeaderProps) {
     },
   });
 
-  const viewerTitle =
-    viewer === "cover" ? "Portada" : "Foto de perfil";
-  const viewerImageUrl =
-    viewer === "cover" ? player.coverUrl : player.avatarUrl;
-
   return (
     <>
       <section
@@ -90,22 +82,17 @@ export default function PlayerHomeHeader({ data }: PlayerHomeHeaderProps) {
         data-testid="player-home-header"
       >
         <div className="relative min-h-44 sm:min-h-52">
-          <button
-            type="button"
-            className="absolute inset-0 z-0 cursor-pointer"
-            aria-label="Ver portada"
-            data-testid="player-cover-open"
-            onClick={() => setViewer("cover")}
-          >
-            {coverUrl ? (
-              <img
-                src={coverUrl}
-                alt=""
-                className="absolute inset-0 size-full object-cover"
-              />
-            ) : null}
-            <span className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/35 to-black/20" />
-          </button>
+          <CoverField
+            imageUrl={coverUrl}
+            fallbackName={player.displayName}
+            canEdit={hasApiSession}
+            isSaving={uploadMutation.isPending}
+            title="Portada"
+            testId="player-cover-open"
+            onSave={(file) =>
+              uploadMutation.mutateAsync({ kind: "cover", file })
+            }
+          />
 
           {hasApiSession ? null : (
             <Button
@@ -121,21 +108,18 @@ export default function PlayerHomeHeader({ data }: PlayerHomeHeaderProps) {
           )}
 
           <div className="pointer-events-none relative z-10 flex items-end gap-4 p-4 pt-16 sm:p-5 sm:pt-20">
-            <button
-              type="button"
-              className="pointer-events-auto shrink-0 cursor-pointer rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
-              aria-label="Ver foto de perfil"
-              data-testid="player-avatar-open"
-              onClick={() => setViewer("avatar")}
-            >
-              <Avatar
-                name={player.displayName}
-                imageUrl={player.avatarUrl}
-                size="xl"
-                alt={player.displayName}
-                className="pointer-events-none ring-2 ring-white/80"
-              />
-            </button>
+            <AvatarField
+              name={player.displayName}
+              imageUrl={player.avatarUrl}
+              canEdit={hasApiSession}
+              isSaving={uploadMutation.isPending}
+              title="Foto de perfil"
+              testId="player-avatar-open"
+              className="pointer-events-auto"
+              onSave={(file) =>
+                uploadMutation.mutateAsync({ kind: "avatar", file })
+              }
+            />
             <div className="min-w-0 flex-1 pb-0.5 text-white">
               <p className="mb-1 inline-flex rounded-md bg-primary px-2 py-0.5 text-xs font-semibold text-primary-foreground">
                 Categoría {formatCategoryLevel(player.categoryLevel)}
@@ -150,23 +134,6 @@ export default function PlayerHomeHeader({ data }: PlayerHomeHeaderProps) {
           </div>
         </div>
       </section>
-
-      <ImageViewerDialog
-        open={viewer !== null}
-        onOpenChange={(open) => {
-          if (!open) setViewer(null);
-        }}
-        mode={viewer ?? "avatar"}
-        title={viewerTitle}
-        imageUrl={viewerImageUrl}
-        fallbackName={player.displayName}
-        canEdit={hasApiSession}
-        isSaving={uploadMutation.isPending}
-        onSave={async (file) => {
-          if (!viewer) return;
-          await uploadMutation.mutateAsync({ kind: viewer, file });
-        }}
-      />
 
       <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
         <DialogContent className="max-w-md">

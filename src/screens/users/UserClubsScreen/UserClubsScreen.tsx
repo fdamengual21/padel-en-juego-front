@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Search } from "lucide-react";
 import Api from "@/api/Api";
 import { useUser } from "@/app/UserProvider";
 import GeographySelectFields from "@/components/GeographySelectFields";
@@ -95,8 +96,9 @@ export default function UserClubsScreen() {
         </p>
       </div>
 
-      <div className="space-y-3 rounded-xl border border-border bg-card p-4">
-        <div className="w-full">
+      <div className="space-y-3">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <label htmlFor="clubs-search" className="sr-only">
             Buscar clubes
           </label>
@@ -107,6 +109,7 @@ export default function UserClubsScreen() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             data-testid="public-clubs-search"
+            className="h-9 pl-8"
           />
         </div>
         <GeographySelectFields
@@ -129,7 +132,7 @@ export default function UserClubsScreen() {
         </p>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3">
         {showSkeletons
           ? Array.from({ length: PAGE_SIZE }, (_, i) => (
               <ClubCardSkeleton key={`sk-${i}`} />
@@ -170,11 +173,11 @@ function ClubCardSkeleton() {
       className="overflow-hidden rounded-xl border border-border bg-card"
       aria-hidden
     >
-      <div className="aspect-[16/9] animate-pulse bg-muted" />
-      <div className="space-y-3 p-4">
-        <div className="h-5 w-2/3 animate-pulse rounded bg-muted" />
-        <div className="h-4 w-1/2 animate-pulse rounded bg-muted" />
-        <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />
+      <div className="aspect-[5/3] animate-pulse bg-muted md:aspect-[16/10]" />
+      <div className="space-y-1.5 p-2 md:p-3">
+        <div className="h-3.5 w-2/3 animate-pulse rounded bg-muted" />
+        <div className="h-3 w-1/2 animate-pulse rounded bg-muted" />
+        <div className="h-3 w-3/4 animate-pulse rounded bg-muted" />
       </div>
     </div>
   );

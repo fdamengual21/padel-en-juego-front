@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type ChangeEvent, type ReactNode } from "react";
-import { LoaderCircle, Pencil, XIcon } from "lucide-react";
+import { LoaderCircle, XIcon } from "lucide-react";
 import { initialsFromName } from "@/components/Avatar";
+import ImageEditOverlay from "@/components/ImageEditOverlay";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -32,8 +33,8 @@ interface ImageViewerDialogProps {
   canEdit?: boolean;
   isSaving?: boolean;
   editAriaLabel?: string;
-  onSave?: (file: File) => Promise<void>;
-  onDelete?: () => Promise<void>;
+  onSave?: (file: File) => void | Promise<unknown>;
+  onDelete?: () => void | Promise<unknown>;
 }
 
 function isAllowedImage(file: File): boolean {
@@ -52,21 +53,6 @@ function validateImageFile(file: File): string | null {
     return "La imagen no puede superar 5 MB.";
   }
   return null;
-}
-
-function EditHoverOverlay() {
-  return (
-    <span
-      className={cn(
-        "pointer-events-none absolute inset-0 flex items-center justify-center bg-black/40 transition-opacity",
-        "opacity-100 [@media(hover:hover)]:bg-transparent [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:bg-black/40 [@media(hover:hover)]:group-hover:opacity-100",
-      )}
-    >
-      <span className="flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
-        <Pencil className="size-5" />
-      </span>
-    </span>
-  );
 }
 
 function SavingOverlay() {
@@ -107,7 +93,7 @@ function InteractiveFrame({
       onClick={onEdit}
     >
       {children}
-      {isSaving ? <SavingOverlay /> : <EditHoverOverlay />}
+      {isSaving ? <SavingOverlay /> : <ImageEditOverlay />}
     </button>
   );
 }

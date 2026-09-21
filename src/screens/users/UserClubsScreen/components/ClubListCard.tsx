@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { ChevronRight, Clock, MapPin } from "lucide-react";
 import type { PublicClubListItem } from "@/modules/clubs";
+import { Badge } from "@/components/ui/badge";
 import { formatLocationEs } from "@/lib/dates";
 import { formatClubScheduleEs } from "@/lib/clubSchedule";
-import { Clock, MapPin } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface ClubListCardProps {
   club: PublicClubListItem;
@@ -24,7 +26,7 @@ export default function ClubListCard({ club }: ClubListCardProps) {
       className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card"
       data-testid={`public-club-card-${club.id}`}
     >
-      <div className="relative aspect-[16/9] w-full bg-muted">
+      <div className="relative aspect-[5/3] w-full bg-muted md:aspect-[16/10]">
         {showImage ? (
           <img
             src={club.coverUrl ?? ""}
@@ -33,42 +35,47 @@ export default function ClubListCard({ club }: ClubListCardProps) {
             onError={() => setImageFailed(true)}
           />
         ) : (
-          <div className="flex size-full items-center justify-center text-sm text-muted-foreground">
+          <div className="flex size-full items-center justify-center text-[11px] text-muted-foreground md:text-sm">
             Sin imagen
           </div>
         )}
       </div>
 
-      <div className="flex flex-1 flex-col gap-3 p-4">
-        <div className="min-w-0 space-y-1">
-          <h3 className="truncate text-lg font-semibold tracking-tight">
+      <div className="flex flex-1 flex-col gap-1.5 p-2 md:gap-2 md:p-3">
+        <div className="flex items-start justify-between gap-1">
+          <h3 className="min-w-0 truncate text-sm font-semibold tracking-tight md:text-base">
             {club.name}
           </h3>
-          <p className="flex items-center gap-1.5 truncate text-sm text-muted-foreground">
-            <MapPin className="size-3.5 shrink-0" />
-            {location ?? "Ubicación no informada"}
-          </p>
+          <ChevronRight
+            className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+            aria-hidden
+          />
         </div>
 
-        <div className="mt-auto space-y-2 text-sm">
-          <p className="flex items-center gap-1.5 text-muted-foreground">
-            <Clock className="size-3.5 shrink-0" />
-            <span className="truncate">
-              {schedule ?? "Horario no informado"}
-            </span>
-          </p>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="font-medium text-foreground">
-              {formatCourtPriceRange(club.minCourtPrice, club.maxCourtPrice)}
-            </p>
-            {hasSlots ? (
-              <span className="rounded-md bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">
-                {slots} turno{slots === 1 ? "" : "s"} hoy
-              </span>
-            ) : (
-              <span className="text-xs text-muted-foreground">Sin turnos hoy</span>
+        <p className="flex items-center gap-1 truncate text-[11px] text-muted-foreground md:gap-1.5 md:text-sm">
+          <MapPin className="size-3 shrink-0 md:size-3.5" />
+          <span className="truncate">{location ?? "Ubicación no informada"}</span>
+        </p>
+        <p className="flex items-center gap-1 truncate text-[11px] text-muted-foreground md:gap-1.5 md:text-sm">
+          <Clock className="size-3 shrink-0 md:size-3.5" />
+          <span className="truncate">{schedule ?? "Horario no informado"}</span>
+        </p>
+
+        <div className="mt-auto flex items-center justify-between gap-1 pt-0.5">
+          <Badge
+            variant="secondary"
+            className={cn(
+              "h-auto max-w-full truncate px-1.5 py-0.5 text-[10px] font-medium md:text-xs",
+              hasSlots
+                ? "bg-success/15 text-success"
+                : "bg-warning/15 text-warning",
             )}
-          </div>
+          >
+            {slots} turno{slots === 1 ? "" : "s"} hoy
+          </Badge>
+          <p className="min-w-0 truncate text-right text-[11px] text-muted-foreground md:text-xs">
+            {formatCourtPriceRange(club.minCourtPrice, club.maxCourtPrice)}
+          </p>
         </div>
       </div>
     </article>
@@ -79,7 +86,7 @@ function formatCourtPriceRange(
   min: number | null,
   max: number | null,
 ): string {
-  if (min == null || max == null) return "Precio no informado";
+  if (min == null || max == null) return "Sin precio definido";
   const fmt = (value: number) =>
     new Intl.NumberFormat("es-AR", {
       style: "currency",

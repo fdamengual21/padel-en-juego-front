@@ -28,13 +28,42 @@ export function weekdayFullLabel(day: WeekdayIso): string {
   return WEEKDAY_FULL[day];
 }
 
-/** Ej. "Lun–Vie · 08:00–23:00" o "Todos los días · 08:00–00:00" */
+/** Ej. "De Lun a Vie" o "Lun, Mié, Vie". */
+export function formatOpenDaysEs(openDays: readonly WeekdayIso[]): string {
+  const days = [...new Set(openDays)].sort((a, b) => a - b) as WeekdayIso[];
+  if (days.length === 7) return "Todos los días";
+  if (days.length === 0) return "Sin días";
+
+  const ranges: Array<[WeekdayIso, WeekdayIso]> = [];
+  let start = days[0]!;
+  let end = days[0]!;
+  for (let i = 1; i < days.length; i++) {
+    const day = days[i]!;
+    if (day === end + 1) {
+      end = day;
+      continue;
+    }
+    ranges.push([start, end]);
+    start = day;
+    end = day;
+  }
+  ranges.push([start, end]);
+
+  return ranges
+    .map(([from, to]) =>
+      from === to
+        ? weekdayShortLabel(from)
+        : `De ${weekdayShortLabel(from)} a ${weekdayShortLabel(to)}`,
+    )
+    .join(", ");
+}
+
+/** Ej. "De Lun a Sáb · 08:00–23:00" o "Todos los días · 08:00–00:00" */
 export function formatClubScheduleEs(
   openTime: string,
   closeTime: string,
   openDays: readonly WeekdayIso[],
 ): string {
-  const days = [...openDays].sort((a, b) => a - b);
   const [oH, oM] = openTime.split(":").map(Number);
   const [cH, cM] = closeTime.split(":").map(Number);
   const openMin = (oH || 0) * 60 + (oM || 0);
@@ -43,7 +72,5 @@ export function formatClubScheduleEs(
     closeMin <= openMin
       ? `${openTime}–${closeTime} (cierra día siguiente)`
       : `${openTime}–${closeTime}`;
-  if (days.length === 7) return `Todos los días · ${hours}`;
-  if (days.length === 0) return `Sin días · ${hours}`;
-  return `${days.map(weekdayShortLabel).join(", ")} · ${hours}`;
+  return `${formatOpenDaysEs(openDays)} · ${hours}`;
 }
