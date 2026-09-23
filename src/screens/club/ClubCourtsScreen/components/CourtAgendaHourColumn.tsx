@@ -17,10 +17,11 @@ export default function CourtAgendaHourColumn({
     <div className="w-14 shrink-0">
       {Array.from({ length: modules }, (_, index) => {
         const hour = startHour + index;
-        const label = `${String(hour).padStart(2, "0")}:00`;
+        const clockHour = ((hour % 24) + 24) % 24;
+        const label = `${String(clockHour).padStart(2, "0")}:00`;
         return (
           <div
-            key={label}
+            key={hour}
             className="box-border flex flex-col items-center overflow-hidden"
             style={{ height: CALENDAR_AGENDA_HOUR_SLOT_PX }}
             data-agenda-hour={hour}

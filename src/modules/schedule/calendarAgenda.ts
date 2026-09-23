@@ -23,6 +23,13 @@ export interface CalendarAgendaRange {
   to: string;
 }
 
+/** Horario del club para ubicar la madrugada en el día en que arranca la jornada. */
+export interface AgendaJornadaSchedule {
+  openMinutes: number;
+  closeMinutes: number;
+  openDays: readonly number[];
+}
+
 export interface CalendarAgendaHours {
   startHour: number;
   modules: number;
@@ -128,28 +135,56 @@ export function buildAgendaMonthGridDays(date: Dayjs): Dayjs[] {
 export function rangeForAgendaView(
   mode: CalendarAgendaViewMode,
   date: Dayjs,
+  options?: { tailMinutes?: number },
 ): CalendarAgendaRange {
+  const tailMinutes = options?.tailMinutes ?? 0;
   if (mode === "day") {
     const start = date.startOf("day");
+    const end = tailMinutes > 0 ? start.add(1, "day").add(tailMinutes, "minute") : start.endOf("day");
     return {
       from: start.toISOString(),
-      to: start.endOf("day").toISOString(),
+      to: end.toISOString(),
     };
   }
   if (mode === "month") {
     const days = buildAgendaMonthGridDays(date);
     const first = days[0] ?? date.startOf("month");
     const last = days[days.length - 1] ?? date.endOf("month");
+    const end = last.add(1, "day").startOf("day");
     return {
       from: first.startOf("day").toISOString(),
-      to: last.add(1, "day").startOf("day").toISOString(),
+      to: (tailMinutes > 0 ? end.add(tailMinutes, "minute") : end).toISOString(),
     };
   }
   const weekStart = startOfAgendaWeek(date);
+  const end = weekStart.add(CALENDAR_AGENDA_WEEK_DAYS, "day").startOf("day");
   return {
     from: weekStart.startOf("day").toISOString(),
-    to: weekStart.add(CALENDAR_AGENDA_WEEK_DAYS, "day").startOf("day").toISOString(),
+    to: (tailMinutes > 0 ? end.add(tailMinutes, "minute") : end).toISOString(),
   };
+}
+
+/**
+ * Día de columna de un evento. Si cae en la madrugada previa al cierre,
+ * pertenece a la jornada que arrancó el día anterior.
+ */
+export function agendaJornadaColumnDay(
+  startAt: Dayjs,
+  schedule?: AgendaJornadaSchedule,
+): Dayjs {
+  const day = startAt.startOf("day");
+  if (!schedule || schedule.closeMinutes >= schedule.openMinutes) {
+    return day;
+  }
+  const minutes = startAt.hour() * 60 + startAt.minute();
+  if (minutes >= schedule.closeMinutes) {
+    return day;
+  }
+  const previous = day.subtract(1, "day");
+  if (schedule.openDays.includes(previous.isoWeekday())) {
+    return previous;
+  }
+  return day;
 }
 
 /**
@@ -159,6 +194,7 @@ export function rangeForAgendaView(
 export function groupEventsByWeekDays(
   events: readonly CalendarEventGridItemDto[],
   weekStart: Dayjs,
+  schedule?: AgendaJornadaSchedule,
 ): CalendarEventGridItemDto[][] {
   const start = startOfAgendaWeek(weekStart).startOf("day");
   const buckets: CalendarEventGridItemDto[][] = Array.from(
@@ -171,7 +207,9 @@ export function groupEventsByWeekDays(
     if (!eventDay.isValid()) {
       continue;
     }
-    const index = eventDay.startOf("day").diff(start, "day");
+    const index = agendaJornadaColumnDay(eventDay, schedule)
+      .startOf("day")
+      .diff(start, "day");
     if (index >= 0 && index < CALENDAR_AGENDA_WEEK_DAYS) {
       buckets[index].push(event);
     }
@@ -187,8 +225,12 @@ export function resolveAgendaHours(
   events: readonly CalendarEventGridItemDto[],
   options?: { openHour?: number; closeHour?: number },
 ): CalendarAgendaHours {
-  let minHour = options?.openHour ?? CALENDAR_AGENDA_DEFAULT_START_HOUR;
-  let maxHour = options?.closeHour ?? CALENDAR_AGENDA_DEFAULT_END_HOUR;
+  const openHour = options?.openHour ?? CALENDAR_AGENDA_DEFAULT_START_HOUR;
+  const requestedEnd = options?.closeHour ?? CALENDAR_AGENDA_DEFAULT_END_HOUR;
+  const closesNextDay = requestedEnd > 24;
+  let minHour = openHour;
+  let maxHour = requestedEnd;
+  const hourCap = Math.min(48, Math.max(24, requestedEnd));
 
   for (const event of events) {
     if (event.allDay) {
@@ -199,7 +241,9 @@ export function resolveAgendaHours(
     if (!start.isValid()) {
       continue;
     }
-    minHour = Math.min(minHour, start.hour());
+    if (!closesNextDay || start.hour() >= openHour) {
+      minHour = Math.min(minHour, start.hour());
+    }
     const endHour = end.isValid()
       ? Math.max(end.hour() + (end.minute() > 0 ? 1 : 0), start.hour() + 1)
       : start.hour() + 1;
@@ -207,7 +251,7 @@ export function resolveAgendaHours(
   }
 
   minHour = Math.max(0, minHour);
-  maxHour = Math.min(24, Math.max(maxHour, minHour + 1));
+  maxHour = Math.min(hourCap, Math.max(maxHour, minHour + 1));
   return { startHour: minHour, modules: maxHour - minHour };
 }
 
@@ -218,13 +262,14 @@ export function resolveAgendaHours(
 export function layoutAgendaEventBlock(
   event: CalendarEventGridItemDto,
   startHour: number,
+  columnDay?: Dayjs,
 ): CalendarAgendaEventLayout {
   if (event.allDay) {
     return { top: 0, height: 28 };
   }
   const start = dayjs(event.startAt);
   const end = dayjs(event.endAt);
-  const dayStart = start
+  const dayStart = (columnDay ?? start)
     .hour(startHour)
     .minute(0)
     .second(0)
@@ -266,10 +311,11 @@ function visualIntervalsOverlap(
 export function placeAgendaDayEvents(
   events: readonly CalendarEventGridItemDto[],
   startHour: number,
+  columnDay?: Dayjs,
 ): CalendarAgendaPlacedEvent[] {
   const positioned = events.map((event) => ({
     event,
-    ...layoutAgendaEventBlock(event, startHour),
+    ...layoutAgendaEventBlock(event, startHour, columnDay),
   }));
 
   const sorted = [...positioned].sort((a, b) => {
@@ -465,6 +511,7 @@ function sortGroupedAgendaEvents(
 export function layoutAgendaDayItems(
   events: readonly CalendarEventGridItemDto[],
   startHour: number,
+  columnDay?: Dayjs,
 ): CalendarAgendaDayItem[] {
   const buckets = new Map<string, CalendarEventGridItemDto[]>();
   for (const event of events) {
@@ -482,7 +529,9 @@ export function layoutAgendaDayItems(
 
   for (const [key, bucket] of buckets) {
     if (bucket.length >= 2) {
-      const layouts = bucket.map((item) => layoutAgendaEventBlock(item, startHour));
+      const layouts = bucket.map((item) =>
+        layoutAgendaEventBlock(item, startHour, columnDay),
+      );
       const top = Math.min(...layouts.map((layout) => layout.top));
       const height = Math.max(
         CALENDAR_AGENDA_COMPACT_MAX_HEIGHT,
@@ -501,7 +550,7 @@ export function layoutAgendaDayItems(
     }
   }
 
-  const placed = placeAgendaDayEvents(singles, startHour);
+  const placed = placeAgendaDayEvents(singles, startHour, columnDay);
   return [
     ...placed.map((placement) => ({ kind: "event" as const, placement })),
     ...groups.map((group) => ({ kind: "group" as const, group })),

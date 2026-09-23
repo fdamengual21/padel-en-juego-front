@@ -4,6 +4,7 @@ import {
   groupEventsByWeekDays,
   resolveAgendaHours,
   startOfAgendaWeek,
+  type AgendaJornadaSchedule,
   type CalendarAgendaViewMode,
   type CalendarEventGridItemDto,
 } from "@/modules/schedule";
@@ -18,6 +19,7 @@ interface CourtAgendaGridProps {
   loading?: boolean;
   openHour?: number;
   closeHour?: number;
+  jornada?: AgendaJornadaSchedule;
   onSelectEvent?: (eventId: string) => void;
   onEmptySlotClick?: (day: Dayjs, hour: number) => void;
 }
@@ -29,12 +31,13 @@ export default function CourtAgendaGrid({
   loading = false,
   openHour,
   closeHour,
+  jornada,
   onSelectEvent,
   onEmptySlotClick,
 }: CourtAgendaGridProps) {
   const mode = viewMode === "month" ? "week" : viewMode;
   const weekStart = startOfAgendaWeek(selectedDate);
-  const days = groupEventsByWeekDays(events, weekStart);
+  const days = groupEventsByWeekDays(events, weekStart, jornada);
   const { startHour, modules } = resolveAgendaHours(events, {
     openHour,
     closeHour,
@@ -95,6 +98,7 @@ export default function CourtAgendaGrid({
               return (
                 <CourtAgendaDayColumn
                   key={day.format("YYYY-MM-DD")}
+                  columnDay={day}
                   events={days[index] ?? []}
                   startHour={startHour}
                   modules={modules}

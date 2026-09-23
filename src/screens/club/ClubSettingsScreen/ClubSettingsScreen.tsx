@@ -15,7 +15,11 @@ import { InputField, PhoneField } from "@/components/Form";
 import GeographySelectFields from "@/components/GeographySelectFields";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { formatClubScheduleEs, weekdayShortLabel } from "@/lib/clubSchedule";
+import {
+  formatClubScheduleEs,
+  parseClockMinutes,
+  weekdayShortLabel,
+} from "@/lib/clubSchedule";
 import {
   combinePhone,
   DEFAULT_PHONE_DIAL,
@@ -87,12 +91,15 @@ const schema = yup.object({
     .string()
     .required("Indicá el horario de cierre")
     .test(
-      "after-open",
-      "El cierre debe ser posterior a la apertura",
+      "not-same-as-open",
+      "El cierre no puede coincidir con la apertura",
       function (value) {
-        const open = this.parent.openTime as string | undefined;
-        if (!open || !value) return true;
-        return value > open;
+        const open = parseClockMinutes(
+          (this.parent.openTime as string | undefined) ?? "",
+        );
+        const close = parseClockMinutes(value ?? "");
+        if (open == null || close == null) return true;
+        return close !== open;
       },
     ),
   openDays: yup
@@ -359,6 +366,7 @@ export default function ClubSettingsScreen() {
               type="time"
               required
               disabled={!canUpdate}
+              hint="Si es anterior a la apertura, cierra al día siguiente. Esos turnos siguen siendo del día en que abre."
             />
           </div>
           <div className="space-y-2">

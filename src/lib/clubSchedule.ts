@@ -58,19 +58,36 @@ export function formatOpenDaysEs(openDays: readonly WeekdayIso[]): string {
     .join(", ");
 }
 
-/** Ej. "De Lun a Sáb · 08:00–23:00" o "Todos los días · 08:00–00:00" */
+/** Minutos desde medianoche, o null si el texto no es HH:mm. */
+export function parseClockMinutes(value: string): number | null {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours > 23 || minutes > 59) return null;
+  return hours * 60 + minutes;
+}
+
+/** El cierre cae el día calendario siguiente al día en que arranca la jornada. */
+export function clubClosesNextDay(openTime: string, closeTime: string): boolean {
+  const openMin = parseClockMinutes(openTime);
+  const closeMin = parseClockMinutes(closeTime);
+  if (openMin == null || closeMin == null) return false;
+  return closeMin < openMin;
+}
+
+/** Ej. "08:00–23:00" o "09:00–02:00 (cierra día siguiente)". */
+export function formatClubHoursEs(openTime: string, closeTime: string): string {
+  return clubClosesNextDay(openTime, closeTime)
+    ? `${openTime}–${closeTime} (cierra día siguiente)`
+    : `${openTime}–${closeTime}`;
+}
+
+/** Ej. "De Lun a Sáb · 08:00–23:00" o "Todos los días · 09:00–02:00 (cierra día siguiente)". */
 export function formatClubScheduleEs(
   openTime: string,
   closeTime: string,
   openDays: readonly WeekdayIso[],
 ): string {
-  const [oH, oM] = openTime.split(":").map(Number);
-  const [cH, cM] = closeTime.split(":").map(Number);
-  const openMin = (oH || 0) * 60 + (oM || 0);
-  const closeMin = (cH || 0) * 60 + (cM || 0);
-  const hours =
-    closeMin <= openMin
-      ? `${openTime}–${closeTime} (cierra día siguiente)`
-      : `${openTime}–${closeTime}`;
-  return `${formatOpenDaysEs(openDays)} · ${hours}`;
+  return `${formatOpenDaysEs(openDays)} · ${formatClubHoursEs(openTime, closeTime)}`;
 }

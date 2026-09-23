@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import type { Dayjs } from "dayjs";
 import {
   CALENDAR_AGENDA_HOUR_SLOT_PX,
   layoutAgendaDayItems,
@@ -8,6 +9,7 @@ import CourtAgendaEventBlock from "./CourtAgendaEventBlock";
 import CourtAgendaEventGroupBlock from "./CourtAgendaEventGroupBlock";
 
 interface CourtAgendaDayColumnProps {
+  columnDay: Dayjs;
   events: CalendarEventGridItemDto[];
   startHour: number;
   modules: number;
@@ -20,6 +22,7 @@ interface CourtAgendaDayColumnProps {
  * Same-minute starts collapse into a group chip + list.
  */
 export default function CourtAgendaDayColumn({
+  columnDay,
   events,
   startHour,
   modules,
@@ -27,14 +30,15 @@ export default function CourtAgendaDayColumn({
   onEmptySlotClick,
 }: CourtAgendaDayColumnProps) {
   const items = useMemo(
-    () => layoutAgendaDayItems(events, startHour),
-    [events, startHour],
+    () => layoutAgendaDayItems(events, startHour, columnDay),
+    [columnDay, events, startHour],
   );
 
   return (
     <div className="relative min-w-[92px] flex-1 basis-0">
       {Array.from({ length: modules }, (_, index) => {
         const hour = startHour + index;
+        const clockHour = ((hour % 24) + 24) % 24;
         return (
           <div
             key={hour}
@@ -47,7 +51,7 @@ export default function CourtAgendaDayColumn({
               <button
                 type="button"
                 className="absolute inset-0 z-0 m-0 block w-full appearance-none border-0 bg-transparent p-0 hover:bg-muted/40"
-                aria-label={`Crear reserva a las ${String(hour).padStart(2, "0")}:00`}
+                aria-label={`Crear reserva a las ${String(clockHour).padStart(2, "0")}:00`}
                 onClick={() => onEmptySlotClick(hour)}
               />
             ) : null}

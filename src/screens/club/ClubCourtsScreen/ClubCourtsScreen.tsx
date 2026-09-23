@@ -21,6 +21,10 @@ import {
   rangeForAgendaView,
   startOfAgendaWeek,
 } from "@/modules/schedule";
+import {
+  clubClosesNextDay,
+  parseClockMinutes,
+} from "@/lib/clubSchedule";
 import { cn } from "@/lib/utils";
 import CourtAgendaGrid from "./components/CourtAgendaGrid";
 import CourtAgendaToolbar, {
@@ -148,10 +152,6 @@ export default function ClubCourtsScreen() {
   const [reservationModal, setReservationModal] =
     useState<ReservationModalState | null>(null);
 
-  const range = useMemo(
-    () => rangeForAgendaView(mode, cursorDate),
-    [mode, cursorDate],
-  );
   const summaryDate = cursorDate.format("YYYY-MM-DD");
 
   const courtsQuery = useQuery({
@@ -166,6 +166,23 @@ export default function ClubCourtsScreen() {
     enabled: Boolean(clubId),
     retry: false,
   });
+
+  const scheduleTailMinutes = useMemo(() => {
+    const openTime = settingsQuery.data?.openTime;
+    const closeTime = settingsQuery.data?.closeTime;
+    if (!openTime || !closeTime || !clubClosesNextDay(openTime, closeTime)) {
+      return 0;
+    }
+    return parseClockMinutes(closeTime) ?? 0;
+  }, [settingsQuery.data]);
+
+  const range = useMemo(
+    () =>
+      rangeForAgendaView(mode, cursorDate, {
+        tailMinutes: scheduleTailMinutes,
+      }),
+    [mode, cursorDate, scheduleTailMinutes],
+  );
 
   const courts = courtsQuery.data ?? [];
   const activeCourtId = selectedCourtId ?? courts[0]?.id ?? null;
@@ -228,18 +245,42 @@ export default function ClubCourtsScreen() {
   }, [multiBoard?.events, multiBoard?.courts, courts]);
 
   const openHours = useMemo(() => {
-    if (headerView === "overview" && multiBoard) {
+    const fromSettings = settingsQuery.data;
+    const openTime =
+      fromSettings?.openTime ||
+      (headerView === "overview" ? multiBoard?.openTime : board?.club.openTime) ||
+      null;
+    const closeTime =
+      fromSettings?.closeTime ||
+      (headerView === "overview" ? multiBoard?.closeTime : board?.club.closeTime) ||
+      null;
+    const openDays = fromSettings?.openDays?.length
+      ? fromSettings.openDays
+      : (board?.club.openDays ?? []);
+    if (!openTime || !closeTime) {
       return {
-        openHour: Number(multiBoard.openTime.slice(0, 2)),
-        closeHour: Number(multiBoard.closeTime.slice(0, 2)),
+        openHour: undefined as number | undefined,
+        closeHour: undefined as number | undefined,
+        jornada: undefined,
       };
     }
-    if (!board) return { openHour: undefined, closeHour: undefined };
+    const openHour = Number(openTime.slice(0, 2)) || 0;
+    const closeHour = Number(closeTime.slice(0, 2)) || 0;
+    const openMinutes = parseClockMinutes(openTime) ?? openHour * 60;
+    const closeMinutes = parseClockMinutes(closeTime) ?? closeHour * 60;
+    const closesNextDay = closeMinutes < openMinutes;
     return {
-      openHour: Number(board.club.openTime.slice(0, 2)),
-      closeHour: Number(board.club.closeTime.slice(0, 2)),
+      openHour,
+      closeHour: closesNextDay
+        ? 24 + closeHour + (closeMinutes % 60 > 0 ? 1 : 0)
+        : closeHour,
+      jornada: {
+        openMinutes,
+        closeMinutes,
+        openDays,
+      },
     };
-  }, [headerView, multiBoard, board]);
+  }, [headerView, multiBoard, board, settingsQuery.data]);
 
   const eventsById = useMemo(() => {
     const map = new Map<string, CourtAgendaEvent>();
@@ -264,8 +305,8 @@ export default function ClubCourtsScreen() {
     if (!canWriteReservations) return;
     if (targetCourtId) setSelectedCourtId(targetCourtId);
     const startsAt = day
-      .hour(hour)
-      .minute(0)
+      .startOf("day")
+      .add(hour, "hour")
       .second(0)
       .millisecond(0)
       .toISOString();
@@ -507,6 +548,7 @@ export default function ClubCourtsScreen() {
               loading={multiBoardQuery.isLoading}
               openHour={openHours.openHour}
               closeHour={openHours.closeHour}
+              jornada={openHours.jornada}
               onSelectEvent={(eventId) => {
                 void openEvent(eventId);
               }}
@@ -526,6 +568,7 @@ export default function ClubCourtsScreen() {
               loading={boardQuery.isLoading}
               openHour={openHours.openHour}
               closeHour={openHours.closeHour}
+              jornada={openHours.jornada}
               onSelectEvent={(eventId) => {
                 void openEvent(eventId, court.id);
               }}

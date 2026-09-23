@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import type { Club, Court, CourtDaySummary } from "@/domain";
 import { Button } from "@/components/ui/button";
+import { formatClubHoursEs } from "@/lib/clubSchedule";
 import { formatLocationEs } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 
@@ -42,7 +43,7 @@ export default function CourtSummaryCard({
         ? "Ocupada"
         : "Cerrado";
   const available = liveStatus === "available";
-  const openLabel = `${club.openTime} – ${club.closeTime}`;
+  const openLabel = formatClubHoursEs(club.openTime, club.closeTime);
 
   return (
     <article

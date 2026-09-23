@@ -8,6 +8,7 @@ export {
 } from "./types";
 export { mapCourtAgendaEventToGridItem } from "./mapCourtAgendaEvent";
 export {
+  type AgendaJornadaSchedule,
   type CalendarAgendaViewMode,
   type CalendarAgendaRange,
   type CalendarAgendaHours,

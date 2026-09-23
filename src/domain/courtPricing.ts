@@ -29,6 +29,13 @@ export type CourtPriceRuleDraft = Pick<
   label?: string | null;
 };
 
+const MINUTES_PER_DAY = 24 * 60;
+const MINUTES_PER_WEEK = 7 * MINUTES_PER_DAY;
+
+function previousIsoWeekday(day: WeekdayIso): WeekdayIso {
+  return (day === 1 ? 7 : day - 1) as WeekdayIso;
+}
+
 function rangesOverlap(
   aStart: number,
   aEnd: number,
@@ -36,6 +43,53 @@ function rangesOverlap(
   bEnd: number,
 ): boolean {
   return aStart < bEnd && bStart < aEnd;
+}
+
+/** Franja en minutos de la semana. Si cierra al día siguiente, incluye esa madrugada. */
+function expandRuleIntervals(
+  startTime: string,
+  endTime: string,
+  daysOfWeek: readonly WeekdayIso[],
+): Array<[number, number]> {
+  const from = parseHm(startTime);
+  const to = parseHm(endTime);
+  if (!Number.isFinite(from) || !Number.isFinite(to) || from === to) return [];
+
+  const intervals: Array<[number, number]> = [];
+  for (const day of daysOfWeek) {
+    const origin = (day - 1) * MINUTES_PER_DAY;
+    const start = origin + from;
+    const end = origin + (to < from ? to + MINUTES_PER_DAY : to);
+    if (end <= MINUTES_PER_WEEK) {
+      intervals.push([start, end]);
+      continue;
+    }
+    intervals.push([start, MINUTES_PER_WEEK]);
+    intervals.push([0, end - MINUTES_PER_WEEK]);
+  }
+  return intervals;
+}
+
+function ruleCoversStart(
+  rule: Pick<CourtPriceRuleDraft, "startTime" | "endTime" | "daysOfWeek">,
+  weekday: WeekdayIso,
+  startMinutes: number,
+): boolean {
+  const from = parseHm(rule.startTime);
+  const to = parseHm(rule.endTime);
+  if (!Number.isFinite(from) || !Number.isFinite(to) || from === to) return false;
+  if (from < to) {
+    return (
+      rule.daysOfWeek.includes(weekday) &&
+      startMinutes >= from &&
+      startMinutes < to
+    );
+  }
+  const evening =
+    rule.daysOfWeek.includes(weekday) && startMinutes >= from;
+  const morningAfter =
+    rule.daysOfWeek.includes(previousIsoWeekday(weekday)) && startMinutes < to;
+  return evening || morningAfter;
 }
 
 /**
@@ -58,8 +112,8 @@ export function validateCourtPriceRules(
     if (!Number.isFinite(from) || !Number.isFinite(to)) {
       return `La tarifa ${i + 1} tiene un horario inválido`;
     }
-    if (from >= to) {
-      return `La tarifa ${i + 1}: "desde" debe ser anterior a "hasta"`;
+    if (from === to) {
+      return `La tarifa ${i + 1}: "desde" y "hasta" no pueden coincidir`;
     }
   }
 
@@ -68,15 +122,31 @@ export function validateCourtPriceRules(
       const a = rules[i]!;
       const b = rules[j]!;
       const sharedDays = a.daysOfWeek.filter((d) => b.daysOfWeek.includes(d));
-      if (sharedDays.length === 0) continue;
 
-      const aFrom = parseHm(a.startTime);
-      const aTo = parseHm(a.endTime);
-      const bFrom = parseHm(b.startTime);
-      const bTo = parseHm(b.endTime);
-      if (!rangesOverlap(aFrom, aTo, bFrom, bTo)) continue;
+      const aIntervals = expandRuleIntervals(
+        a.startTime,
+        a.endTime,
+        a.daysOfWeek,
+      );
+      const bIntervals = expandRuleIntervals(
+        b.startTime,
+        b.endTime,
+        b.daysOfWeek,
+      );
+      const overlaps = aIntervals.some(([aFrom, aTo]) =>
+        bIntervals.some(([bFrom, bTo]) =>
+          rangesOverlap(aFrom, aTo, bFrom, bTo),
+        ),
+      );
+      if (!overlaps) continue;
 
-      const daysLabel = sharedDays.map((d) => WEEKDAY_LABEL_ES[d]).join(", ");
+      const days =
+        sharedDays.length > 0
+          ? sharedDays
+          : [...new Set([...a.daysOfWeek, ...b.daysOfWeek])].sort(
+              (left, right) => left - right,
+            );
+      const daysLabel = days.map((d) => WEEKDAY_LABEL_ES[d]).join(", ");
       return `Las tarifas ${i + 1} y ${j + 1} se solapan el ${daysLabel} (${a.startTime}–${a.endTime} y ${b.startTime}–${b.endTime})`;
     }
   }
@@ -106,12 +176,9 @@ export function resolvePriceForSlot(
   const startMinutes = start.getHours() * 60 + start.getMinutes();
   const dayRules = rules.filter((rule) => rule.daysOfWeek.includes(weekday));
 
-  const matching = dayRules.filter((rule) => {
-    const from = parseHm(rule.startTime);
-    const to = parseHm(rule.endTime);
-    if (!Number.isFinite(from) || !Number.isFinite(to)) return false;
-    return startMinutes >= from && startMinutes < to;
-  });
+  const matching = rules.filter((rule) =>
+    ruleCoversStart(rule, weekday, startMinutes),
+  );
 
   if (matching.length >= 1) {
     const chosen =
