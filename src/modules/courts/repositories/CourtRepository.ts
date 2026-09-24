@@ -1,6 +1,6 @@
 import type { AxiosInstance } from "axios";
 import { readData } from "@/config/axiosInstance";
-import type { Court, CourtPriceRule, WeekdayIso } from "@/domain";
+import type { Court, CourtPriceRule, CourtStatus, WeekdayIso } from "@/domain";
 import type { ApiEnvelope } from "@/lib/apiClient";
 import { resolveClubHeaderId } from "@/modules/auth/clubContext";
 import { useAuthStore } from "@/stores/authStore";
@@ -14,6 +14,18 @@ export interface ICourtRepository {
   deactivate(id: string): Promise<Court>;
   uploadPhoto(id: string, file: File): Promise<Court>;
   deletePhoto(id: string): Promise<Court>;
+}
+
+function asCourtStatus(value: unknown): CourtStatus {
+  if (
+    value === "active" ||
+    value === "inactive" ||
+    value === "comingSoon" ||
+    value === "maintenance"
+  ) {
+    return value;
+  }
+  return "active";
 }
 
 function asString(value: unknown): string {
@@ -70,7 +82,7 @@ export function normalizeCourt(raw: Record<string, unknown>): Court {
     id,
     clubId: asString(raw.clubId),
     name: asString(raw.name),
-    status: raw.isActive === false ? "inactive" : "active",
+    status: asCourtStatus(raw.status),
     imageUrl: asNullableString(raw.imageUrl),
     slotDurationMinutes: asNumber(raw.slotDurationMinutes, 90) === 120 ? 120 : 90,
     basePrice: asNumber(raw.basePrice),

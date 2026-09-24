@@ -466,11 +466,20 @@ export interface MatchSlot {
   sourceMatchId: string | null;
 }
 
+export type CourtStatus = "active" | "inactive" | "comingSoon" | "maintenance";
+
+export const COURT_STATUS_LABELS: Record<CourtStatus, string> = {
+  active: "Activa",
+  inactive: "Inactiva",
+  comingSoon: "Próximamente",
+  maintenance: "En mantenimiento",
+};
+
 export interface Court {
   id: string;
   clubId: string;
   name: string;
-  status: EntityStatus;
+  status: CourtStatus;
   /** URL pública de la foto. */
   imageUrl: string | null;
   /** Duración del turno en minutos (90 o 120). */
@@ -539,12 +548,17 @@ export interface CourtReservation {
   clubId: string;
   clientId: string;
   courtId: string | null;
+  bookedByPlayerId?: string;
+  playerFirstName?: string;
+  playerLastName?: string;
+  courtName?: string;
   startsAt: string;
   endsAt: string;
   status: CourtReservationStatus;
   /** Precio cobrado al reservar (snapshot). */
   price: number | null;
   createdAt: string;
+  cancelledAt?: string | null;
 }
 
 export type ClientTournamentOutcome =
@@ -908,6 +922,8 @@ export interface CourtDayOverviewItem {
   minPrice: number | null;
   priceBands: CourtDayPriceBand[];
   availableSlots: CourtAvailableSlot[];
+  /** Por qué no hay turnos, o vacío si el día opera. */
+  message?: string;
 }
 
 export interface CourtsDayOverviewView {

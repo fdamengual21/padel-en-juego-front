@@ -31,7 +31,7 @@ export default function CourtAgendaDayHeader({
         {day.format("D")}
       </span>
       {isToday ? (
-        <span className="text-[10px] font-medium text-primary">Hoy</span>
+        <span className="text-[10px] font-medium text-primary-strong">Hoy</span>
       ) : (
         <span className="h-3" aria-hidden />
       )}

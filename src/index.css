@@ -34,6 +34,7 @@
   --color-secondary-foreground: var(--secondary-foreground);
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-strong: var(--primary-strong);
   --color-primary: var(--primary);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
@@ -61,9 +62,11 @@
   --card-foreground: oklch(0.22 0.035 265);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.22 0.035 265);
-  /* Lima #A3E300-ish */
+  /* Lima #A3E300-ish — fill de CTAs. No usarlo como color de texto sobre canvas claro. */
   --primary: oklch(0.88 0.21 125);
   --primary-foreground: oklch(0.22 0.035 265);
+  /* Verde de texto sobre superficies claras. WCAG AA ≥ 4.5:1 vs background, card y muted. */
+  --primary-strong: oklch(0.52 0.16 140);
   --secondary: oklch(0.96 0.008 247);
   --secondary-foreground: oklch(0.22 0.035 265);
   --muted: oklch(0.96 0.008 247);
@@ -102,6 +105,7 @@
   --popover-foreground: oklch(0.97 0.005 265);
   --primary: oklch(0.88 0.21 125);
   --primary-foreground: oklch(0.22 0.035 265);
+  --primary-strong: oklch(0.88 0.21 125);
   --secondary: oklch(0.28 0.03 265);
   --secondary-foreground: oklch(0.97 0.005 265);
   --muted: oklch(0.28 0.03 265);

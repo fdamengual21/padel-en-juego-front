@@ -33,6 +33,7 @@ export const ROUTES = {
     clients: "/club/clientes",
     clientDetail: (id: string) => `/club/clientes/${id}`,
     courts: "/club/canchas",
+    courtConfig: (id: string) => `/club/canchas/${id}`,
     schedule: "/club/agenda",
     settings: "/club/configuracion",
   },

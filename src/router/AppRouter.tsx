@@ -22,6 +22,7 @@ import ClubTournamentDetailScreen from "@/screens/club/ClubTournamentDetailScree
 import ClubClientsScreen from "@/screens/club/ClubClientsScreen";
 import ClubClientDetailScreen from "@/screens/club/ClubClientDetailScreen";
 import ClubCourtsScreen from "@/screens/club/ClubCourtsScreen";
+import ClubCourtConfigScreen from "@/screens/club/ClubCourtConfigScreen";
 import ClubSettingsScreen from "@/screens/club/ClubSettingsScreen";
 import UserHomeScreen from "@/screens/users/UserHomeScreen";
 import UserClubsScreen from "@/screens/users/UserClubsScreen";
@@ -36,6 +37,7 @@ import RequireClubContext from "@/router/guards/RequireClubContext";
 import RequirePermission from "@/router/guards/RequirePermission";
 import LegacyPlayerRedirect from "@/router/LegacyPlayerRedirect";
 import {
+  PERMISSION_CLUB_CLIENTS_READ,
   PERMISSION_CLUB_COURTS_READ,
   PERMISSION_CLUB_SETTINGS_READ,
   PERMISSION_CLUB_TOURNAMENTS_READ,
@@ -151,11 +153,17 @@ const router = createBrowserRouter(
             <RequireFeature feature="clients" redirectTo={ROUTES.club.dashboard} />
           }
         >
-          <Route path="clientes" element={<ClubClientsScreen />} />
           <Route
-            path="clientes/:clientId"
-            element={<ClubClientDetailScreen />}
-          />
+            element={
+              <RequirePermission permission={PERMISSION_CLUB_CLIENTS_READ} />
+            }
+          >
+            <Route path="clientes" element={<ClubClientsScreen />} />
+            <Route
+              path="clientes/:clientId"
+              element={<ClubClientDetailScreen />}
+            />
+          </Route>
         </Route>
         <Route path="jugadores" element={<Navigate to={ROUTES.club.clients} replace />} />
         <Route
@@ -169,6 +177,7 @@ const router = createBrowserRouter(
             }
           >
             <Route path="canchas" element={<ClubCourtsScreen />} />
+            <Route path="canchas/:courtId" element={<ClubCourtConfigScreen />} />
           </Route>
         </Route>
         <Route

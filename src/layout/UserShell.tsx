@@ -1,18 +1,29 @@
-import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   Building2,
   History,
   Home,
   LogOut,
   Medal,
+  Menu,
   Trophy,
   User,
   type LucideIcon,
 } from "lucide-react";
 import { useMockSession } from "@/app/MockSessionProvider";
 import Avatar from "@/components/Avatar";
-import { Button } from "@/components/ui/button";
-import { filterByFeature, type FeatureKey } from "@/config/features";
+import AccountDrawerMenu, {
+  AccountActionSections,
+  type AccountDrawerAction,
+} from "@/layout/AccountDrawerMenu";
+import { filterByFeature, isFeatureEnabled, type FeatureKey } from "@/config/features";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { ROUTES } from "@/router/routes";
 import { cn } from "@/lib/utils";
 
@@ -63,6 +74,8 @@ const gridColsClass: Record<number, string> = {
 
 export default function UserShell() {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const [moreOpen, setMoreOpen] = useState(false);
   const {
     isAuthenticated,
     player,
@@ -74,7 +87,12 @@ export default function UserShell() {
   const visibleItems = filterByFeature(items).filter(
     (item) => !item.authOnly || isAuthenticated,
   );
-  const colsClass = gridColsClass[visibleItems.length] ?? "grid-cols-5";
+  const browseItems = visibleItems.filter(
+    (item) => item.to !== ROUTES.player.profile,
+  );
+  const bottomCount = browseItems.length + (isAuthenticated ? 1 : 0);
+  const colsClass = gridColsClass[bottomCount] ?? "grid-cols-5";
+  const moreActive = moreOpen || pathname === ROUTES.player.profile;
   const displayName = isAuthenticated
     ? player?.displayName ?? "Jugador"
     : "Explorar";
@@ -88,6 +106,36 @@ export default function UserShell() {
     navigate(ROUTES.chooseMode);
   };
 
+  const accountActions = (placement: "sidebar" | "sheet"): AccountDrawerAction[] => [
+    ...(isFeatureEnabled("profile")
+      ? [
+          {
+            label: "Mi perfil",
+            icon: User,
+            group: "account" as const,
+            onSelect: () => navigate(ROUTES.player.profile),
+          },
+        ]
+      : []),
+    ...(hasAssociatedClub
+      ? [
+          {
+            label: "Ir a vista club",
+            icon: Building2,
+            group: "context" as const,
+            onSelect: goToClub,
+          },
+        ]
+      : []),
+    {
+      label: "Cerrar sesión",
+      icon: LogOut,
+      group: "session",
+      onSelect: logout,
+      testId: placement === "sidebar" ? "player-logout" : undefined,
+    },
+  ];
+
   return (
     <div className="min-h-svh bg-background text-foreground flex">
       {/* Sidebar jugador: light, distinto del navy del club */}
@@ -97,12 +145,12 @@ export default function UserShell() {
       >
         <div className="border-b border-border px-4 py-5">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Padel en juego
+            Easy padel
           </p>
           <h1 className="mt-1 text-xl font-semibold tracking-tight">Jugador</h1>
         </div>
         <nav className="space-y-1 p-3">
-          {visibleItems.map(({ to, label, icon: Icon, end }) => (
+          {browseItems.map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}
@@ -122,89 +170,49 @@ export default function UserShell() {
           ))}
         </nav>
         <div className="mt-auto space-y-2 border-t border-border p-3">
-          <div className="flex items-center gap-2.5 rounded-lg px-2 py-1.5">
-            <Avatar
-              name={displayName}
-              imageUrl={player?.avatarUrl}
-              size="sm"
-              alt={displayName}
-            />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">{displayName}</p>
-              <p className="text-xs text-muted-foreground">
-                {isAuthenticated ? "Cuenta" : "Sin sesión"}
-              </p>
-            </div>
-          </div>
-          {hasAssociatedClub ? (
-            <button
-              type="button"
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
-              onClick={goToClub}
-            >
-              Vista club
-            </button>
-          ) : null}
           {isAuthenticated ? (
-            <Button
-              type="button"
-              variant="ghost"
-              className="w-full justify-start gap-2 px-3 text-muted-foreground"
-              onClick={() => logout()}
-              data-testid="player-logout"
-            >
-              <LogOut className="size-4" />
-              Cerrar sesión
-            </Button>
+            <AccountDrawerMenu
+              displayName={displayName}
+              avatarUrl={player?.avatarUrl}
+              surface="player"
+              placement="sidebar"
+              actions={accountActions("sidebar")}
+              testId="player-account-menu"
+            />
           ) : (
-            <Link
-              to={ROUTES.auth.login}
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
-              data-testid="player-header-login"
-            >
-              Ingresar
-            </Link>
+            <>
+              <div className="flex items-center gap-2.5 rounded-lg px-2 py-1.5">
+                <Avatar name={displayName} size="sm" alt={displayName} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{displayName}</p>
+                  <p className="text-xs text-muted-foreground">Sin sesión</p>
+                </div>
+              </div>
+              <Link
+                to={ROUTES.auth.login}
+                className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
+                data-testid="player-header-login"
+              >
+                Ingresar
+              </Link>
+            </>
           )}
         </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-between gap-3 border-b border-border bg-card px-4 py-3 md:hidden">
-          <div className="min-w-0">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Padel en juego
-            </p>
-            <h1 className="truncate text-lg font-semibold tracking-tight">
-              {displayName}
-            </h1>
-          </div>
-          <div className="flex shrink-0 items-center gap-3 text-sm">
-            {isAuthenticated ? (
-              <button
-                type="button"
-                className="font-medium text-muted-foreground underline-offset-4 hover:underline"
-                onClick={() => logout()}
-              >
-                Cerrar sesión
-              </button>
-            ) : (
-              <Link
-                to={ROUTES.auth.login}
-                className="font-medium text-foreground underline-offset-4 hover:underline"
-              >
-                Ingresar
-              </Link>
-            )}
-            {hasAssociatedClub ? (
-              <button
-                type="button"
-                className="font-medium text-foreground underline-offset-4 hover:underline"
-                onClick={goToClub}
-              >
-                Vista club
-              </button>
-            ) : null}
-          </div>
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Easy padel
+          </p>
+          {isAuthenticated ? null : (
+            <Link
+              to={ROUTES.auth.login}
+              className="shrink-0 text-sm font-medium text-foreground underline-offset-4 hover:underline"
+            >
+              Ingresar
+            </Link>
+          )}
         </header>
 
         <main className="flex-1 overflow-auto pb-20 md:pb-0 md:p-6">
@@ -216,7 +224,7 @@ export default function UserShell() {
           className="fixed inset-x-0 bottom-0 border-t border-border bg-card/95 backdrop-blur md:hidden"
         >
           <ul className={cn("mx-auto grid max-w-lg", colsClass)}>
-            {visibleItems.map(({ to, label, icon: Icon, end }) => (
+            {browseItems.map(({ to, label, icon: Icon, end }) => (
               <li key={to}>
                 <NavLink
                   to={to}
@@ -246,8 +254,60 @@ export default function UserShell() {
                 </NavLink>
               </li>
             ))}
+            {isAuthenticated ? (
+              <li>
+                <button
+                  type="button"
+                  className={cn(
+                    "flex w-full flex-col items-center gap-0.5 py-1.5 text-[11px] transition-colors",
+                    moreActive
+                      ? "font-medium text-foreground"
+                      : "text-muted-foreground",
+                  )}
+                  aria-expanded={moreOpen}
+                  data-testid="player-more"
+                  onClick={() => setMoreOpen(true)}
+                >
+                  <span
+                    className={cn(
+                      "flex size-8 items-center justify-center rounded-lg",
+                      moreActive && "bg-primary text-primary-foreground",
+                    )}
+                  >
+                    <Menu className="size-5" />
+                  </span>
+                  Más
+                </button>
+              </li>
+            ) : null}
           </ul>
         </nav>
+        <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
+          <SheetContent side="bottom" className="rounded-t-2xl">
+            <SheetHeader>
+              <SheetTitle>Más</SheetTitle>
+            </SheetHeader>
+            <div className="px-3 pb-6">
+              <AccountActionSections
+                actions={accountActions("sheet")}
+                renderItem={(action) => (
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-sm hover:bg-muted"
+                    data-testid={action.testId}
+                    onClick={() => {
+                      setMoreOpen(false);
+                      action.onSelect();
+                    }}
+                  >
+                    <action.icon className="size-4 text-muted-foreground" />
+                    {action.label}
+                  </button>
+                )}
+              />
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
     </div>
   );

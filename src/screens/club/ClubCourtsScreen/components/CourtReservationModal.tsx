@@ -7,10 +7,8 @@ import type {
   Court,
   CourtAgendaEvent,
   CourtReservation,
-  IdentityMatch,
 } from "@/domain";
 import Api from "@/api/Api";
-import DuplicateIdentityDialog from "@/components/auth/DuplicateIdentityDialog";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
@@ -23,12 +21,9 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import ClientPickerField, {
-  emptyClientSlot,
-  isClientSlotReady,
-  type ClientSlotValue,
-  type ManualClientDraft,
-} from "./ClientPickerField";
+import { toastError, toastSuccess } from "@/lib/toast";
+import type { ReservationPlayer } from "@/modules/reservations";
+import ReservationPlayerField from "./ReservationPlayerField";
 
 type ModalMode = "view" | "edit" | "create";
 
@@ -44,6 +39,8 @@ interface CourtReservationModalProps {
   initialCourtId: string | null;
   mode: ModalMode;
   presetStartsAt?: string | null;
+  initialDate?: string | null;
+  preselectSlot?: boolean;
   event?: CourtAgendaEvent | null;
   reservation?: CourtReservation | null;
   client?: Client | null;
@@ -69,25 +66,6 @@ function formatMoney(value: number | null | undefined): string {
   }).format(value);
 }
 
-/** Snap to closest free turn when the calendar hour is not on the slot grid. */
-function nearestAvailableSlot(
-  slots: readonly { startsAt: string }[],
-  targetIso: string,
-): string | null {
-  const target = dayjs(targetIso).valueOf();
-  if (!Number.isFinite(target) || slots.length === 0) return null;
-  let best: string | null = null;
-  let bestDist = Number.POSITIVE_INFINITY;
-  for (const slot of slots) {
-    const dist = Math.abs(dayjs(slot.startsAt).valueOf() - target);
-    if (dist < bestDist) {
-      bestDist = dist;
-      best = slot.startsAt;
-    }
-  }
-  return best;
-}
-
 /** Dígitos para wa.me; null si no hay un teléfono usable. */
 function whatsappDigits(phone: string | null | undefined): string | null {
   if (!phone?.trim()) return null;
@@ -108,65 +86,6 @@ function WhatsAppIcon({ className }: { className?: string }) {
   );
 }
 
-async function createClientFromDraft(
-  clubId: string,
-  draft: ManualClientDraft,
-  link?: { playerId?: string | null; userId?: string | null },
-): Promise<Client> {
-  return Api.TournamentOpsService().createClient({
-    clubId,
-    firstName: draft.firstName,
-    lastName: draft.lastName,
-    phone: draft.phone || null,
-    email: draft.email || null,
-    playerId: link?.playerId ?? null,
-    userId: link?.userId ?? null,
-  });
-}
-
-async function resolveClientIdFromMatch(
-  clubId: string,
-  draft: ManualClientDraft,
-  match: IdentityMatch,
-): Promise<string> {
-  if (match.clientId) return match.clientId;
-  if (match.playerId) {
-    const created = await createClientFromDraft(clubId, draft, {
-      playerId: match.playerId,
-      userId: match.userId,
-    });
-    return created.id;
-  }
-  if (match.userId) {
-    const created = await createClientFromDraft(
-      clubId,
-      {
-        ...draft,
-        firstName: match.firstName || draft.firstName,
-        lastName: match.lastName || draft.lastName,
-        email: match.email ?? draft.email,
-        phone: match.phone ?? draft.phone,
-      },
-      { userId: match.userId, playerId: match.playerId },
-    );
-    return created.id;
-  }
-  const created = await createClientFromDraft(clubId, draft);
-  return created.id;
-}
-
-async function resolveClientId(
-  clubId: string,
-  slot: ClientSlotValue,
-): Promise<string> {
-  if (slot.mode === "search") {
-    if (!slot.client) throw new Error("Elegí un cliente");
-    return slot.client.id;
-  }
-  const created = await createClientFromDraft(clubId, slot.draft);
-  return created.id;
-}
-
 function toDateIso(value: string | null | undefined): string {
   const d = dayjs(value ?? undefined);
   return d.isValid() ? d.format("YYYY-MM-DD") : dayjs().format("YYYY-MM-DD");
@@ -179,6 +98,8 @@ export default function CourtReservationModal({
   initialCourtId,
   mode: initialMode,
   presetStartsAt,
+  initialDate = null,
+  preselectSlot = false,
   event,
   reservation,
   client,
@@ -191,20 +112,11 @@ export default function CourtReservationModal({
   const [selectedCourtId, setSelectedCourtId] = useState<string | null>(
     initialCourtId,
   );
-  const [clientSlot, setClientSlot] = useState<ClientSlotValue>(() =>
-    emptyClientSlot(),
-  );
-  const [dupOpen, setDupOpen] = useState(false);
-  const [dupMatches, setDupMatches] = useState<IdentityMatch[]>([]);
-  const [allowCreateNew, setAllowCreateNew] = useState(false);
-  const [dateIso, setDateIso] = useState(() => toDateIso(presetStartsAt));
+  const [player, setPlayer] = useState<ReservationPlayer | null>(null);
+  const [pinSlot, setPinSlot] = useState(false);
+  const [dateIso, setDateIso] = useState(() => initialDate ?? toDateIso(presetStartsAt));
   const [selectedStartsAt, setSelectedStartsAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [quote, setQuote] = useState<{
-    price: number;
-    label: string | null;
-    endsAt: string;
-  } | null>(null);
   const [busy, setBusy] = useState(false);
 
   const court =
@@ -223,34 +135,42 @@ export default function CourtReservationModal({
     setMode(initialMode);
     setError(null);
     setBusy(false);
-    setDupOpen(false);
-    setDupMatches([]);
-    setAllowCreateNew(false);
     setSelectedCourtId(initialCourtId);
 
     if (initialMode === "create") {
-      const start = presetStartsAt ?? undefined;
-      setClientSlot(emptyClientSlot());
-      setDateIso(toDateIso(start));
-      setSelectedStartsAt(start ? dayjs(start).toISOString() : null);
+      setPlayer(null);
+      setDateIso(initialDate ?? toDateIso(presetStartsAt));
+      setPinSlot(preselectSlot && Boolean(presetStartsAt));
+      setSelectedStartsAt(null);
       return;
     }
 
     const startIso = reservation?.startsAt ?? event?.startAt ?? presetStartsAt;
     setDateIso(toDateIso(startIso));
     setSelectedStartsAt(startIso ? dayjs(startIso).toISOString() : null);
-    setClientSlot(client ? { mode: "search", client } : emptyClientSlot());
+    if (reservation?.bookedByPlayerId) {
+      setPlayer({
+        id: reservation.bookedByPlayerId,
+        firstName: reservation.playerFirstName ?? "",
+        lastName: reservation.playerLastName ?? "",
+        phone: null,
+      });
+    } else {
+      setPlayer(null);
+    }
   }, [
     open,
     initialMode,
     initialCourtId,
     presetStartsAt,
+    initialDate,
+    preselectSlot,
     reservation,
     event,
     client,
   ]);
 
-  const { data: availableSlots = [], isFetching: loadingSlots } = useQuery({
+  const { data: slotList, isFetching: loadingSlots, isError: slotsError } = useQuery({
     queryKey: [
       "court-available-slots",
       selectedCourtId,
@@ -258,59 +178,50 @@ export default function CourtReservationModal({
       ignoreReservationId ?? null,
     ],
     queryFn: () =>
-      Api.TournamentOpsService().listAvailableCourtSlots(
-        selectedCourtId!,
+      Api.ReservationService().listSlots(
         dateIso,
-        { ignoreReservationId },
+        selectedCourtId!,
+        ignoreReservationId,
       ),
     enabled: open && !readOnly && Boolean(selectedCourtId) && Boolean(dateIso),
+    refetchOnMount: "always",
   });
+  const availableSlots = slotList?.slots ?? [];
+  const slotMessage = slotList?.message ?? null;
+  const openedDate = initialDate ?? (presetStartsAt ? toDateIso(presetStartsAt) : null);
 
   useEffect(() => {
-    if (!open || readOnly || loadingSlots || !selectedCourtId) return;
-    if (!selectedStartsAt) {
-      if (availableSlots.length > 0 && presetStartsAt) {
-        const nearest = nearestAvailableSlot(availableSlots, presetStartsAt);
-        if (nearest) setSelectedStartsAt(nearest);
-      }
-      return;
-    }
-    const stillAvailable = availableSlots.some(
-      (slot) =>
-        dayjs(slot.startsAt).valueOf() === dayjs(selectedStartsAt).valueOf(),
+    if (!open || readOnly || loadingSlots || !pinSlot || !presetStartsAt) return;
+    if (openedDate && dateIso !== openedDate) return;
+    const turno = dayjs(presetStartsAt).format("HH:mm");
+    const match = availableSlots.find(
+      (slot) => dayjs(slot.startsAt).format("HH:mm") === turno,
     );
-    if (!stillAvailable) {
-      const nearest = nearestAvailableSlot(availableSlots, selectedStartsAt);
-      setSelectedStartsAt(nearest);
-    }
+    setSelectedStartsAt(match?.startsAt ?? null);
   }, [
     open,
     readOnly,
     loadingSlots,
-    availableSlots,
-    selectedStartsAt,
+    pinSlot,
     presetStartsAt,
-    selectedCourtId,
+    openedDate,
+    dateIso,
+    availableSlots,
   ]);
 
-  useEffect(() => {
-    if (!open || !selectedStartsAt || !selectedCourtId || isTournament) {
-      setQuote(null);
-      return;
-    }
-    let cancelled = false;
-    void Api.TournamentOpsService()
-      .quoteCourtSlot(selectedCourtId, selectedStartsAt)
-      .then((result) => {
-        if (!cancelled) setQuote(result);
-      })
-      .catch(() => {
-        if (!cancelled) setQuote(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, selectedStartsAt, selectedCourtId, isTournament]);
+  const selectedSlot =
+    availableSlots.find(
+      (slot) =>
+        selectedStartsAt != null &&
+        dayjs(slot.startsAt).format("HH:mm") === dayjs(selectedStartsAt).format("HH:mm"),
+    ) ?? null;
+  const quote = selectedSlot
+    ? {
+        price: selectedSlot.price,
+        label: selectedSlot.priceLabel,
+        endsAt: selectedSlot.endsAt,
+      }
+    : null;
 
   const title =
     mode === "create"
@@ -338,7 +249,7 @@ export default function CourtReservationModal({
   const canSubmit =
     !readOnly &&
     Boolean(selectedCourtId) &&
-    isClientSlotReady(clientSlot) &&
+    Boolean(player) &&
     Boolean(selectedStartsAt) &&
     !busy &&
     !isSaving;
@@ -351,103 +262,57 @@ export default function CourtReservationModal({
       onSaved();
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo guardar");
+      const message = err instanceof Error ? err.message : "No se pudo guardar";
+      setError(message);
+      toastError("No se pudo guardar", message);
     } finally {
       setBusy(false);
     }
   };
 
-  const persistReservation = async (clientId: string) => {
+  const persistReservation = async () => {
     if (!selectedCourtId) throw new Error("Elegí una cancha");
     if (!selectedStartsAt) throw new Error("Elegí un turno");
+    if (!player) throw new Error("Elegí un jugador");
     if (mode === "create" || !reservation) {
-      await Api.TournamentOpsService().createCourtReservation({
-        clubId,
+      await Api.ReservationService().create({
         courtId: selectedCourtId,
-        clientId,
+        bookedByPlayerId: player.id,
         startsAt: selectedStartsAt,
-        price: quote?.price ?? null,
       });
       return;
     }
-    await Api.TournamentOpsService().updateCourtReservation(reservation.id, {
-      clientId,
+    await Api.ReservationService().update(reservation.id, {
+      bookedByPlayerId: player.id,
       startsAt: selectedStartsAt,
-      price: quote?.price ?? reservation.price,
     });
   };
 
   const handleSave = () =>
     run(async () => {
-      if (!selectedCourtId) throw new Error("Elegí una cancha");
-      if (!selectedStartsAt) throw new Error("Elegí un turno");
-
-      if (clientSlot.mode === "manual" && !allowCreateNew) {
-        const draft = clientSlot.draft;
-        const hasContact = Boolean(draft.email.trim() || draft.phone.trim());
-        if (hasContact) {
-          const { matches } =
-            await Api.TournamentOpsService().findIdentityMatches({
-              clubId,
-              email: draft.email || null,
-              phone: draft.phone || null,
-            });
-          if (matches.length > 0) {
-            setDupMatches(matches);
-            setDupOpen(true);
-            return;
-          }
-        }
-      }
-
-      const clientId = await resolveClientId(clubId, clientSlot);
-      setAllowCreateNew(false);
-      await persistReservation(clientId);
+      await persistReservation();
+      toastSuccess(mode === "create" ? "Reserva creada" : "Reserva actualizada");
     });
-
-  const handleUseIdentityMatch = (match: IdentityMatch) =>
-    void run(async () => {
-      if (clientSlot.mode !== "manual") return;
-      const clientId = await resolveClientIdFromMatch(
-        clubId,
-        clientSlot.draft,
-        match,
-      );
-      setDupOpen(false);
-      setAllowCreateNew(false);
-      await persistReservation(clientId);
-    });
-
-  const handleCreateNewDespiteMatch = () => {
-    setDupOpen(false);
-    setAllowCreateNew(true);
-    void run(async () => {
-      const clientId = await resolveClientId(clubId, clientSlot);
-      setAllowCreateNew(false);
-      await persistReservation(clientId);
-    });
-  };
 
   const handleCancelReservation = () => {
     if (!reservation) return;
     void run(async () => {
-      await Api.TournamentOpsService().cancelCourtReservation(reservation.id);
+      await Api.ReservationService().cancel(reservation.id);
+      toastSuccess("Reserva cancelada");
     });
   };
 
   const handleComplete = () => {
     if (!reservation) return;
     void run(async () => {
-      await Api.TournamentOpsService().updateCourtReservation(reservation.id, {
-        status: "completed",
-      });
+      await Api.ReservationService().complete(reservation.id);
+      toastSuccess("Reserva completada");
     });
   };
 
   const handleCourtChange = (nextCourtId: string) => {
     setSelectedCourtId(nextCourtId || null);
     setSelectedStartsAt(null);
-    setQuote(null);
     setError(null);
   };
 
@@ -508,7 +373,9 @@ export default function CourtReservationModal({
                     <div>
                       <dt className="text-muted-foreground">Cliente</dt>
                       <dd className="font-medium">
-                        {client?.displayName ?? event?.title ?? "—"}
+                        {reservation?.playerFirstName
+                          ? `${reservation.playerFirstName} ${reservation.playerLastName ?? ""}`.trim()
+                          : (client?.displayName ?? event?.title ?? "—")}
                       </dd>
                     </div>
                     <div>
@@ -571,11 +438,7 @@ export default function CourtReservationModal({
                   </select>
                 </div>
 
-                <ClientPickerField
-                  clubId={clubId}
-                  value={clientSlot}
-                  onChange={setClientSlot}
-                />
+                <ReservationPlayerField value={player} onChange={setPlayer} />
 
                 <div className="space-y-1.5">
                   <Label htmlFor="reservation-date">Fecha</Label>
@@ -586,6 +449,7 @@ export default function CourtReservationModal({
                       if (!next) return;
                       setDateIso(next);
                       setSelectedStartsAt(null);
+                      setPinSlot(false);
                     }}
                   />
                 </div>
@@ -600,17 +464,23 @@ export default function CourtReservationModal({
                     <p className="text-sm text-muted-foreground">
                       Cargando turnos…
                     </p>
+                  ) : slotsError ? (
+                    <p className="text-sm text-destructive">
+                      No se pudieron cargar los turnos.
+                    </p>
+                  ) : slotMessage ? (
+                    <p className="text-sm text-muted-foreground">{slotMessage}</p>
                   ) : availableSlots.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
-                      No hay turnos libres este día (cerrado u ocupados).
+                      No hay turnos libres este día.
                     </p>
                   ) : (
                     <div className="flex flex-wrap gap-2">
                       {availableSlots.map((slot) => {
                         const selected =
                           selectedStartsAt != null &&
-                          dayjs(slot.startsAt).valueOf() ===
-                            dayjs(selectedStartsAt).valueOf();
+                          dayjs(slot.startsAt).format("HH:mm") ===
+                            dayjs(selectedStartsAt).format("HH:mm");
                         return (
                           <button
                             key={slot.startsAt}
@@ -631,26 +501,26 @@ export default function CourtReservationModal({
                   )}
                 </div>
 
-                <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 text-sm">
-                  <p>
-                    Fin estimado:{" "}
-                    <span className="font-medium">
-                      {quote ? dayjs(quote.endsAt).format("HH:mm") : "—"}
-                    </span>
-                  </p>
-                  <p className="mt-1">
-                    Precio:{" "}
-                    <span className="font-medium">
-                      {formatMoney(quote?.price ?? null)}
-                    </span>
-                    {quote?.label ? (
-                      <span className="text-muted-foreground">
-                        {" "}
-                        · {quote.label}
+                {selectedSlot ? (
+                  <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 text-sm">
+                    <p>
+                      Fin estimado:{" "}
+                      <span className="font-medium">
+                        {dayjs(selectedSlot.endsAt).format("HH:mm")}
                       </span>
-                    ) : null}
-                  </p>
-                </div>
+                    </p>
+                    <p className="mt-1">
+                      Precio:{" "}
+                      <span className="font-medium">{formatMoney(selectedSlot.price)}</span>
+                      {selectedSlot.priceLabel ? (
+                        <span className="text-muted-foreground">
+                          {" "}
+                          · {selectedSlot.priceLabel}
+                        </span>
+                      ) : null}
+                    </p>
+                  </div>
+                ) : null}
               </div>
             )}
 
@@ -717,13 +587,6 @@ export default function CourtReservationModal({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <DuplicateIdentityDialog
-        open={dupOpen}
-        matches={dupMatches}
-        onOpenChange={setDupOpen}
-        onUseMatch={(match) => void handleUseIdentityMatch(match)}
-        onCreateNew={handleCreateNewDespiteMatch}
-      />
     </>
   );
 }

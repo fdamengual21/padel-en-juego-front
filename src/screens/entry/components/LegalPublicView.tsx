@@ -27,7 +27,7 @@ export default function LegalPublicView({ documentType }: LegalPublicViewProps) 
   return (
     <div className="min-h-svh bg-background">
       <div className="mx-auto w-full max-w-2xl space-y-6 px-6 py-10">
-        <p className="text-sm text-muted-foreground">Padel en juego</p>
+        <p className="text-sm text-muted-foreground">Easy padel</p>
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Cargando documento…</p>
         ) : null}

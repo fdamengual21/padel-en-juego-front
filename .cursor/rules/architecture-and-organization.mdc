@@ -12,6 +12,7 @@ src/api/Api.ts            # fachada lazy (inyecta axiosInstance a repositories H
 src/config/axiosInstance.ts  # axios + interceptor JWT desde zustand
 src/modules/              # repositories + services
 src/stores/               # zustand persist (auth tokens; /me en memoria)
+src/utils/                # helpers reutilizables sin UI (fachada en index.ts)
 src/authorization/        # permissionCodes, hasAccess, usePermissions
 src/layout/               # shells de modo (ClubShell, UserShell)
 src/screens/
@@ -33,6 +34,21 @@ src/app/                  # UserProvider (login + /me) y MockSessionProvider (gu
 - Shells en `src/layout/` (nav lateral club, bottom nav users).
 - Rutas URL en espanol: jugador en `/` (`/torneos`, `/perfil`); club en `/club`; auth en `/ingresar`. El codigo de carpetas esta en ingles (`users`). `/player` redirige al jugador en raiz.
 
+## Fachada `index.ts`
+
+Un `index.ts` es la API pública de un módulo. Quien importa desde afuera usa esa carpeta (`@/utils`, `@/modules/clubs`), no un archivo interno.
+
+| Carpeta | `index.ts` |
+|---|---|
+| `src/modules/<nombre>/`, `src/utils/`, `src/domain/`, `src/authorization/`, `src/components/<dominio>/` (`Form/`, `guards/`, `tournaments/`) | Sí. Lista solo lo público. |
+| `src/screens/<modo>/<ScreenName>/` | Sí, y solo `export { default } from "./ScreenName"`. |
+| `components/` de una screen, un archivo usado por un solo padre | No. Import relativo al archivo. |
+
+- Named exports, símbolo por símbolo. No `export *`.
+- Helpers internos (no reexportados) no salen del archivo.
+- No anidar un `index.ts` en cada subcarpeta si no hay otra frontera. Un index en la raíz del módulo alcanza.
+- `src/modules/<nombre>/types/index.ts` sí: es la fachada de tipos de ese módulo, reexportada por el `index.ts` del módulo.
+
 ## Screens y componentes
 
 - Cada screen: `src/screens/<modo>/<ScreenName>/` con `ScreenName.tsx` + `index.ts` (reexport default).
@@ -50,7 +66,7 @@ UI (screens/layout/components) → Api.XxxService() → Service → Repository �
 
 - Auth, geography, sexes, legal, users y catálogo público de clubes: HTTP real via `axiosInstance` (`/api/auth/*`, `/api/geography/*`, `/api/sexes`, `/api/legal/current`, `GET`/`PATCH /api/users/me`, `GET /api/public/clubs`). El interceptor pone `Authorization` desde zustand y `X-Club-Id` **solo** si el usuario eligió un club (`isClubMode`) y ese id está en `clubs[]` de `/me`.
 - Tras login o confirmar email, `AuthService` exige token+refresh+expires, `UserProvider` los guarda en zustand y pide `/me` (no usa el `user` del login). `UserService.me()` no llama si no hay JWT. Al refrescar, si hay JWT **siempre** se vuelve a pedir `/me`. El persist de `padel-en-juego.auth` guarda tokens + club elegido, **no** el DTO de `/me`. Logout limpia persist, mock-session y la cache de queries.
-- Settings de club: `GET/PATCH /api/club/settings` e imagenes `POST/DELETE /api/club/settings/avatar|cover` (la API valida staff + permiso). Canchas: `GET/POST /api/club/courts`, `GET/PATCH/DELETE /api/club/courts/{id}` y foto `POST/DELETE /api/club/courts/{id}/photo` (`club.courts.read` / `club.courts.write`). Torneos y reservas siguen stub.
+- Settings de club: `GET/PATCH /api/club/settings` e imagenes `POST/DELETE /api/club/settings/avatar|cover` (la API valida staff + permiso). Contexto operativo (nombre y horario, staff activo, sin `club.settings.read`): `GET /api/club/context`, en memoria en `useClubSessionStore` (se limpia al salir del club). Canchas: `GET/POST /api/club/courts`, `GET/PATCH/DELETE /api/club/courts/{id}` y foto `POST/DELETE /api/club/courts/{id}/photo` (`club.courts.read` / `club.courts.write`). Torneos y reservas siguen stub.
 - Permisos UI: `src/authorization/` + `PermissionsGuard` / `usePermissions()` contra `scopedPermissions` de `/me`. No recalcular por rol en el cliente. Ver **permissions-and-guards.mdc**.
 - Grupos/partidos/bracket: **automaticos** al sincronizar inscripciones (sin botones Generar en UI).
 - Horario manual: `match.scheduleManual = true` (AutoMatch no lo pisa).

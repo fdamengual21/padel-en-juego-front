@@ -8,6 +8,7 @@ import { resolveClubHeaderId } from "@/modules/auth/clubContext";
 import { useAuthStore } from "@/stores/authStore";
 import type {
   Club,
+  ClubContext,
   ClubSettings,
   PublicClubListItem,
   PublicClubListQuery,
@@ -18,6 +19,7 @@ import type {
 export interface IClubRepository {
   list(): Promise<Club[]>;
   getById(id: string): Promise<Club | null>;
+  getContext(): Promise<ClubContext>;
   getSettings(): Promise<ClubSettings>;
   updateSettings(payload: UpdateClubSettingsInput): Promise<ClubSettings>;
   uploadAvatar(file: File): Promise<ClubSettings>;
@@ -94,6 +96,17 @@ function normalizePublicClubPage(
   return { items, page, pageSize, totalItems, totalPages };
 }
 
+function normalizeClubContext(raw: Record<string, unknown>): ClubContext {
+  return {
+    id: asString(raw.id),
+    name: asString(raw.name),
+    isActive: raw.isActive === true,
+    openTime: asHour(raw.openTime),
+    closeTime: asHour(raw.closeTime),
+    openDays: asOpenDays(raw.openDays),
+  };
+}
+
 function normalizeClubSettings(raw: Record<string, unknown>): ClubSettings {
   return {
     id: asString(raw.id),
@@ -129,6 +142,14 @@ export class ClubRepository implements IClubRepository {
 
   async getById(_id: string): Promise<Club | null> {
     return null;
+  }
+
+  async getContext(): Promise<ClubContext> {
+    this.assertClubHeader();
+    const response = await this.axiosInstance.get<
+      ApiEnvelope<Record<string, unknown>>
+    >("/club/context");
+    return normalizeClubContext(readData(response) ?? {});
   }
 
   async getSettings(): Promise<ClubSettings> {

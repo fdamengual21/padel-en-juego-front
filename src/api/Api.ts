@@ -2,6 +2,8 @@ import axiosInstance from "@/config/axiosInstance";
 import { AuthRepository, AuthService } from '@/modules/auth'
 import { ClubRepository, ClubService } from '@/modules/clubs'
 import { CourtRepository, CourtService } from '@/modules/courts'
+import { ClientRepository, ClientService } from '@/modules/clients'
+import { ReservationRepository, ReservationService } from '@/modules/reservations'
 import { GeographyRepository, GeographyService } from '@/modules/geography'
 import { LegalRepository, LegalService } from '@/modules/legal'
 import { SexRepository, SexService } from '@/modules/sexes'
@@ -11,6 +13,8 @@ import { UserRepository, UserService } from '@/modules/users'
 
 let clubService: ClubService | null = null
 let courtService: CourtService | null = null
+let clientService: ClientService | null = null
+let reservationService: ReservationService | null = null
 let tournamentService: TournamentService | null = null
 let tournamentOpsService: TournamentOpsService | null = null
 let authService: AuthService | null = null
@@ -27,6 +31,16 @@ const Api = {
   CourtService() {
     if (!courtService) courtService = new CourtService(new CourtRepository(axiosInstance))
     return courtService
+  },
+  ClientService() {
+    if (!clientService) clientService = new ClientService(new ClientRepository(axiosInstance))
+    return clientService
+  },
+  ReservationService() {
+    if (!reservationService) {
+      reservationService = new ReservationService(new ReservationRepository(axiosInstance))
+    }
+    return reservationService
   },
   TournamentService() {
     if (!tournamentService) {

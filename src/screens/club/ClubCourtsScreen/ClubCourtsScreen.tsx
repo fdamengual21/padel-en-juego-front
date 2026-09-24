@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs, { type Dayjs } from "dayjs";
 import "dayjs/locale/es";
@@ -11,7 +12,7 @@ import type {
   CourtDaySummary,
   CourtReservation,
 } from "@/domain";
-import { isoWeekdayFromDate } from "@/domain";
+import { COURT_STATUS_LABELS, isoWeekdayFromDate } from "@/domain";
 import Api from "@/api/Api";
 import { useMockSession } from "@/app/MockSessionProvider";
 import { useAuthStore } from "@/stores/authStore";
@@ -26,16 +27,23 @@ import {
   parseClockMinutes,
 } from "@/lib/clubSchedule";
 import { cn } from "@/lib/utils";
+import {
+  isClubOperatingOnDate,
+  listOperatingSlots,
+  resolveClubOpenStatus,
+} from "@/utils";
+import type { ClubSession } from "@/stores/clubSessionStore";
 import CourtAgendaGrid from "./components/CourtAgendaGrid";
 import CourtAgendaToolbar, {
   type CourtAgendaToolbarMode,
 } from "./components/CourtAgendaToolbar";
-import CourtConfigDialog from "./components/CourtConfigDialog";
 import CourtReservationModal from "./components/CourtReservationModal";
 import CourtSummaryCard from "./components/CourtSummaryCard";
 import CourtsOverviewCard from "./components/CourtsOverviewCard";
 import CreateCourtDialog from "./components/CreateCourtDialog";
 import { Plus } from "lucide-react";
+import { useClubSession } from "@/hooks/useClubSession";
+import { ROUTES } from "@/router/routes";
 import { usePermissions } from "@/authorization";
 import {
   PERMISSION_CLUB_COURTS_WRITE,
@@ -86,40 +94,86 @@ function priceBandsForDate(court: Court, date: string) {
     }));
 }
 
-function daySummaryFromCourt(court: Court, date: string): CourtDaySummary {
+function scheduleOf(session: ClubSession | null) {
+  return {
+    openTime: session?.openTime ?? null,
+    closeTime: session?.closeTime ?? null,
+    openDays: session?.openDays ?? [],
+  };
+}
+
+function slotsMessage(
+  court: Court,
+  date: string,
+  session: ClubSession | null,
+  slotCount: number,
+): string {
+  if (!session) return "Cargando horario…";
+  if (court.status === "inactive") return "Cancha inactiva.";
+  if (court.status === "comingSoon") return "Próximamente.";
+  if (court.status === "maintenance") return "En mantenimiento.";
+  if (!session.openTime || !session.closeTime || session.openDays.length === 0) {
+    return "Sin horario del club.";
+  }
+  if (!isClubOperatingOnDate({ ...scheduleOf(session), date })) {
+    return "El club no abre este día.";
+  }
+  if (slotCount === 0) return "Sin turnos en este horario.";
+  return "";
+}
+
+function daySummaryFromCourt(
+  court: Court,
+  date: string,
+  session: ClubSession | null,
+): CourtDaySummary {
   const priceBands = priceBandsForDate(court, date);
+  const schedule = scheduleOf(session);
+  const availableSlots =
+    session && court.status === "active"
+      ? listOperatingSlots({
+          ...schedule,
+          date,
+          slotDurationMinutes: court.slotDurationMinutes,
+        })
+      : [];
+  const clubOpen =
+    session != null &&
+    resolveClubOpenStatus({ ...schedule, at: new Date() }) === "open";
   return {
     date,
-    totalSlots: 0,
+    totalSlots: availableSlots.length,
     occupiedSlots: 0,
-    freeSlots: 0,
-    nextFreeAt: null,
+    freeSlots: availableSlots.length,
+    nextFreeAt: availableSlots[0]?.startsAt ?? null,
     minPrice: priceBands.length
       ? Math.min(court.basePrice, ...priceBands.map((band) => band.price))
       : court.basePrice,
-    message: "",
+    message: slotsMessage(court, date, session, availableSlots.length),
     priceBands,
-    availableSlots: [],
-    liveStatus: "closed",
+    availableSlots,
+    liveStatus: clubOpen ? "available" : "closed",
   };
 }
 
 function overviewFromCourts(
   courts: Court[],
   date: string,
+  session: ClubSession | null,
 ): CourtDayOverviewItem[] {
   return courts.map((court) => {
-    const priceBands = priceBandsForDate(court, date);
+    const summary = daySummaryFromCourt(court, date, session);
     return {
       court,
       date,
-      liveStatus: "closed",
-      freeSlots: 0,
-      totalSlots: 0,
-      nextFreeAt: null,
-      minPrice: court.basePrice,
-      priceBands,
-      availableSlots: [],
+      liveStatus: summary.liveStatus,
+      freeSlots: summary.freeSlots,
+      totalSlots: summary.totalSlots,
+      nextFreeAt: summary.nextFreeAt,
+      minPrice: summary.minPrice,
+      priceBands: summary.priceBands,
+      availableSlots: summary.availableSlots,
+      message: summary.message,
     };
   });
 }
@@ -130,24 +184,28 @@ interface ReservationModalState {
   reservation: CourtReservation | null;
   client: Client | null;
   presetStartsAt: string | null;
+  /** Fecha de la jornada que se está viendo. */
+  initialDate: string | null;
+  /** True solo si se abrió desde un chip de turno. */
+  preselectSlot: boolean;
   courtId: string | null;
 }
 
 export default function ClubCourtsScreen() {
+  const { session: clubSession } = useClubSession();
   const { clubId } = useMockSession();
   const clubName = useAuthStore(
     (state) =>
       state.user?.clubs.find((club) => club.id === clubId)?.name ?? "Club",
   );
   const { can } = usePermissions();
-  const canWriteCourts = can(PERMISSION_CLUB_COURTS_WRITE);
+  const navigate = useNavigate();
   const canWriteReservations = can(PERMISSION_CLUB_RESERVATIONS_WRITE);
   const queryClient = useQueryClient();
   const [selectedCourtId, setSelectedCourtId] = useState<string | null>(null);
   const [headerView, setHeaderView] = useState<CourtsHeaderView>("overview");
   const [mode, setMode] = useState<CourtAgendaToolbarMode>("week");
   const [cursorDate, setCursorDate] = useState<Dayjs>(() => dayjs());
-  const [configOpen, setConfigOpen] = useState(false);
   const [createCourtOpen, setCreateCourtOpen] = useState(false);
   const [reservationModal, setReservationModal] =
     useState<ReservationModalState | null>(null);
@@ -160,21 +218,16 @@ export default function ClubCourtsScreen() {
     enabled: Boolean(clubId),
   });
 
-  const settingsQuery = useQuery({
-    queryKey: ["club-settings", clubId],
-    queryFn: () => Api.ClubService().getSettings(),
-    enabled: Boolean(clubId),
-    retry: false,
-  });
+  const courts = courtsQuery.data ?? [];
 
   const scheduleTailMinutes = useMemo(() => {
-    const openTime = settingsQuery.data?.openTime;
-    const closeTime = settingsQuery.data?.closeTime;
+    const openTime = clubSession?.openTime;
+    const closeTime = clubSession?.closeTime;
     if (!openTime || !closeTime || !clubClosesNextDay(openTime, closeTime)) {
       return 0;
     }
     return parseClockMinutes(closeTime) ?? 0;
-  }, [settingsQuery.data]);
+  }, [clubSession]);
 
   const range = useMemo(
     () =>
@@ -184,7 +237,6 @@ export default function ClubCourtsScreen() {
     [mode, cursorDate, scheduleTailMinutes],
   );
 
-  const courts = courtsQuery.data ?? [];
   const activeCourtId = selectedCourtId ?? courts[0]?.id ?? null;
 
   const boardQuery = useQuery({
@@ -245,17 +297,16 @@ export default function ClubCourtsScreen() {
   }, [multiBoard?.events, multiBoard?.courts, courts]);
 
   const openHours = useMemo(() => {
-    const fromSettings = settingsQuery.data;
     const openTime =
-      fromSettings?.openTime ||
+      clubSession?.openTime ||
       (headerView === "overview" ? multiBoard?.openTime : board?.club.openTime) ||
       null;
     const closeTime =
-      fromSettings?.closeTime ||
+      clubSession?.closeTime ||
       (headerView === "overview" ? multiBoard?.closeTime : board?.club.closeTime) ||
       null;
-    const openDays = fromSettings?.openDays?.length
-      ? fromSettings.openDays
+    const openDays = clubSession?.openDays?.length
+      ? clubSession.openDays
       : (board?.club.openDays ?? []);
     if (!openTime || !closeTime) {
       return {
@@ -280,7 +331,7 @@ export default function ClubCourtsScreen() {
         openDays,
       },
     };
-  }, [headerView, multiBoard, board, settingsQuery.data]);
+  }, [headerView, multiBoard, board, clubSession]);
 
   const eventsById = useMemo(() => {
     const map = new Map<string, CourtAgendaEvent>();
@@ -298,25 +349,28 @@ export default function ClubCourtsScreen() {
     void queryClient.invalidateQueries({ queryKey: ["court-agenda-board"] });
     void queryClient.invalidateQueries({ queryKey: ["courts-agenda-board"] });
     void queryClient.invalidateQueries({ queryKey: ["courts-day-overview"] });
+    void queryClient.invalidateQueries({ queryKey: ["court-reservations"] });
+    void queryClient.invalidateQueries({ queryKey: ["court-slots"] });
     void queryClient.invalidateQueries({ queryKey: ["courts", clubId] });
   };
 
-  const openCreate = (targetCourtId: string | null, day: Dayjs, hour: number) => {
+  const openCreate = (targetCourtId: string | null, day: Dayjs) => {
     if (!canWriteReservations) return;
-    if (targetCourtId) setSelectedCourtId(targetCourtId);
-    const startsAt = day
-      .startOf("day")
-      .add(hour, "hour")
-      .second(0)
-      .millisecond(0)
-      .toISOString();
+    const courtId =
+      targetCourtId ??
+      courts.find((court) => court.status === "active")?.id ??
+      courts[0]?.id ??
+      null;
+    if (courtId) setSelectedCourtId(courtId);
     setReservationModal({
       mode: "create",
       event: null,
       reservation: null,
       client: null,
-      presetStartsAt: startsAt,
-      courtId: targetCourtId,
+      presetStartsAt: null,
+      initialDate: day.format("YYYY-MM-DD"),
+      preselectSlot: false,
+      courtId,
     });
   };
 
@@ -333,6 +387,8 @@ export default function ClubCourtsScreen() {
         reservation: null,
         client: null,
         presetStartsAt: null,
+        initialDate: null,
+        preselectSlot: false,
         courtId,
       });
       return;
@@ -363,13 +419,53 @@ export default function ClubCourtsScreen() {
       reservation,
       client,
       presetStartsAt: null,
+      initialDate: null,
+      preselectSlot: false,
       courtId,
     });
   };
 
-  const clubView = clubViewFromSettings(clubId, clubName, settingsQuery.data);
+  const clubView = clubViewFromSettings(clubId, clubName, clubSession
+    ? {
+        name: clubSession.name,
+        isActive: clubSession.isActive,
+        openTime: clubSession.openTime,
+        closeTime: clubSession.closeTime,
+        openDays: clubSession.openDays,
+      }
+    : undefined);
   const suggestedCourtName = `Cancha ${courts.length + 1}`;
-  const overviewItems = overviewFromCourts(courts, summaryDate);
+  const slotsQuery = useQuery({
+    queryKey: ["court-slots", clubId, summaryDate],
+    queryFn: () => Api.ReservationService().listSlots(summaryDate),
+    enabled: Boolean(clubId),
+  });
+
+  const reservationsQuery = useQuery({
+    queryKey: ["court-reservations", clubId, summaryDate],
+    queryFn: () => Api.ReservationService().list(summaryDate),
+    enabled: Boolean(clubId),
+  });
+
+  const overviewItems = overviewFromCourts(courts, summaryDate, clubSession).map(
+    (item) => {
+      if (!slotsQuery.data) return item;
+      const availableSlots = slotsQuery.data.slots
+        .filter((slot) => slot.courtId === item.court.id)
+        .map((slot) => ({
+          startsAt: slot.startsAt,
+          endsAt: slot.endsAt,
+          label: slot.label,
+        }));
+      return {
+        ...item,
+        availableSlots,
+        freeSlots: availableSlots.length,
+        totalSlots: availableSlots.length,
+        nextFreeAt: availableSlots[0]?.startsAt ?? null,
+      };
+    },
+  );
 
   return (
     <div className="space-y-5" data-testid="club-courts">
@@ -425,7 +521,7 @@ export default function ClubCourtsScreen() {
                 {courts.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.name}
-                    {item.status === "inactive" ? " (inactiva)" : ""}
+                    {item.status !== "active" ? ` (${COURT_STATUS_LABELS[item.status]})` : ""}
                   </option>
                 ))}
               </select>
@@ -463,8 +559,6 @@ export default function ClubCourtsScreen() {
         ) : (
           <CourtsOverviewCard
             items={overviewItems}
-            selectedCourtId={activeCourtId}
-            onSelectCourt={setSelectedCourtId}
             onSelectSlot={
               canWriteReservations
                 ? (courtId, startsAt) => {
@@ -475,6 +569,8 @@ export default function ClubCourtsScreen() {
                       reservation: null,
                       client: null,
                       presetStartsAt: startsAt,
+                      initialDate: summaryDate,
+                      preselectSlot: true,
                       courtId,
                     });
                   }
@@ -490,8 +586,25 @@ export default function ClubCourtsScreen() {
         <CourtSummaryCard
           club={clubView}
           court={court}
-          daySummary={daySummaryFromCourt(court, summaryDate)}
-          onConfigure={() => setConfigOpen(true)}
+          daySummary={(() => {
+            const summary = daySummaryFromCourt(court, summaryDate, clubSession);
+            if (!slotsQuery.data) return summary;
+            const availableSlots = slotsQuery.data.slots
+              .filter((slot) => slot.courtId === court.id)
+              .map((slot) => ({
+                startsAt: slot.startsAt,
+                endsAt: slot.endsAt,
+                label: slot.label,
+              }));
+            return {
+              ...summary,
+              availableSlots,
+              freeSlots: availableSlots.length,
+              totalSlots: availableSlots.length,
+              nextFreeAt: availableSlots[0]?.startsAt ?? null,
+            };
+          })()}
+          onConfigure={() => navigate(ROUTES.club.courtConfig(court.id))}
           onSelectSlot={
             canWriteReservations
               ? (startsAt) =>
@@ -501,6 +614,8 @@ export default function ClubCourtsScreen() {
                     reservation: null,
                     client: null,
                     presetStartsAt: startsAt,
+                    initialDate: summaryDate,
+                    preselectSlot: true,
                     courtId: court.id,
                   })
               : undefined
@@ -509,6 +624,57 @@ export default function ClubCourtsScreen() {
       ) : courtsQuery.isLoading ? (
         <p className="text-base text-muted-foreground">Cargando canchas…</p>
       ) : null}
+
+      <div className="space-y-2" data-testid="court-reservations-list">
+        <h3 className="text-lg font-semibold">Reservas del día</h3>
+        {reservationsQuery.isLoading ? (
+          <p className="text-sm text-muted-foreground">Cargando reservas…</p>
+        ) : (reservationsQuery.data ?? []).length === 0 ? (
+          <p className="text-sm text-muted-foreground">No hay reservas en esta jornada.</p>
+        ) : (
+          <ul className="divide-y divide-border rounded-xl border border-border">
+            {(reservationsQuery.data ?? []).map((reservation) => (
+              <li key={reservation.id}>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-muted"
+                  onClick={() => {
+                    setSelectedCourtId(reservation.courtId);
+                    setReservationModal({
+                      mode: "view",
+                      event: null,
+                      reservation,
+                      client: null,
+                      presetStartsAt: null,
+                      initialDate: null,
+                      preselectSlot: false,
+                      courtId: reservation.courtId,
+                    });
+                  }}
+                >
+                  <span>
+                    {dayjs(reservation.startsAt).format("HH:mm")}
+                    {" – "}
+                    {dayjs(reservation.endsAt).format("HH:mm")}
+                    {" · "}
+                    {reservation.courtName || "Cancha"}
+                    {" · "}
+                    {`${reservation.playerFirstName ?? ""} ${reservation.playerLastName ?? ""}`.trim() ||
+                      "Jugador"}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {reservation.status === "booked"
+                      ? "Reservada"
+                      : reservation.status === "completed"
+                        ? "Completada"
+                        : "Cancelada"}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       {courts.length > 0 ? (
         <>
@@ -527,12 +693,9 @@ export default function ClubCourtsScreen() {
                       event: null,
                       reservation: null,
                       client: null,
-                      presetStartsAt: cursorDate
-                        .hour(12)
-                        .minute(0)
-                        .second(0)
-                        .millisecond(0)
-                        .toISOString(),
+                      presetStartsAt: null,
+                      initialDate: summaryDate,
+                      preselectSlot: false,
                       courtId: defaultCourtId,
                     });
                   }
@@ -555,7 +718,7 @@ export default function ClubCourtsScreen() {
               onEmptySlotClick={
                 canWriteReservations
                   ? (day, hour) => {
-                      openCreate(null, day, hour);
+                      openCreate(null, day);
                     }
                   : undefined
               }
@@ -574,7 +737,7 @@ export default function ClubCourtsScreen() {
               }}
               onEmptySlotClick={
                 canWriteReservations
-                  ? (day, hour) => openCreate(court.id, day, hour)
+                  ? (day) => openCreate(court.id, day)
                   : undefined
               }
             />
@@ -593,18 +756,6 @@ export default function ClubCourtsScreen() {
         }}
       />
 
-      {court && headerView === "detail" ? (
-        <CourtConfigDialog
-          open={configOpen}
-          club={clubView}
-          court={court}
-          priceRules={court.priceRules ?? []}
-          readOnly={!canWriteCourts}
-          onOpenChange={setConfigOpen}
-          onSaved={invalidateBoard}
-        />
-      ) : null}
-
       {reservationModal ? (
         <CourtReservationModal
           open
@@ -613,6 +764,8 @@ export default function ClubCourtsScreen() {
           initialCourtId={modalCourtId}
           mode={reservationModal.mode}
           presetStartsAt={reservationModal.presetStartsAt}
+          initialDate={reservationModal.initialDate}
+          preselectSlot={reservationModal.preselectSlot}
           event={reservationModal.event}
           reservation={reservationModal.reservation}
           client={reservationModal.client}

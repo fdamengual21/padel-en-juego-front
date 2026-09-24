@@ -1,4 +1,4 @@
-# Padel en juego
+# Easy padel
 
 App de gestión de torneos y club de pádel (React + Vite + TypeScript).
 

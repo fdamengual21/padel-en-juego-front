@@ -10,7 +10,7 @@ alwaysApply: false
 
 - Cada screen vive en `src/screens/<modo>/<ScreenName>/` (`club`, `users` o `entry`).
 - Nombre siempre termina en `Screen`.
-- `index.ts` reexporta el default: `export { default } from "./ScreenName"`.
+- `index.ts` reexporta el default: `export { default } from "./ScreenName"`. No reexporta `components/` ni hooks de esa screen.
 - La screen compone UI/estado local; negocio via `Api` / modules.
 
 ## Componentes locales vs globales

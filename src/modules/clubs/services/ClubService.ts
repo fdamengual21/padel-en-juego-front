@@ -20,6 +20,10 @@ export class ClubService {
     return this.repository.getById(id);
   }
 
+  getContext() {
+    return this.repository.getContext();
+  }
+
   getSettings() {
     return this.repository.getSettings();
   }

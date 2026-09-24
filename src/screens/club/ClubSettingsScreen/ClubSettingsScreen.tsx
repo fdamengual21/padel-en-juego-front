@@ -27,6 +27,7 @@ import {
   splitE164,
 } from "@/lib/phone";
 import { toastError, toastSuccess } from "@/lib/toast";
+import { syncClubSessionFromSettings } from "@/hooks/useClubSession";
 import { cn } from "@/lib/utils";
 import type { ClubSettings } from "@/modules/clubs";
 import { useAuthStore } from "@/stores/authStore";
@@ -205,6 +206,7 @@ export default function ClubSettingsScreen() {
     },
     onSuccess: async (updated) => {
       qc.setQueryData(["club-settings", clubId], updated);
+      syncClubSessionFromSettings(updated);
       toastSuccess("Configuración guardada");
       try {
         const me = await Api.UserService().me();

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import Api from "@/api/Api";
+import ImagePickerField from "@/components/ImagePickerField";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -121,11 +122,12 @@ export default function CreateCourtDialog({
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="new-court-photo">Foto (opcional)</Label>
-            <Input
+            <ImagePickerField
               id="new-court-photo"
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)}
+              file={photoFile}
+              canEdit
+              ariaLabel="Editar foto de la cancha"
+              onFileSelect={setPhotoFile}
             />
           </div>
           {error ? <p className="text-sm text-destructive">{error}</p> : null}

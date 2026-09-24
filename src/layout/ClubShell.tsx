@@ -1,16 +1,17 @@
-import { useEffect } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
+  ArrowLeftRight,
   LayoutDashboard,
   LogOut,
   MapPin,
+  Menu,
   Settings,
   Trophy,
+  User,
   Users,
   type LucideIcon,
 } from "lucide-react";
-import Api from "@/api/Api";
 import { useMockSession } from "@/app/MockSessionProvider";
 import { usePermissions } from "@/authorization";
 import {
@@ -18,9 +19,17 @@ import {
   PERMISSION_CLUB_SETTINGS_READ,
   PERMISSION_CLUB_TOURNAMENTS_READ,
 } from "@/authorization/permissionCodes";
-import { Button } from "@/components/ui/button";
+import AccountDrawerMenu, {
+  AccountActionSections,
+} from "@/layout/AccountDrawerMenu";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { filterByFeature, type FeatureKey } from "@/config/features";
-import { ApiHttpError } from "@/lib/apiClient";
+import { useLoadClubSession } from "@/hooks/useClubSession";
 import { toastError } from "@/lib/toast";
 import { findUserClub } from "@/modules/auth/clubContext";
 import { ROUTES } from "@/router/routes";
@@ -68,34 +77,47 @@ const items: NavItem[] = [
   },
 ];
 
+const gridColsClass: Record<number, string> = {
+  1: "grid-cols-1",
+  2: "grid-cols-2",
+  3: "grid-cols-3",
+  4: "grid-cols-4",
+  5: "grid-cols-5",
+  6: "grid-cols-6",
+};
+
 export default function ClubShell() {
   const navigate = useNavigate();
-  const { clubId, clubs, selectedClubId, logout, exitClubMode } =
+  const { pathname } = useLocation();
+  const [moreOpen, setMoreOpen] = useState(false);
+  const { clubs, selectedClubId, player, logout, exitClubMode } =
     useMockSession();
   const { can } = usePermissions();
-  const canReadSettings = can(PERMISSION_CLUB_SETTINGS_READ);
+  const { session, error } = useLoadClubSession();
   const visibleItems = filterByFeature(items).filter(
     (item) => !item.permission || can(item.permission),
   );
+  const bottomItems = visibleItems.filter(
+    (item) => item.to !== ROUTES.club.settings,
+  );
+  const showSettings = visibleItems.some(
+    (item) => item.to === ROUTES.club.settings,
+  );
+  const bottomCount = bottomItems.length + 1;
+  const colsClass = gridColsClass[bottomCount] ?? "grid-cols-5";
+  const moreActive = moreOpen || pathname === ROUTES.club.settings;
   const membership = findUserClub(clubs, selectedClubId);
-  const settingsQuery = useQuery({
-    queryKey: ["club-settings", clubId],
-    queryFn: () => Api.ClubService().getSettings(),
-    enabled: Boolean(clubId) && canReadSettings,
-    retry: false,
-  });
 
   useEffect(() => {
-    const err = settingsQuery.error;
-    if (!(err instanceof ApiHttpError)) return;
-    if (err.status !== 403 && err.status !== 400) return;
+    const status = error?.status;
+    if (status !== 403 && status !== 400) return;
     toastError("No tenés acceso a este club");
     useAuthStore.getState().clearSelectedClub();
     navigate(ROUTES.chooseMode, { replace: true });
-  }, [navigate, settingsQuery.error]);
+  }, [error, navigate]);
 
   const clubName =
-    settingsQuery.data?.name?.trim() || membership?.name?.trim() || "Club";
+    session?.name?.trim() || membership?.name?.trim() || "Club";
 
   const goToPlayer = () => {
     exitClubMode();
@@ -112,6 +134,43 @@ export default function ClubShell() {
     navigate(ROUTES.home);
   };
 
+  const displayName = player?.displayName ?? "Jugador";
+  const accountActions = (placement: "sidebar" | "sheet") => [
+    ...(placement === "sheet" && showSettings
+      ? [
+          {
+            label: "Configuración",
+            icon: Settings,
+            group: "account" as const,
+            onSelect: () => navigate(ROUTES.club.settings),
+          },
+        ]
+      : []),
+    {
+      label: "Ir a vista jugador",
+      icon: User,
+      group: "context" as const,
+      onSelect: goToPlayer,
+    },
+    ...(clubs.length > 1
+      ? [
+          {
+            label: "Cambiar club",
+            icon: ArrowLeftRight,
+            group: "context" as const,
+            onSelect: goToClubPicker,
+          },
+        ]
+      : []),
+    {
+      label: "Cerrar sesión",
+      icon: LogOut,
+      group: "session" as const,
+      onSelect: handleLogout,
+      testId: placement === "sidebar" ? "club-logout" : undefined,
+    },
+  ];
+
   return (
     <div className="flex min-h-svh bg-background text-foreground">
       <aside
@@ -120,7 +179,7 @@ export default function ClubShell() {
       >
         <div className="border-b border-sidebar-border px-4 py-5">
           <p className="text-xs font-medium uppercase tracking-wide text-sidebar-foreground/55">
-            Padel en juego
+            Easy padel
           </p>
           <h1
             className="mt-1 line-clamp-2 text-xl font-semibold leading-snug tracking-tight text-sidebar-foreground"
@@ -150,70 +209,117 @@ export default function ClubShell() {
           ))}
         </nav>
         <div className="mt-auto border-t border-sidebar-border p-3">
-          {clubs.length > 1 ? (
-            <button
-              type="button"
-              className="mb-1 flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-base text-sidebar-foreground/70 hover:bg-sidebar-foreground/10 hover:text-sidebar-foreground"
-              onClick={goToClubPicker}
-            >
-              Cambiar club
-            </button>
-          ) : null}
-          <button
-            type="button"
-            className="mb-1 flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-base text-sidebar-primary hover:bg-sidebar-foreground/10"
-            onClick={goToPlayer}
-          >
-            Vista jugador
-          </button>
-          <Button
-            type="button"
-            variant="ghost"
-            className="w-full justify-start gap-2 px-3 text-sidebar-foreground/55 hover:bg-sidebar-foreground/10 hover:text-sidebar-foreground"
-            onClick={handleLogout}
-          >
-            <LogOut className="size-4" />
-            Cerrar sesión
-          </Button>
+          <AccountDrawerMenu
+            displayName={displayName}
+            avatarUrl={player?.avatarUrl}
+            surface="club"
+            placement="sidebar"
+            actions={accountActions("sidebar")}
+            testId="club-account-menu"
+          />
         </div>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center gap-3 overflow-x-auto border-b border-border bg-card px-4 py-3 md:hidden">
-          {visibleItems.map(({ to, label, end }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              className={({ isActive }) =>
-                cn(
-                  "whitespace-nowrap rounded-md px-2 py-1 text-sm",
-                  isActive
-                    ? "bg-primary font-medium text-primary-foreground"
-                    : "text-muted-foreground",
-                )
-              }
-            >
-              {label}
-            </NavLink>
-          ))}
-          <button
-            type="button"
-            className="whitespace-nowrap text-sm text-muted-foreground"
-            onClick={goToPlayer}
-          >
-            Jugador
-          </button>
-          <button
-            type="button"
-            className="ml-auto whitespace-nowrap text-sm text-muted-foreground"
-            onClick={handleLogout}
-          >
-            Cerrar sesión
-          </button>
+        <header className="border-b border-border bg-card px-4 py-3 md:hidden">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Easy padel
+          </p>
+          <h1 className="truncate text-lg font-semibold tracking-tight">
+            {clubName}
+          </h1>
         </header>
-        <main className="flex-1 overflow-auto p-4 md:p-6">
+        <main className="flex-1 overflow-auto p-4 pb-20 md:p-6 md:pb-6">
           <Outlet />
         </main>
+        <nav
+          data-testid="club-bottom-nav"
+          className="fixed inset-x-0 bottom-0 border-t border-sidebar-border bg-sidebar text-sidebar-foreground md:hidden"
+        >
+          <ul className={cn("mx-auto grid max-w-lg", colsClass)}>
+            {bottomItems.map(({ to, label, icon: Icon, end }) => (
+              <li key={to}>
+                <NavLink
+                  to={to}
+                  end={end}
+                  className={({ isActive }) =>
+                    cn(
+                      "flex flex-col items-center gap-0.5 py-1.5 text-[11px] transition-colors",
+                      isActive
+                        ? "font-medium text-sidebar-foreground"
+                        : "text-sidebar-foreground/70",
+                    )
+                  }
+                >
+                  {({ isActive }) => (
+                    <>
+                      <span
+                        className={cn(
+                          "flex size-8 items-center justify-center rounded-lg",
+                          isActive &&
+                            "bg-sidebar-accent text-sidebar-accent-foreground",
+                        )}
+                      >
+                        <Icon className="size-5" />
+                      </span>
+                      {label}
+                    </>
+                  )}
+                </NavLink>
+              </li>
+            ))}
+            <li>
+              <button
+                type="button"
+                className={cn(
+                  "flex w-full flex-col items-center gap-0.5 py-1.5 text-[11px] transition-colors",
+                  moreActive
+                    ? "font-medium text-sidebar-foreground"
+                    : "text-sidebar-foreground/70",
+                )}
+                aria-expanded={moreOpen}
+                data-testid="club-more"
+                onClick={() => setMoreOpen(true)}
+              >
+                <span
+                  className={cn(
+                    "flex size-8 items-center justify-center rounded-lg",
+                    moreActive &&
+                      "bg-sidebar-accent text-sidebar-accent-foreground",
+                  )}
+                >
+                  <Menu className="size-5" />
+                </span>
+                Más
+              </button>
+            </li>
+          </ul>
+        </nav>
+        <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
+          <SheetContent side="bottom" className="rounded-t-2xl">
+            <SheetHeader>
+              <SheetTitle>Más</SheetTitle>
+            </SheetHeader>
+            <div className="px-3 pb-6">
+              <AccountActionSections
+                actions={accountActions("sheet")}
+                renderItem={(action) => (
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-sm hover:bg-muted"
+                    data-testid={action.testId}
+                    onClick={() => {
+                      setMoreOpen(false);
+                      action.onSelect();
+                    }}
+                  >
+                    <action.icon className="size-4 text-muted-foreground" />
+                    {action.label}
+                  </button>
+                )}
+              />
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
     </div>
   );

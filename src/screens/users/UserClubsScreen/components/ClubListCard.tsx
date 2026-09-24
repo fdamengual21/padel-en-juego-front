@@ -23,25 +23,25 @@ export default function ClubListCard({ club }: ClubListCardProps) {
 
   return (
     <article
-      className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card"
+      className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card md:flex-row"
       data-testid={`public-club-card-${club.id}`}
     >
-      <div className="relative aspect-[5/3] w-full bg-muted md:aspect-[16/10]">
+      <div className="relative h-16 w-full shrink-0 bg-muted md:h-auto md:w-1/3 md:self-stretch">
         {showImage ? (
           <img
             src={club.coverUrl ?? ""}
             alt=""
-            className="size-full object-cover"
+            className="absolute inset-0 size-full object-cover"
             onError={() => setImageFailed(true)}
           />
         ) : (
-          <div className="flex size-full items-center justify-center text-[11px] text-muted-foreground md:text-sm">
+          <div className="flex size-full items-center justify-center px-1 text-center text-[10px] text-muted-foreground">
             Sin imagen
           </div>
         )}
       </div>
 
-      <div className="flex flex-1 flex-col gap-1.5 p-2 md:gap-2 md:p-3">
+      <div className="flex min-w-0 flex-1 flex-col gap-1 p-2 md:gap-1.5 md:p-2.5">
         <div className="flex items-start justify-between gap-1">
           <h3 className="min-w-0 truncate text-sm font-semibold tracking-tight md:text-base">
             {club.name}

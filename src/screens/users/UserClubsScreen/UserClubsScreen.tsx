@@ -170,11 +170,11 @@ export default function UserClubsScreen() {
 function ClubCardSkeleton() {
   return (
     <div
-      className="overflow-hidden rounded-xl border border-border bg-card"
+      className="flex flex-col overflow-hidden rounded-xl border border-border bg-card md:flex-row"
       aria-hidden
     >
-      <div className="aspect-[5/3] animate-pulse bg-muted md:aspect-[16/10]" />
-      <div className="space-y-1.5 p-2 md:p-3">
+      <div className="h-16 w-full shrink-0 animate-pulse bg-muted md:h-24 md:w-1/3" />
+      <div className="flex-1 space-y-1.5 p-2 md:p-2.5">
         <div className="h-3.5 w-2/3 animate-pulse rounded bg-muted" />
         <div className="h-3 w-1/2 animate-pulse rounded bg-muted" />
         <div className="h-3 w-3/4 animate-pulse rounded bg-muted" />

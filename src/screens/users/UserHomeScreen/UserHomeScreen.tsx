@@ -57,7 +57,7 @@ export default function UserHomeScreen() {
         <p className="mt-1 text-sm text-muted-foreground">
           {isAuthenticated
             ? "Próximos torneos y tus reservas."
-            : "Próximos torneos del club. Ingresá para ver tus reservas."}
+            : "Explorá torneos. Ingresá para ver tus reservas."}
         </p>
       </div>
 
@@ -79,7 +79,7 @@ export default function UserHomeScreen() {
             </div>
             {data.upcomingTournaments.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                No hay torneos próximos en este club.
+                No tenés torneos próximos.
               </p>
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">

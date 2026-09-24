@@ -1,7 +1,7 @@
-import { useEffect, useId, useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { LoaderCircle, XIcon } from "lucide-react";
 import { initialsFromName } from "@/components/Avatar";
-import ImageEditOverlay from "@/components/ImageEditOverlay";
+import ImagePickerField from "@/components/ImagePickerField";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -10,16 +10,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { toastError } from "@/lib/toast";
 import { cn } from "@/lib/utils";
-
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-const ALLOWED_IMAGE_TYPES = [
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-];
 
 export type ImageViewerMode = "avatar" | "cover";
 
@@ -37,64 +28,12 @@ interface ImageViewerDialogProps {
   onDelete?: () => void | Promise<unknown>;
 }
 
-function isAllowedImage(file: File): boolean {
-  if (ALLOWED_IMAGE_TYPES.includes(file.type)) return true;
-  if (!file.type) {
-    return /\.(jpe?g|png|webp|gif)$/i.test(file.name);
-  }
-  return false;
-}
-
-function validateImageFile(file: File): string | null {
-  if (!isAllowedImage(file)) {
-    return "Formato no permitido. Usá JPG, PNG, WEBP o GIF.";
-  }
-  if (file.size > MAX_IMAGE_BYTES) {
-    return "La imagen no puede superar 5 MB.";
-  }
-  return null;
-}
-
 function SavingOverlay() {
   return (
     <span className="absolute inset-0 flex items-center justify-center bg-black/50">
       <LoaderCircle className="size-8 animate-spin text-white" />
       <span className="sr-only">Guardando</span>
     </span>
-  );
-}
-
-function InteractiveFrame({
-  canEdit,
-  isSaving,
-  ariaLabel,
-  className,
-  onEdit,
-  children,
-}: {
-  canEdit: boolean;
-  isSaving: boolean;
-  ariaLabel: string;
-  className: string;
-  onEdit: () => void;
-  children: ReactNode;
-}) {
-  if (!canEdit) {
-    return <div className={className}>{children}</div>;
-  }
-
-  return (
-    <button
-      type="button"
-      className={cn("group", className, isSaving ? "cursor-wait" : "cursor-pointer")}
-      disabled={isSaving}
-      aria-label={ariaLabel}
-      data-testid="profile-image-edit"
-      onClick={onEdit}
-    >
-      {children}
-      {isSaving ? <SavingOverlay /> : <ImageEditOverlay />}
-    </button>
   );
 }
 
@@ -111,8 +50,6 @@ export default function ImageViewerDialog({
   onSave,
   onDelete,
 }: ImageViewerDialogProps) {
-  const fileInputId = useId();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const displayedUrl = previewUrl ?? imageUrl;
@@ -124,9 +61,6 @@ export default function ImageViewerDialog({
     if (open) return;
     setPendingFile(null);
     setPreviewUrl(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
   }, [open]);
 
   useEffect(() => {
@@ -140,17 +74,7 @@ export default function ImageViewerDialog({
     onOpenChange(next);
   };
 
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-
-    const error = validateImageFile(file);
-    if (error) {
-      toastError("No se pudo usar la imagen", error);
-      return;
-    }
-
+  const handleFileSelect = (file: File) => {
     setPendingFile(file);
     setPreviewUrl(URL.createObjectURL(file));
   };
@@ -173,11 +97,6 @@ export default function ImageViewerDialog({
     } catch {
       return;
     }
-  };
-
-  const openFilePicker = () => {
-    if (!canEdit || isSaving) return;
-    fileInputRef.current?.click();
   };
 
   const avatarMedia = displayedUrl ? (
@@ -238,27 +157,31 @@ export default function ImageViewerDialog({
 
         {isAvatar ? (
           <div className="relative flex min-h-72 items-center justify-center bg-black px-4 py-6">
-            <InteractiveFrame
+            <ImagePickerField
               canEdit={canEdit}
-              isSaving={isSaving}
+              disabled={isSaving}
               ariaLabel={changeLabel}
-              className="relative size-[min(85vw,22rem)] overflow-hidden rounded-full bg-muted"
-              onEdit={openFilePicker}
+              frameClassName="size-[min(85vw,22rem)] overflow-hidden rounded-full bg-muted"
+              testId="profile-image-edit"
+              onFileSelect={handleFileSelect}
             >
               {avatarMedia}
-            </InteractiveFrame>
+              {isSaving ? <SavingOverlay /> : null}
+            </ImagePickerField>
           </div>
         ) : (
           <div className="relative flex min-h-48 items-center justify-center bg-black px-3 py-3 sm:px-4 sm:py-4">
-            <InteractiveFrame
+            <ImagePickerField
               canEdit={canEdit}
-              isSaving={isSaving}
+              disabled={isSaving}
               ariaLabel={changeLabel}
-              className="relative inline-flex max-h-[min(82vh,44rem)] max-w-full items-center justify-center"
-              onEdit={openFilePicker}
+              frameClassName="inline-flex max-h-[min(82vh,44rem)] max-w-full items-center justify-center"
+              testId="profile-image-edit"
+              onFileSelect={handleFileSelect}
             >
               {coverMedia}
-            </InteractiveFrame>
+              {isSaving ? <SavingOverlay /> : null}
+            </ImagePickerField>
           </div>
         )}
 
@@ -296,20 +219,6 @@ export default function ImageViewerDialog({
               {isSaving ? "Quitando…" : isAvatar ? "Quitar foto" : "Quitar portada"}
             </Button>
           </div>
-        ) : null}
-
-        {canEdit ? (
-          <input
-            id={fileInputId}
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif"
-            className="hidden"
-            tabIndex={-1}
-            aria-hidden
-            disabled={isSaving}
-            onChange={handleFileChange}
-          />
         ) : null}
       </DialogContent>
     </Dialog>

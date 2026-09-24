@@ -1,4 +1,4 @@
-import type { Court, CourtPriceRule } from "@/domain";
+import type { Court, CourtPriceRule, CourtStatus } from "@/domain";
 
 export type { Court, CourtPriceRule };
 
@@ -6,14 +6,14 @@ export interface CreateCourtInput {
   name: string;
   slotDurationMinutes?: number;
   basePrice: number;
-  isActive?: boolean;
+  status?: CourtStatus;
 }
 
 export interface UpdateCourtInput {
   name?: string;
   slotDurationMinutes?: number;
   basePrice?: number;
-  isActive?: boolean;
+  status?: CourtStatus;
   priceRules?: CourtPriceRuleInput[];
 }
 

@@ -66,7 +66,7 @@ export default function CheckEmailScreen() {
           <Mail className="size-6" />
         </div>
         <div>
-          <p className="text-sm text-muted-foreground">Padel en juego</p>
+          <p className="text-sm text-muted-foreground">Easy padel</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">
             Revisá tu correo
           </h1>

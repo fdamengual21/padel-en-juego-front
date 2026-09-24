@@ -1,3 +1,5 @@
+import dayjs from "dayjs";
+import "dayjs/locale/es";
 import {
   CalendarClock,
   CalendarPlus,
@@ -17,6 +19,8 @@ interface CourtSummaryCardProps {
   onConfigure: () => void;
   onSelectSlot?: (startsAt: string) => void;
 }
+
+dayjs.locale("es");
 
 function formatMoney(value: number | null | undefined): string {
   if (value == null) return "—";
@@ -168,13 +172,16 @@ export default function CourtSummaryCard({
           </div>
 
           <div className="space-y-2">
-            <p className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm font-semibold text-foreground">
               <CalendarClock className="size-3.5 text-muted-foreground" />
               Horarios disponibles
+              <span className="font-medium capitalize text-muted-foreground">
+                {dayjs(daySummary.date).format("dddd D [de] MMMM YYYY")}
+              </span>
             </p>
             {(daySummary.availableSlots ?? []).length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                Sin turnos libres este día.
+                {daySummary.message || "Sin turnos libres este día."}
               </p>
             ) : (
               <div className="flex flex-wrap gap-1.5">

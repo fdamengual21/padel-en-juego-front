@@ -1,18 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import type { Club, Court, CourtPriceRule, WeekdayIso } from "@/domain";
-import { validateCourtPriceRules } from "@/domain";
+import type { Club, Court, CourtPriceRule, CourtStatus, WeekdayIso } from "@/domain";
+import { COURT_STATUS_LABELS, validateCourtPriceRules } from "@/domain";
 import Api from "@/api/Api";
 import { toastError, toastSuccess } from "@/lib/toast";
+import ImagePickerField from "@/components/ImagePickerField";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { PERMISSION_CLUB_SETTINGS_READ } from "@/authorization/permissionCodes";
 import { PermissionsGuard } from "@/components/guards";
 import { Input } from "@/components/ui/input";
@@ -20,13 +13,12 @@ import { Label } from "@/components/ui/label";
 import { formatClubScheduleEs } from "@/lib/clubSchedule";
 import { ROUTES } from "@/router/routes";
 
-interface CourtConfigDialogProps {
-  open: boolean;
+interface CourtConfigFormProps {
   club: Club;
   court: Court;
   priceRules: CourtPriceRule[];
   readOnly?: boolean;
-  onOpenChange: (open: boolean) => void;
+  onCancel: () => void;
   onSaved: () => void;
 }
 
@@ -70,17 +62,16 @@ function toRuleDraft(rule: CourtPriceRule): RuleDraft {
   };
 }
 
-export default function CourtConfigDialog({
-  open,
+export default function CourtConfigForm({
   club,
   court,
   priceRules,
   readOnly = false,
-  onOpenChange,
+  onCancel,
   onSaved,
-}: CourtConfigDialogProps) {
+}: CourtConfigFormProps) {
   const [name, setName] = useState(court.name);
-  const [isActive, setIsActive] = useState(court.status !== "inactive");
+  const [status, setStatus] = useState<CourtStatus>(court.status);
   const [slotDurationMinutes, setSlotDurationMinutes] = useState(90);
   const [basePrice, setBasePrice] = useState("0");
   const [rules, setRules] = useState<RuleDraft[]>([]);
@@ -90,9 +81,8 @@ export default function CourtConfigDialog({
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (!open) return;
     setName(court.name);
-    setIsActive(court.status !== "inactive");
+    setStatus(court.status);
     setSlotDurationMinutes(court.slotDurationMinutes === 120 ? 120 : 90);
     setBasePrice(String(court.basePrice));
     setRules(priceRules.map(toRuleDraft));
@@ -100,7 +90,7 @@ export default function CourtConfigDialog({
     setRemovePhoto(false);
     setError(null);
     setBusy(false);
-  }, [open, court, priceRules]);
+  }, [court, priceRules]);
 
   const toggleDay = (index: number, day: WeekdayIso) => {
     setRules((prev) =>
@@ -143,7 +133,7 @@ export default function CourtConfigDialog({
         name: name.trim(),
         slotDurationMinutes,
         basePrice: price,
-        isActive,
+        status,
         priceRules: draftRules,
       });
 
@@ -155,7 +145,6 @@ export default function CourtConfigDialog({
 
       toastSuccess("Cancha actualizada");
       onSaved();
-      onOpenChange(false);
     } catch (err) {
       const message = err instanceof Error ? err.message : "No se pudo guardar";
       setError(message);
@@ -165,40 +154,18 @@ export default function CourtConfigDialog({
     }
   };
 
-  const handleDeactivate = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      await Api.CourtService().deactivate(court.id);
-      toastSuccess("Cancha desactivada");
-      onSaved();
-      onOpenChange(false);
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "No se pudo desactivar";
-      setError(message);
-      toastError("No se pudo desactivar la cancha", message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const shownPhoto =
     photoFile || removePhoto ? null : court.imageUrl;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="max-h-[90vh] max-w-xl overflow-y-auto"
-        data-testid="court-config-dialog"
-      >
-        <DialogHeader>
-          <DialogTitle>Configurar {court.name}</DialogTitle>
-          <DialogDescription>
+    <div className="space-y-5" data-testid="court-config-form">
+        <div>
+          <h2 className="text-2xl font-semibold tracking-tight">Configurar {court.name}</h2>
+          <p className="text-sm text-muted-foreground">
             Duración del turno, precio base y tarifas. El horario de apertura
             es único del club y se edita en Configuración.
-          </DialogDescription>
-        </DialogHeader>
+          </p>
+        </div>
 
         <div className="space-y-5">
           <div className="rounded-lg border border-border bg-muted/30 p-3">
@@ -219,8 +186,7 @@ export default function CourtConfigDialog({
               <PermissionsGuard permission={PERMISSION_CLUB_SETTINGS_READ}>
                 <Link
                   to={ROUTES.club.settings}
-                  className="text-xs font-medium text-primary underline-offset-2 hover:underline"
-                  onClick={() => onOpenChange(false)}
+                  className="text-xs font-medium text-sidebar underline-offset-2 hover:underline"
                 >
                   Ir a Configuración
                 </Link>
@@ -240,56 +206,49 @@ export default function CourtConfigDialog({
 
           <div className="space-y-2">
             <Label htmlFor="court-photo">Foto</Label>
-            <div className="overflow-hidden rounded-lg border border-border bg-muted">
-              {shownPhoto ? (
-                <img
-                  src={shownPhoto}
-                  alt=""
-                  className="aspect-[16/9] w-full object-cover"
-                />
-              ) : (
-                <div className="flex aspect-[16/9] items-center justify-center text-sm text-muted-foreground">
-                  {photoFile ? photoFile.name : "Sin imagen"}
-                </div>
-              )}
-            </div>
-            {!readOnly ? (
-              <div className="flex flex-wrap gap-2">
-                <Input
-                  id="court-photo"
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
-                  onChange={(e) => {
-                    setPhotoFile(e.target.files?.[0] ?? null);
-                    setRemovePhoto(false);
-                  }}
-                />
-                {court.imageUrl && !removePhoto ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setPhotoFile(null);
-                      setRemovePhoto(true);
-                    }}
-                  >
-                    Quitar foto
-                  </Button>
-                ) : null}
-              </div>
+            <ImagePickerField
+              id="court-photo"
+              imageUrl={shownPhoto}
+              file={photoFile}
+              canEdit={!readOnly}
+              ariaLabel="Editar foto de la cancha"
+              testId="court-photo-picker"
+              onFileSelect={(file) => {
+                setPhotoFile(file);
+                setRemovePhoto(false);
+              }}
+            />
+            {!readOnly && court.imageUrl && !removePhoto ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setPhotoFile(null);
+                  setRemovePhoto(true);
+                }}
+              >
+                Quitar foto
+              </Button>
             ) : null}
           </div>
 
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={isActive}
+          <div className="space-y-1.5">
+            <Label htmlFor="court-status">Estado</Label>
+            <select
+              id="court-status"
+              className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm"
+              value={status}
               disabled={readOnly}
-              onChange={(e) => setIsActive(e.target.checked)}
-            />
-            Cancha activa (visible en el listado público)
-          </label>
+              onChange={(event) => setStatus(event.target.value as CourtStatus)}
+            >
+              {(Object.keys(COURT_STATUS_LABELS) as CourtStatus[]).map((value) => (
+                <option key={value} value={value}>
+                  {COURT_STATUS_LABELS[value]}
+                </option>
+              ))}
+            </select>
+          </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
@@ -460,32 +419,16 @@ export default function CourtConfigDialog({
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
         </div>
 
-        <DialogFooter className="gap-2 sm:justify-between">
-          {!readOnly && court.status !== "inactive" ? (
-            <Button
-              type="button"
-              variant="ghost"
-              className="text-destructive"
-              disabled={busy}
-              onClick={() => void handleDeactivate()}
-            >
-              Desactivar
+        <div className="flex gap-2">
+          <Button type="button" variant="ghost" onClick={onCancel}>
+            Volver
+          </Button>
+          {!readOnly ? (
+            <Button type="button" disabled={busy} onClick={() => void handleSave()}>
+              {busy ? "Guardando…" : "Guardar"}
             </Button>
-          ) : (
-            <span />
-          )}
-          <div className="flex gap-2">
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-              Cerrar
-            </Button>
-            {!readOnly ? (
-              <Button type="button" disabled={busy} onClick={() => void handleSave()}>
-                {busy ? "Guardando…" : "Guardar"}
-              </Button>
-            ) : null}
-          </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          ) : null}
+        </div>
+    </div>
   );
 }

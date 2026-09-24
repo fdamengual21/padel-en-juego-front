@@ -10,9 +10,10 @@ alwaysApply: false
 
 **Theme default: light.** No activar dark por `prefers-color-scheme`. `.dark` solo con toggle explícito futuro. Diseñar y verificar siempre en light primero.
 
-## Marca (referencia Padel en juego)
+## Marca (referencia Easy padel)
 
-- **Acento lima** (`--primary`): CTAs, item activo de nav, ranking, campeón de bracket, estados “activos”.
+- **Acento lima** (`--primary`): CTAs, item activo de nav, ranking, campeón de bracket, estados “activos”. Es un relleno claro: no usarlo como color de texto sobre canvas light.
+- **Verde de texto** (`--primary-strong` / `text-primary-strong`): links y etiquetas sobre fondo claro. Mismo rol de marca, con contraste AA (≥ 4.5:1).
 - **Texto / navy** (`--foreground`, `--primary-foreground` sobre lima): contraste alto sobre botones y chips activos.
 - **Canvas light** (`--background` gris muy claro, `--card` blanco): contenido siempre light.
 - **Sidebar club navy** (`--sidebar*`): solo el aside del modo club. No convertir toda la app a dark.

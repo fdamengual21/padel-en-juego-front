@@ -2,6 +2,15 @@ import type { WeekdayIso } from "@/domain";
 
 export type { Club, UpdateClubInput } from "@/domain";
 
+export interface ClubContext {
+  id: string;
+  name: string;
+  isActive: boolean;
+  openTime: string | null;
+  closeTime: string | null;
+  openDays: WeekdayIso[];
+}
+
 export interface ClubSettings {
   id: string;
   name: string;

@@ -9,6 +9,7 @@
  * | club.tournaments.read/write | si | si | si | si |
  * | club.courts.read | si | si | si | si |
  * | club.courts.write | si | si | si | no |
+ * | club.clients.read/write | si | si | si | si |
  * | club.reservations.read/write | si | si | si | si |
  * | club.lessons.read | si | si | si | si |
  * | club.lessons.write | si | si | no | si |
@@ -36,6 +37,8 @@ export const PERMISSION_CLUB_TOURNAMENTS_READ = "club.tournaments.read";
 export const PERMISSION_CLUB_TOURNAMENTS_WRITE = "club.tournaments.write";
 export const PERMISSION_CLUB_COURTS_READ = "club.courts.read";
 export const PERMISSION_CLUB_COURTS_WRITE = "club.courts.write";
+export const PERMISSION_CLUB_CLIENTS_READ = "club.clients.read";
+export const PERMISSION_CLUB_CLIENTS_WRITE = "club.clients.write";
 export const PERMISSION_CLUB_RESERVATIONS_READ = "club.reservations.read";
 export const PERMISSION_CLUB_RESERVATIONS_WRITE = "club.reservations.write";
 export const PERMISSION_CLUB_LESSONS_READ = "club.lessons.read";
@@ -61,6 +64,8 @@ export const PERMISSION_CODES = {
   clubTournamentsWrite: PERMISSION_CLUB_TOURNAMENTS_WRITE,
   clubCourtsRead: PERMISSION_CLUB_COURTS_READ,
   clubCourtsWrite: PERMISSION_CLUB_COURTS_WRITE,
+  clubClientsRead: PERMISSION_CLUB_CLIENTS_READ,
+  clubClientsWrite: PERMISSION_CLUB_CLIENTS_WRITE,
   clubReservationsRead: PERMISSION_CLUB_RESERVATIONS_READ,
   clubReservationsWrite: PERMISSION_CLUB_RESERVATIONS_WRITE,
   clubLessonsRead: PERMISSION_CLUB_LESSONS_READ,

@@ -80,7 +80,7 @@ export default function LoginScreen() {
     >
       <div className="w-full max-w-md space-y-6">
         <div className="text-center">
-          <p className="text-sm text-muted-foreground">Padel en juego</p>
+          <p className="text-sm text-muted-foreground">Easy padel</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">Ingresar</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             Usá el email y la contraseña de tu cuenta.

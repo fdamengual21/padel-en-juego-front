@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { isClubUuid, findUserClub } from "@/modules/auth/clubContext";
+import { findUserClub, isClubUuid } from "@/modules/auth/clubContext";
+import { useClubSessionStore } from "@/stores/clubSessionStore";
 import type { UserMeDto } from "@/modules/users";
 
 export const AUTH_STORE_KEY = "padel-en-juego.auth";
@@ -56,6 +57,7 @@ export const useAuthStore = create<AuthStore>()(
           selectedClubId: null,
           isClubMode: false,
         });
+        useClubSessionStore.getState().clear();
       },
 
       setUserProfile: (user) => {
@@ -69,14 +71,17 @@ export const useAuthStore = create<AuthStore>()(
 
       exitClubMode: () => {
         set({ isClubMode: false });
+        useClubSessionStore.getState().clear();
       },
 
       clearSelectedClub: () => {
         set({ selectedClubId: null, isClubMode: false });
+        useClubSessionStore.getState().clear();
       },
 
       clearAuth: () => {
         set({ ...emptySession });
+        useClubSessionStore.getState().clear();
       },
     }),
     {
