@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
-import { CalendarClock, Pencil } from "lucide-react";
+import { CalendarClock, Pencil, TriangleAlert } from "lucide-react";
 import type {
   Client,
   Court,
@@ -9,6 +9,7 @@ import type {
   CourtReservation,
 } from "@/domain";
 import Api from "@/api/Api";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
@@ -53,6 +54,8 @@ interface CourtReservationModalProps {
 
 const statusLabels: Record<string, string> = {
   booked: "Reservada",
+  pending: "Pendiente",
+  rejected: "Rechazada",
   completed: "Completada",
   cancelled: "Cancelada",
 };
@@ -118,6 +121,8 @@ export default function CourtReservationModal({
   const [selectedStartsAt, setSelectedStartsAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
 
   const court =
     courts.find((c) => c.id === selectedCourtId) ??
@@ -135,6 +140,8 @@ export default function CourtReservationModal({
     setMode(initialMode);
     setError(null);
     setBusy(false);
+    setRejectOpen(false);
+    setRejectReason("");
     setSelectedCourtId(initialCourtId);
 
     if (initialMode === "create") {
@@ -186,7 +193,9 @@ export default function CourtReservationModal({
     enabled: open && !readOnly && Boolean(selectedCourtId) && Boolean(dateIso),
     refetchOnMount: "always",
   });
-  const availableSlots = slotList?.slots ?? [];
+  const availableSlots = (slotList?.slots ?? []).filter(
+    (slot) => slot.status !== "pending",
+  );
   const slotMessage = slotList?.message ?? null;
   const openedDate = initialDate ?? (presetStartsAt ? toDateIso(presetStartsAt) : null);
 
@@ -223,14 +232,17 @@ export default function CourtReservationModal({
       }
     : null;
 
+  const isPending = reservation?.status === "pending";
   const title =
     mode === "create"
       ? "Nueva reserva"
       : mode === "edit"
         ? "Editar reserva"
-        : isTournament
-          ? "Partido de torneo"
-          : "Detalle de reserva";
+        : isPending
+          ? "Pedido de turno"
+          : isTournament
+            ? "Partido de torneo"
+            : "Detalle de reserva";
 
   const durationMinutes = quote
     ? dayjs(quote.endsAt).diff(dayjs(selectedStartsAt), "minute")
@@ -307,6 +319,22 @@ export default function CourtReservationModal({
     void run(async () => {
       await Api.ReservationService().complete(reservation.id);
       toastSuccess("Reserva completada");
+    });
+  };
+
+  const handleAccept = () => {
+    if (!reservation) return;
+    void run(async () => {
+      await Api.ReservationService().accept(reservation.id);
+      toastSuccess("Pedido aceptado");
+    });
+  };
+
+  const handleReject = () => {
+    if (!reservation) return;
+    void run(async () => {
+      await Api.ReservationService().reject(reservation.id, rejectReason);
+      toastSuccess("Pedido rechazado");
     });
   };
 
@@ -469,11 +497,17 @@ export default function CourtReservationModal({
                       No se pudieron cargar los turnos.
                     </p>
                   ) : slotMessage ? (
-                    <p className="text-sm text-muted-foreground">{slotMessage}</p>
+                    <Alert variant="warning">
+                      <TriangleAlert />
+                      <AlertDescription>{slotMessage}</AlertDescription>
+                    </Alert>
                   ) : availableSlots.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      No hay turnos libres este día.
-                    </p>
+                    <Alert variant="warning">
+                      <TriangleAlert />
+                      <AlertDescription>
+                        No hay turnos libres este día.
+                      </AlertDescription>
+                    </Alert>
                   ) : (
                     <div className="flex flex-wrap gap-2">
                       {availableSlots.map((slot) => {
@@ -529,7 +563,11 @@ export default function CourtReservationModal({
 
           <DialogFooter className="border-t border-border px-4 py-3 sm:justify-between">
             <div className="flex flex-wrap gap-2">
-              {canMutate && mode === "view" && reservation && !isTournament ? (
+              {canMutate &&
+              mode === "view" &&
+              reservation &&
+              !isTournament &&
+              !isPending ? (
                 <Button
                   type="button"
                   size="sm"
@@ -539,6 +577,62 @@ export default function CourtReservationModal({
                   <Pencil className="size-3.5" />
                   Editar
                 </Button>
+              ) : null}
+              {canMutate && isPending && mode === "view" && reservation ? (
+                rejectOpen ? (
+                  <div className="flex w-full flex-col gap-2">
+                    <label className="text-sm text-muted-foreground" htmlFor="reject-reason">
+                      Nota (opcional)
+                    </label>
+                    <textarea
+                      id="reject-reason"
+                      className="min-h-16 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm"
+                      value={rejectReason}
+                      onChange={(event) => setRejectReason(event.target.value)}
+                      placeholder="Motivo del rechazo"
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="destructive"
+                        disabled={busy || isSaving}
+                        onClick={handleReject}
+                      >
+                        Confirmar rechazo
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        disabled={busy || isSaving}
+                        onClick={() => setRejectOpen(false)}
+                      >
+                        Volver
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={busy || isSaving}
+                      onClick={handleAccept}
+                    >
+                      Aceptar
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={busy || isSaving}
+                      onClick={() => setRejectOpen(true)}
+                    >
+                      Rechazar
+                    </Button>
+                  </>
+                )
               ) : null}
               {canMutate &&
               reservation &&

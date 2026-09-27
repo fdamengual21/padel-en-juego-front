@@ -1,12 +1,12 @@
 import dayjs from "dayjs";
 import "dayjs/locale/es";
-import type { CourtDayOverviewItem, CourtLiveStatus } from "@/domain";
+import type { CourtAvailableSlot, CourtDayOverviewItem, CourtLiveStatus } from "@/domain";
 import { COURT_STATUS_LABELS } from "@/domain";
 import { cn } from "@/lib/utils";
 
 interface CourtsOverviewCardProps {
   items: CourtDayOverviewItem[];
-  onSelectSlot?: (courtId: string, startsAt: string) => void;
+  onSelectSlot?: (courtId: string, slot: CourtAvailableSlot) => void;
   onOpenDetail: (courtId: string) => void;
 }
 
@@ -129,27 +129,34 @@ export default function CourtsOverviewCard({
                   </p>
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
-                    {item.availableSlots.map((slot) =>
-                      onSelectSlot ? (
+                    {item.availableSlots.map((slot) => {
+                      const pending = slot.status === "pending";
+                      const chipClass = cn(
+                        "shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium",
+                        pending
+                          ? "border-warning bg-warning/15 text-sidebar"
+                          : "border-border bg-card text-muted-foreground",
+                      );
+                      return onSelectSlot ? (
                         <button
                           key={slot.startsAt}
                           type="button"
-                          className="shrink-0 rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium text-sidebar transition-colors hover:bg-muted"
-                          onClick={() =>
-                            onSelectSlot(item.court.id, slot.startsAt)
-                          }
+                          className={cn(
+                            chipClass,
+                            pending
+                              ? "hover:bg-warning/25"
+                              : "text-sidebar transition-colors hover:bg-muted",
+                          )}
+                          onClick={() => onSelectSlot(item.court.id, slot)}
                         >
                           {slot.label}
                         </button>
                       ) : (
-                        <span
-                          key={slot.startsAt}
-                          className="shrink-0 rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium text-muted-foreground"
-                        >
+                        <span key={slot.startsAt} className={chipClass}>
                           {slot.label}
                         </span>
-                      ),
-                    )}
+                      );
+                    })}
                   </div>
                 )}
               </div>

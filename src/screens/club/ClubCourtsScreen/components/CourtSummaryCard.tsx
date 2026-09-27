@@ -6,7 +6,7 @@ import {
   Clock3,
   MapPin,
 } from "lucide-react";
-import type { Club, Court, CourtDaySummary } from "@/domain";
+import type { Club, Court, CourtAvailableSlot, CourtDaySummary } from "@/domain";
 import { Button } from "@/components/ui/button";
 import { formatClubHoursEs } from "@/lib/clubSchedule";
 import { formatLocationEs } from "@/lib/dates";
@@ -17,7 +17,7 @@ interface CourtSummaryCardProps {
   court: Court;
   daySummary: CourtDaySummary;
   onConfigure: () => void;
-  onSelectSlot?: (startsAt: string) => void;
+  onSelectSlot?: (slot: CourtAvailableSlot) => void;
 }
 
 dayjs.locale("es");
@@ -185,25 +185,34 @@ export default function CourtSummaryCard({
               </p>
             ) : (
               <div className="flex flex-wrap gap-1.5">
-                {daySummary.availableSlots.map((slot) =>
-                  onSelectSlot ? (
+                {daySummary.availableSlots.map((slot) => {
+                  const pending = slot.status === "pending";
+                  const chipClass = cn(
+                    "rounded-full border px-3 py-1 text-xs font-medium",
+                    pending
+                      ? "border-warning bg-warning/15 text-sidebar"
+                      : "border-border bg-card text-muted-foreground",
+                  );
+                  return onSelectSlot ? (
                     <button
                       key={slot.startsAt}
                       type="button"
-                      className="rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-sidebar transition-colors hover:bg-muted"
-                      onClick={() => onSelectSlot(slot.startsAt)}
+                      className={cn(
+                        chipClass,
+                        pending
+                          ? "hover:bg-warning/25"
+                          : "text-sidebar transition-colors hover:bg-muted",
+                      )}
+                      onClick={() => onSelectSlot(slot)}
                     >
                       {slot.label}
                     </button>
                   ) : (
-                    <span
-                      key={slot.startsAt}
-                      className="rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground"
-                    >
+                    <span key={slot.startsAt} className={chipClass}>
                       {slot.label}
                     </span>
-                  ),
-                )}
+                  );
+                })}
               </div>
             )}
           </div>

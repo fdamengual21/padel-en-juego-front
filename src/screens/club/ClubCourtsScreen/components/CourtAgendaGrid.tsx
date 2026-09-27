@@ -1,3 +1,4 @@
+import { LoaderCircle } from "lucide-react";
 import type { Dayjs } from "dayjs";
 import {
   CALENDAR_AGENDA_WEEK_DAYS,
@@ -17,6 +18,8 @@ interface CourtAgendaGridProps {
   selectedDate: Dayjs;
   events: CalendarEventGridItemDto[];
   loading?: boolean;
+  /** Spinner encima de la grilla mientras llegan los turnos dados. */
+  turnsLoading?: boolean;
   openHour?: number;
   closeHour?: number;
   jornada?: AgendaJornadaSchedule;
@@ -29,6 +32,7 @@ export default function CourtAgendaGrid({
   selectedDate,
   events,
   loading = false,
+  turnsLoading = false,
   openHour,
   closeHour,
   jornada,
@@ -47,19 +51,19 @@ export default function CourtAgendaGrid({
       ? [selectedDate.startOf("day").diff(weekStart.startOf("day"), "day")]
       : Array.from({ length: CALENDAR_AGENDA_WEEK_DAYS }, (_, index) => index);
 
-  if (loading) {
-    return (
-      <div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">
-        Cargando agenda…
-      </div>
-    );
-  }
+  const showSpinner = loading || turnsLoading;
 
   return (
     <div
-      className="overflow-x-auto rounded-xl border border-border bg-card"
+      className="relative overflow-x-auto rounded-xl border border-border bg-card"
       data-testid="court-agenda-grid"
     >
+      {showSpinner ? (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-card/70">
+          <LoaderCircle className="size-6 animate-spin text-muted-foreground" />
+          <span className="sr-only">Cargando turnos…</span>
+        </div>
+      ) : null}
       <div
         className={
           mode === "week"

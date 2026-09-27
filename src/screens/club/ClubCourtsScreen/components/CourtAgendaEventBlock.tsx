@@ -20,6 +20,8 @@ const toneClasses = {
     "border-border bg-success/10 text-sidebar border-l-success",
   error:
     "border-border bg-destructive/10 text-sidebar border-l-destructive",
+  warning:
+    "border-border bg-warning/15 text-sidebar border-l-warning",
 } as const;
 
 export default function CourtAgendaEventBlock({
@@ -27,7 +29,10 @@ export default function CourtAgendaEventBlock({
   onSelect,
 }: CourtAgendaEventBlockProps) {
   const { event, top, height, columnIndex, columnCount } = placement;
-  const tone = calendarAgendaEventStatusTone(event.status);
+  const tone =
+    event.type === "reservation" && event.status === "Pending"
+      ? "warning"
+      : calendarAgendaEventStatusTone(event.status);
   const cancelled = event.status === "Cancelled";
   const density = resolveAgendaEventDensity(height);
   const title = event.title.trim() || calendarEventTypeLabelEs(event.type);

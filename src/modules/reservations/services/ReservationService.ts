@@ -12,6 +12,10 @@ export class ReservationService {
     return this.repository.list(date, courtId);
   }
 
+  listCalendar(from: string, to: string, courtId?: string) {
+    return this.repository.listCalendar(from, to, courtId);
+  }
+
   listSlots(date: string, courtId?: string, ignoreReservationId?: string) {
     return this.repository.listSlots(date, courtId, ignoreReservationId);
   }
@@ -34,5 +38,13 @@ export class ReservationService {
 
   complete(id: string) {
     return this.repository.complete(id);
+  }
+
+  accept(id: string) {
+    return this.repository.accept(id);
+  }
+
+  reject(id: string, reason?: string) {
+    return this.repository.reject(id, reason);
   }
 }

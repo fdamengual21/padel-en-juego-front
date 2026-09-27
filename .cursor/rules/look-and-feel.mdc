@@ -37,6 +37,15 @@ Sin hex hardcodeados en screens/components. Usar clases semánticas (`bg-primary
 - Dashboard club: KPIs compactos + próximos partidos (una composición clara, no “admin widgets”).
 - Bracket = viz (`xyflow`+dagre), no verdad; mobile por rondas + pan/zoom; copy humano (`1° Zona A`); acento lima en final/campeón.
 
+## Vacío y error de listado
+
+Cuando un listado no tiene filas, o la carga falló y no hay nada que mostrar, usar `EmptyState` (`@/components/EmptyState`). Ocupa el ancho del contenedor.
+
+- Borde punteado, `rounded-xl`, alto mínimo y contenido centrado en ambos ejes.
+- Ícono Lucide en círculo `bg-muted`. En error, círculo `bg-destructive/10` e ícono `text-destructive`. El título queda en `text-foreground`; el detalle, en `text-muted-foreground`.
+- Copy corto en español. Una acción, si hace falta, va debajo del texto.
+- Si el listado ya tiene ítems, un error de recarga no reemplaza la grilla.
+
 ## Evitar
 
 Purple-on-white / cream+serif AI, dark por defecto o por OS, multi-shadow, pills excesivos, marca como fondo de página, enums en UI, lógica de torneo en el cliente, Inter como fuente de marca.

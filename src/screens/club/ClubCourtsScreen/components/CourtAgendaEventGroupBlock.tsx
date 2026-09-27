@@ -44,12 +44,61 @@ function gridStatusToBadge(status: CalendarEventGridItemDto["status"]): string {
   return "booked";
 }
 
+/** Lista al costado de la columna, o arriba del bloque si no entra. Siempre dentro del viewport. */
+function placeGroupMenu(
+  chip: HTMLElement,
+  menu: HTMLElement,
+): { top: number; left: number } {
+  const rect = chip.getBoundingClientRect();
+  const menuWidth = menu.offsetWidth;
+  const menuHeight = menu.offsetHeight;
+  const gap = 8;
+  const margin = 8;
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const grid = chip.closest("[data-testid='court-agenda-grid']");
+  const gridRect = grid?.getBoundingClientRect();
+  const chipMid = rect.left + rect.width / 2;
+  const split = gridRect ? gridRect.left + gridRect.width / 2 : viewportWidth / 2;
+  const preferRight = chipMid < split;
+  const rightLeft = rect.right + gap;
+  const leftLeft = rect.left - gap - menuWidth;
+  const fits = (left: number) =>
+    left >= margin && left + menuWidth <= viewportWidth - margin;
+
+  let left: number | null = null;
+  if (preferRight && fits(rightLeft)) left = rightLeft;
+  else if (!preferRight && fits(leftLeft)) left = leftLeft;
+  else if (fits(rightLeft)) left = rightLeft;
+  else if (fits(leftLeft)) left = leftLeft;
+
+  const maxTop = Math.max(margin, viewportHeight - margin - menuHeight);
+  if (left == null) {
+    const aboveTop = rect.top - gap - menuHeight;
+    const clampedLeft = Math.min(
+      Math.max(margin, rect.left),
+      Math.max(margin, viewportWidth - menuWidth - margin),
+    );
+    const top =
+      aboveTop >= margin
+        ? aboveTop
+        : Math.min(Math.max(margin, rect.bottom + gap), maxTop);
+    return { top, left: clampedLeft };
+  }
+
+  let top = rect.top;
+  if (top > maxTop) top = maxTop;
+  if (top < margin) top = margin;
+  return { top, left };
+}
+
 export default function CourtAgendaEventGroupBlock({
   group,
   onSelectEvent,
 }: CourtAgendaEventGroupBlockProps) {
   const listId = useId();
   const chipRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLUListElement>(null);
   const [open, setOpen] = useState(false);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(
     null,
@@ -70,13 +119,15 @@ export default function CourtAgendaEventGroupBlock({
   const groupCancelled = tone === "error";
 
   useLayoutEffect(() => {
-    if (!open || !chipRef.current) {
+    if (!open || !chipRef.current || !menuRef.current) {
       setMenuPos(null);
       return;
     }
-    const rect = chipRef.current.getBoundingClientRect();
-    setMenuPos({ top: rect.bottom + 4, left: rect.left });
-  }, [open]);
+    const next = placeGroupMenu(chipRef.current, menuRef.current);
+    setMenuPos((current) =>
+      current?.top === next.top && current.left === next.left ? current : next,
+    );
+  }, [open, group.events]);
 
   useEffect(() => {
     if (!open) return;
@@ -130,7 +181,7 @@ export default function CourtAgendaEventGroupBlock({
         ) : null}
       </button>
 
-      {open && menuPos
+      {open
         ? createPortal(
             <>
               <button
@@ -140,11 +191,16 @@ export default function CourtAgendaEventGroupBlock({
                 onClick={() => setOpen(false)}
               />
               <ul
+                ref={menuRef}
                 id={listId}
                 role="listbox"
                 aria-label={ariaLabel}
                 className="fixed z-50 max-h-80 min-w-[260px] max-w-[360px] overflow-auto rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-md"
-                style={{ top: menuPos.top, left: menuPos.left }}
+                style={{
+                  top: menuPos?.top ?? 0,
+                  left: menuPos?.left ?? 0,
+                  visibility: menuPos ? "visible" : "hidden",
+                }}
               >
                 {group.events.map((event) => {
                   const title =

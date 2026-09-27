@@ -14,6 +14,7 @@ import type {
 
 export interface IReservationRepository {
   list(date: string, courtId?: string): Promise<CourtReservation[]>;
+  listCalendar(from: string, to: string, courtId?: string): Promise<CourtReservation[]>;
   listSlots(
     date: string,
     courtId?: string,
@@ -24,6 +25,8 @@ export interface IReservationRepository {
   update(id: string, patch: UpdateReservationInput): Promise<CourtReservation>;
   cancel(id: string): Promise<CourtReservation>;
   complete(id: string): Promise<CourtReservation>;
+  accept(id: string): Promise<CourtReservation>;
+  reject(id: string, reason?: string): Promise<CourtReservation>;
 }
 
 function asString(value: unknown): string {
@@ -40,7 +43,15 @@ function asNumber(value: unknown): number {
 }
 
 function asStatus(value: unknown): CourtReservationStatus {
-  if (value === "booked" || value === "cancelled" || value === "completed") return value;
+  if (
+    value === "booked" ||
+    value === "pending" ||
+    value === "rejected" ||
+    value === "cancelled" ||
+    value === "completed"
+  ) {
+    return value;
+  }
   return "booked";
 }
 
@@ -74,6 +85,8 @@ function normalizeSlot(raw: Record<string, unknown>): CourtSlot {
     label: asString(raw.label),
     price: asNumber(raw.price),
     priceLabel: asString(raw.priceLabel) || null,
+    status: raw.status === "pending" ? "pending" : "available",
+    reservationId: asString(raw.reservationId) || null,
   };
 }
 
@@ -98,6 +111,17 @@ export class ReservationRepository implements IReservationRepository {
     const response = await this.axiosInstance.get<ApiEnvelope<Record<string, unknown>[]>>(
       "/club/reservations",
       { params: { date, courtId } },
+    );
+    return (readData(response) ?? [])
+      .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
+      .map(normalizeReservation);
+  }
+
+  async listCalendar(from: string, to: string, courtId?: string): Promise<CourtReservation[]> {
+    this.assertClubHeader();
+    const response = await this.axiosInstance.get<ApiEnvelope<Record<string, unknown>[]>>(
+      "/club/reservations/calendar",
+      { params: { from, to, courtId } },
     );
     return (readData(response) ?? [])
       .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
@@ -160,6 +184,23 @@ export class ReservationRepository implements IReservationRepository {
     this.assertClubHeader();
     const response = await this.axiosInstance.post<ApiEnvelope<Record<string, unknown>>>(
       `/club/reservations/${id}/cancel`,
+    );
+    return normalizeReservation(readData(response) ?? {});
+  }
+
+  async accept(id: string) {
+    this.assertClubHeader();
+    const response = await this.axiosInstance.post<ApiEnvelope<Record<string, unknown>>>(
+      `/club/reservations/${id}/accept`,
+    );
+    return normalizeReservation(readData(response) ?? {});
+  }
+
+  async reject(id: string, reason?: string) {
+    this.assertClubHeader();
+    const response = await this.axiosInstance.post<ApiEnvelope<Record<string, unknown>>>(
+      `/club/reservations/${id}/reject`,
+      { reason: reason?.trim() || null },
     );
     return normalizeReservation(readData(response) ?? {});
   }

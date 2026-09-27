@@ -540,7 +540,7 @@ export interface Client {
   updatedAt: string;
 }
 
-export type CourtReservationStatus = "booked" | "cancelled" | "completed";
+export type CourtReservationStatus = "booked" | "pending" | "rejected" | "cancelled" | "completed";
 
 /** Reserva de cancha del club (actividad que convierte a alguien en Cliente). */
 export interface CourtReservation {
@@ -957,6 +957,9 @@ export interface CourtAvailableSlot {
   endsAt: string;
   /** Ej. "09:00 – 10:30" */
   label: string;
+  /** pending ocupa el hueco y no abre un alta. */
+  status?: "available" | "pending";
+  reservationId?: string | null;
 }
 
 export interface CreateCourtInput {

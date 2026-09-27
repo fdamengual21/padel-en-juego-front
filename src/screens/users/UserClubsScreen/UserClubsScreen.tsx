@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Search } from "lucide-react";
+import { Building2, CircleAlert, Search } from "lucide-react";
 import Api from "@/api/Api";
 import { useUser } from "@/app/UserProvider";
+import { EmptyState } from "@/components/EmptyState";
 import GeographySelectFields from "@/components/GeographySelectFields";
 import { Input } from "@/components/ui/input";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -86,6 +87,10 @@ export default function UserClubsScreen() {
   const totalPages = data?.totalPages ?? 1;
   const totalItems = data?.totalItems ?? 0;
   const showSkeletons = (!geoSeeded || isLoading) && items.length === 0;
+  const showLoadError = isError && items.length === 0 && !showSkeletons;
+  const showEmpty =
+    !showSkeletons && !isError && items.length === 0 && !isFetching;
+  const hasActiveFilters = Boolean(debouncedSearch.trim()) || provinceId != null;
 
   return (
     <div className="space-y-5 p-4 md:p-0" data-testid="player-clubs">
@@ -123,29 +128,45 @@ export default function UserClubsScreen() {
       </div>
 
       {isFetching && items.length > 0 ? (
-        <p className="text-xs text-muted-foreground">Actualizando…</p>
+        <p className="text-center text-xs text-muted-foreground">Actualizando…</p>
       ) : null}
 
-      {isError ? (
-        <p className="text-sm text-muted-foreground">
-          No se pudieron cargar los clubes.
-        </p>
+      {isError && items.length > 0 ? (
+        <EmptyState
+          tone="error"
+          icon={CircleAlert}
+          title="No se pudieron cargar los clubes."
+          className="min-h-0 py-8"
+        />
       ) : null}
 
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3">
-        {showSkeletons
-          ? Array.from({ length: PAGE_SIZE }, (_, i) => (
-              <ClubCardSkeleton key={`sk-${i}`} />
-            ))
-          : items.map((club) => <ClubListCard key={club.id} club={club} />)}
-      </div>
+      {showLoadError ? (
+        <EmptyState
+          tone="error"
+          icon={CircleAlert}
+          title="No se pudieron cargar los clubes."
+        />
+      ) : null}
 
-      {!showSkeletons && items.length === 0 && !isFetching ? (
-        <p className="text-sm text-muted-foreground">
-          {debouncedSearch.trim() || provinceId != null
-            ? "No hay clubes que coincidan con la búsqueda."
-            : "Todavía no hay clubes para mostrar."}
-        </p>
+      {showSkeletons || items.length > 0 ? (
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3">
+          {showSkeletons
+            ? Array.from({ length: PAGE_SIZE }, (_, i) => (
+                <ClubCardSkeleton key={`sk-${i}`} />
+              ))
+            : items.map((club) => <ClubListCard key={club.id} club={club} />)}
+        </div>
+      ) : null}
+
+      {showEmpty ? (
+        <EmptyState
+          icon={hasActiveFilters ? Search : Building2}
+          title={
+            hasActiveFilters
+              ? "No hay clubes que coincidan con la búsqueda."
+              : "Todavía no hay clubes para mostrar."
+          }
+        />
       ) : null}
 
       <ClubsPagination

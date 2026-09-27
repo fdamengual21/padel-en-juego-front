@@ -1,4 +1,4 @@
-export type CalendarEventStatusApi = "Pending" | "Completed" | "Cancelled";
+export type CalendarEventStatusApi = "Pending" | "Booked" | "Completed" | "Cancelled";
 
 export interface CalendarEventGridItemDto {
   id: string;
