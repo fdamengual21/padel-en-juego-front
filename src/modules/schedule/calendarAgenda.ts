@@ -466,12 +466,14 @@ export function splitAgendaMonthDayEvents(
 }
 
 /**
- * Agrupa eventos en columnas paralelas a `days` (clave local `YYYY-MM-DD` de `startAt`).
+ * Agrupa eventos en columnas paralelas a `days`.
+ * Con horario de jornada, la madrugada queda en el día que abrió el club.
  * Cada bucket queda ordenado con `sortAgendaMonthDayEvents`.
  */
 export function groupEventsByCalendarDays(
   events: readonly CalendarEventGridItemDto[],
   days: readonly Dayjs[],
+  schedule?: AgendaJornadaSchedule,
 ): CalendarEventGridItemDto[][] {
   const buckets: CalendarEventGridItemDto[][] = days.map(() => []);
   const indexByKey = new Map(
@@ -483,7 +485,8 @@ export function groupEventsByCalendarDays(
     if (!eventDay.isValid()) {
       continue;
     }
-    const index = indexByKey.get(eventDay.format("YYYY-MM-DD"));
+    const columnDay = agendaJornadaColumnDay(eventDay, schedule).startOf("day");
+    const index = indexByKey.get(columnDay.format("YYYY-MM-DD"));
     if (index != null) {
       buckets[index]?.push(event);
     }

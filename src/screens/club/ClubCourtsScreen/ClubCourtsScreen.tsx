@@ -36,6 +36,7 @@ import {
 } from "@/utils";
 import type { ClubSession } from "@/stores/clubSessionStore";
 import CourtAgendaGrid from "./components/CourtAgendaGrid";
+import CourtAgendaMonthGrid from "./components/CourtAgendaMonthGrid";
 import CourtAgendaToolbar, {
   type CourtAgendaToolbarMode,
 } from "./components/CourtAgendaToolbar";
@@ -773,7 +774,29 @@ export default function ClubCourtsScreen() {
             }
           />
 
-          {headerView === "overview" ? (
+          {mode === "month" && (headerView === "overview" || court) ? (
+            <CourtAgendaMonthGrid
+              selectedDate={cursorDate}
+              events={
+                headerView === "overview"
+                  ? [...overviewGridEvents, ...reservationGridEvents]
+                  : [...gridEvents, ...reservationGridEvents]
+              }
+              loading={
+                headerView === "overview" ? multiBoardQuery.isLoading : boardQuery.isLoading
+              }
+              turnsLoading={calendarReservationsQuery.isFetching}
+              jornada={openHours.jornada}
+              onSelectEvent={(eventId) => {
+                openGridEvent(eventId, headerView === "detail" ? court?.id : undefined);
+              }}
+              onEmptyDayClick={
+                canWriteReservations
+                  ? (day) => openCreate(headerView === "detail" ? court?.id ?? null : null, day)
+                  : undefined
+              }
+            />
+          ) : headerView === "overview" ? (
             <CourtAgendaGrid
               viewMode={mode}
               selectedDate={cursorDate}

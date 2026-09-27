@@ -4,13 +4,14 @@ import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
+  formatAgendaMonthLabel,
   formatAgendaWeekRangeLabel,
   shiftAgendaDate,
   type CalendarAgendaViewMode,
 } from "@/modules/schedule";
 import { cn } from "@/lib/utils";
 
-export type CourtAgendaToolbarMode = Extract<CalendarAgendaViewMode, "day" | "week">;
+export type CourtAgendaToolbarMode = CalendarAgendaViewMode;
 
 interface CourtAgendaToolbarProps {
   mode: CourtAgendaToolbarMode;
@@ -30,7 +31,9 @@ export default function CourtAgendaToolbar({
   const label =
     mode === "day"
       ? date.format("dddd D [de] MMMM YYYY")
-      : formatAgendaWeekRangeLabel(date);
+      : mode === "month"
+        ? formatAgendaMonthLabel(date)
+        : formatAgendaWeekRangeLabel(date);
 
   return (
     <div
@@ -43,6 +46,7 @@ export default function CourtAgendaToolbar({
             [
               { value: "day", label: "Día" },
               { value: "week", label: "Semana" },
+              { value: "month", label: "Mes" },
             ] as const
           ).map((option) => (
             <button
