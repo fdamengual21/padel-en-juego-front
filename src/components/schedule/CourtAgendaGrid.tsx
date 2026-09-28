@@ -10,7 +10,9 @@ import {
   type CalendarEventGridItemDto,
 } from "@/modules/schedule";
 import CourtAgendaDayColumn from "./CourtAgendaDayColumn";
-import CourtAgendaDayHeader from "./CourtAgendaDayHeader";
+import CourtAgendaDayHeader, {
+  type CourtAgendaDayNote,
+} from "./CourtAgendaDayHeader";
 import CourtAgendaHourColumn from "./CourtAgendaHourColumn";
 
 interface CourtAgendaGridProps {
@@ -23,6 +25,7 @@ interface CourtAgendaGridProps {
   openHour?: number;
   closeHour?: number;
   jornada?: AgendaJornadaSchedule;
+  dayNotes?: Readonly<Record<string, CourtAgendaDayNote>>;
   onSelectEvent?: (eventId: string) => void;
   onEmptySlotClick?: (day: Dayjs, hour: number) => void;
 }
@@ -36,6 +39,7 @@ export default function CourtAgendaGrid({
   openHour,
   closeHour,
   jornada,
+  dayNotes,
   onSelectEvent,
   onEmptySlotClick,
 }: CourtAgendaGridProps) {
@@ -87,6 +91,7 @@ export default function CourtAgendaGrid({
                 <CourtAgendaDayHeader
                   day={day}
                   selected={day.isSame(selectedDate, "day")}
+                  note={dayNotes?.[day.format("YYYY-MM-DD")]}
                 />
               </div>
             );

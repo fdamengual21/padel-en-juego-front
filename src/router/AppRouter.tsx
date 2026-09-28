@@ -26,6 +26,8 @@ import ClubCourtConfigScreen from "@/screens/club/ClubCourtConfigScreen";
 import ClubSettingsScreen from "@/screens/club/ClubSettingsScreen";
 import UserHomeScreen from "@/screens/users/UserHomeScreen";
 import UserClubsScreen from "@/screens/users/UserClubsScreen";
+import UserClubDetailScreen from "@/screens/users/UserClubDetailScreen";
+import UserClubAvailabilityScreen from "@/screens/users/UserClubAvailabilityScreen";
 import UserTournamentsScreen from "@/screens/users/UserTournamentsScreen";
 import UserTournamentDetailScreen from "@/screens/users/UserTournamentDetailScreen";
 import UserRankingScreen from "@/screens/users/UserRankingScreen";
@@ -79,6 +81,11 @@ const router = createBrowserRouter(
           element={<RequireFeature feature="clubs" redirectTo={ROUTES.home} />}
         >
           <Route path="clubes" element={<UserClubsScreen />} />
+          <Route path="clubes/:clubId" element={<UserClubDetailScreen />} />
+          <Route
+            path="clubes/:clubId/disponibilidad"
+            element={<UserClubAvailabilityScreen />}
+          />
         </Route>
         <Route
           element={

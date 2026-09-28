@@ -24,5 +24,6 @@ export function calendarEventDurationMinutes(
 export function calendarEventTypeLabelEs(type: string): string {
   if (type === "reservation") return "Reserva";
   if (type === "tournament_match") return "Partido";
+  if (type === "availability") return "Disponible";
   return type;
 }

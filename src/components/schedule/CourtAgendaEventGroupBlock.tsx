@@ -30,11 +30,15 @@ function groupCountLabel(events: readonly CalendarEventGridItemDto[]): string {
   const count = events.length;
   const allReservations = events.every((e) => e.type === "reservation");
   const allMatches = events.every((e) => e.type === "tournament_match");
+  const allAvailable = events.every((e) => e.type === "availability");
   if (allReservations) {
     return count === 1 ? "1 reserva" : `${count} reservas`;
   }
   if (allMatches) {
     return count === 1 ? "1 partido" : `${count} partidos`;
+  }
+  if (allAvailable) {
+    return count === 1 ? "1 turno" : `${count} turnos`;
   }
   return formatAgendaEventGroupLabel(count);
 }
@@ -194,7 +198,9 @@ export default function CourtAgendaEventGroupBlock({
                               : secondary}
                           </p>
                         </div>
-                        <StatusBadge status={gridStatusToBadge(event.status)} />
+                        {event.type === "availability" ? null : (
+                          <StatusBadge status={gridStatusToBadge(event.status)} />
+                        )}
                       </button>
                     </li>
                   );

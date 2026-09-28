@@ -40,7 +40,7 @@ Un `index.ts` es la API pública de un módulo. Quien importa desde afuera usa e
 
 | Carpeta | `index.ts` |
 |---|---|
-| `src/modules/<nombre>/`, `src/utils/`, `src/domain/`, `src/authorization/`, `src/components/<dominio>/` (`Form/`, `guards/`, `tournaments/`) | Sí. Lista solo lo público. |
+| `src/modules/<nombre>/`, `src/utils/`, `src/domain/`, `src/authorization/`, `src/components/<dominio>/` (`Form/`, `guards/`, `tournaments/`, `reservations/`) | Sí. Lista solo lo público. |
 | `src/screens/<modo>/<ScreenName>/` | Sí, y solo `export { default } from "./ScreenName"`. |
 | `components/` de una screen, un archivo usado por un solo padre | No. Import relativo al archivo. |
 
@@ -55,7 +55,7 @@ Un `index.ts` es la API pública de un módulo. Quien importa desde afuera usa e
 - Nombre de screen termina en `Screen`.
 - Solo se usa en esa screen → `screens/.../<Screen>/components/`.
 - Varias screens del mismo modo → `screens/<modo>/components/` (ej. `TournamentForm`).
-- Reutilizable entre modos o generico → `src/components/` (por dominio: `tournaments/`, `ui/`).
+- Reutilizable entre modos o generico → `src/components/` (por dominio: `tournaments/`, `reservations/`, `ui/`).
 - Un archivo, un componente `export default`. Props: `interface XProps`.
 
 ## Dependencias
@@ -64,7 +64,7 @@ Un `index.ts` es la API pública de un módulo. Quien importa desde afuera usa e
 UI (screens/layout/components) → Api.XxxService() → Service → Repository → HTTP o stub
 ```
 
-- Auth, geography, sexes, legal, users y catálogo público de clubes: HTTP real via `axiosInstance` (`/api/auth/*`, `/api/geography/*`, `/api/sexes`, `/api/legal/current`, `GET`/`PATCH /api/users/me`, `GET /api/public/clubs`). El interceptor pone `Authorization` desde zustand y `X-Club-Id` **solo** si el usuario eligió un club (`isClubMode`) y ese id está en `clubs[]` de `/me`.
+- Auth, geography, sexes, legal, users y catálogo público de clubes: HTTP real via `axiosInstance` (`/api/auth/*`, `/api/geography/*`, `/api/sexes`, `/api/legal/current`, `GET`/`PATCH /api/users/me`, `GET /api/users/me/reservations`, `POST /api/users/me/reservations/{id}/cancel`, `GET /api/public/clubs`, `GET /api/public/clubs/{id}`, `GET /api/public/clubs/{id}/availability`, `POST /api/public/clubs/{id}/reservations`). El interceptor pone `Authorization` desde zustand y `X-Club-Id` **solo** si el usuario eligió un club (`isClubMode`) y ese id está en `clubs[]` de `/me`.
 - Tras login o confirmar email, `AuthService` exige token+refresh+expires, `UserProvider` los guarda en zustand y pide `/me` (no usa el `user` del login). `UserService.me()` no llama si no hay JWT. Al refrescar, si hay JWT **siempre** se vuelve a pedir `/me`. El persist de `padel-en-juego.auth` guarda tokens + club elegido, **no** el DTO de `/me`. Logout limpia persist, mock-session y la cache de queries.
 - Settings de club: `GET/PATCH /api/club/settings` e imagenes `POST/DELETE /api/club/settings/avatar|cover` (la API valida staff + permiso). Contexto operativo (nombre y horario, staff activo, sin `club.settings.read`): `GET /api/club/context`, en memoria en `useClubSessionStore` (se limpia al salir del club). Canchas: `GET/POST /api/club/courts`, `GET/PATCH/DELETE /api/club/courts/{id}` y foto `POST/DELETE /api/club/courts/{id}/photo` (`club.courts.read` / `club.courts.write`). Torneos y reservas siguen stub.
 - Permisos UI: `src/authorization/` + `PermissionsGuard` / `usePermissions()` contra `scopedPermissions` de `/me`. No recalcular por rol en el cliente. Ver **permissions-and-guards.mdc**.

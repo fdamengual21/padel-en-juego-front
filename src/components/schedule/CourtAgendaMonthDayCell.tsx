@@ -19,6 +19,8 @@ interface CourtAgendaMonthDayCellProps {
   events: CalendarEventGridItemDto[];
   inCurrentMonth: boolean;
   maxVisibleChips: number;
+  /** Si viene, el popover lista estos turnos y no los chips del día. */
+  listEvents?: CalendarEventGridItemDto[];
   onSelectEvent?: (eventId: string) => void;
   onEmptyDayClick?: (day: Dayjs) => void;
 }
@@ -54,6 +56,7 @@ export default function CourtAgendaMonthDayCell({
   events,
   inCurrentMonth,
   maxVisibleChips,
+  listEvents,
   onSelectEvent,
   onEmptyDayClick,
 }: CourtAgendaMonthDayCellProps) {
@@ -63,9 +66,12 @@ export default function CourtAgendaMonthDayCell({
   const [open, setOpen] = useState(false);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
   const isToday = day.isSame(dayjs(), "day");
+  const listing = listEvents !== undefined;
+  const popupEvents = listing ? listEvents : events;
   const { visible, hidden } = splitAgendaMonthDayEvents(events, maxVisibleChips);
   const multiple = events.length > 1;
   const dayLabel = day.format("D [de] MMMM");
+  const canOpenList = listing ? listEvents.length > 0 : multiple;
 
   useLayoutEffect(() => {
     if (!open || !cellRef.current || !menuRef.current) {
@@ -88,10 +94,11 @@ export default function CourtAgendaMonthDayCell({
   const openList = () => setOpen(true);
 
   const activateEvent = (eventId: string) => {
-    if (multiple) {
+    if (canOpenList) {
       openList();
       return;
     }
+    if (listing) return;
     onSelectEvent?.(eventId);
   };
 
@@ -106,6 +113,10 @@ export default function CourtAgendaMonthDayCell({
           events.length === 0 && onEmptyDayClick && "cursor-pointer hover:bg-muted/40",
         )}
         onClick={() => {
+          if (listing) {
+            if (canOpenList) openList();
+            return;
+          }
           if (events.length === 0) {
             onEmptyDayClick?.(day);
             return;
@@ -131,15 +142,18 @@ export default function CourtAgendaMonthDayCell({
         <div className="flex min-h-0 flex-1 flex-col gap-0.5">
           {visible.map((event) => {
             const title = event.title.trim() || calendarEventTypeLabelEs(event.type);
-            const clock = formatAgendaBlockClock(event.startAt);
+            const clock = event.allDay ? "" : formatAgendaBlockClock(event.startAt);
+            const struck =
+              event.status === "Cancelled" && event.type === "reservation";
             return (
               <button
                 key={event.id}
                 type="button"
                 className={cn(
                   "truncate rounded-md border-l-2 px-1 py-0.5 text-left text-[11px] font-semibold leading-tight",
+                  event.type === "availability" && "py-1 text-xs",
                   toneClasses[eventTone(event)],
-                  event.status === "Cancelled" && "line-through opacity-60",
+                  struck && "line-through opacity-60",
                 )}
                 onClick={(clickEvent) => {
                   clickEvent.stopPropagation();
@@ -187,16 +201,14 @@ export default function CourtAgendaMonthDayCell({
                   visibility: menuPos ? "visible" : "hidden",
                 }}
               >
-                {events.map((event) => {
+                {popupEvents.map((event) => {
                   const title = event.title.trim() || calendarEventTypeLabelEs(event.type);
-                  const clock = formatAgendaBlockClock(event.startAt);
-                  const secondary = [
-                    clock,
-                    calendarEventTypeLabelEs(event.type),
-                    event.subtitle?.trim(),
-                  ]
-                    .filter(Boolean)
-                    .join(" · ");
+                  const clock = event.allDay ? "" : formatAgendaBlockClock(event.startAt);
+                  const secondary = listing
+                    ? event.subtitle?.trim() || ""
+                    : [clock, calendarEventTypeLabelEs(event.type), event.subtitle?.trim()]
+                        .filter(Boolean)
+                        .join(" · ");
                   return (
                     <li key={event.id} role="option">
                       <button
@@ -209,9 +221,11 @@ export default function CourtAgendaMonthDayCell({
                       >
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-medium">{title}</p>
-                          <p className="truncate text-xs text-muted-foreground">{secondary}</p>
+                          {secondary ? (
+                            <p className="truncate text-xs text-muted-foreground">{secondary}</p>
+                          ) : null}
                         </div>
-                        <StatusBadge status={badgeStatus(event.status)} />
+                        {listing ? null : <StatusBadge status={badgeStatus(event.status)} />}
                       </button>
                     </li>
                   );

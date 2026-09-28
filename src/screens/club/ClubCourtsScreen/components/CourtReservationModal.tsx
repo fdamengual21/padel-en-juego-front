@@ -23,7 +23,11 @@ import {
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { toastError, toastSuccess } from "@/lib/toast";
-import type { ReservationPlayer } from "@/modules/reservations";
+import type {
+  CourtSlot,
+  CreateReservationInput,
+  ReservationPlayer,
+} from "@/modules/reservations";
 import ReservationPlayerField from "./ReservationPlayerField";
 
 type ModalMode = "view" | "edit" | "create";
@@ -48,6 +52,15 @@ interface CourtReservationModalProps {
   isSaving?: boolean;
   /** False si solo hay reservations.read: consulta, sin editar/guardar/cancelar. */
   canMutate?: boolean;
+  /** Si viene, no se busca otro jugador: el pedido es de esta persona. */
+  fixedPlayer?: ReservationPlayer | null;
+  /** Turnos ya conocidos (vista pública). No consulta el calendario del staff. */
+  fixedSlots?: CourtSlot[];
+  /** Alta distinta a la del club. El jugador logueado no usa el endpoint de staff. */
+  submitCreate?: (input: CreateReservationInput) => Promise<void>;
+  createTitle?: string;
+  createSuccessMessage?: string;
+  saveLabel?: string;
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }
@@ -108,6 +121,12 @@ export default function CourtReservationModal({
   client,
   isSaving = false,
   canMutate = true,
+  fixedPlayer = null,
+  fixedSlots,
+  submitCreate,
+  createTitle,
+  createSuccessMessage,
+  saveLabel = "Guardar",
   onOpenChange,
   onSaved,
 }: CourtReservationModalProps) {
@@ -145,7 +164,7 @@ export default function CourtReservationModal({
     setSelectedCourtId(initialCourtId);
 
     if (initialMode === "create") {
-      setPlayer(null);
+      setPlayer(fixedPlayer);
       setDateIso(initialDate ?? toDateIso(presetStartsAt));
       setPinSlot(preselectSlot && Boolean(presetStartsAt));
       setSelectedStartsAt(null);
@@ -175,6 +194,7 @@ export default function CourtReservationModal({
     reservation,
     event,
     client,
+    fixedPlayer,
   ]);
 
   const { data: slotList, isFetching: loadingSlots, isError: slotsError } = useQuery({
@@ -190,11 +210,24 @@ export default function CourtReservationModal({
         selectedCourtId!,
         ignoreReservationId,
       ),
-    enabled: open && !readOnly && Boolean(selectedCourtId) && Boolean(dateIso),
+    enabled:
+      open &&
+      !readOnly &&
+      fixedSlots == null &&
+      Boolean(selectedCourtId) &&
+      Boolean(dateIso),
     refetchOnMount: "always",
   });
-  const availableSlots = (slotList?.slots ?? []).filter(
-    (slot) => slot.status !== "pending",
+  const availableSlots = (
+    fixedSlots ??
+    slotList?.slots ??
+    []
+  ).filter(
+    (slot) =>
+      slot.status !== "pending" &&
+      (fixedSlots == null ||
+        (slot.courtId === selectedCourtId &&
+          dayjs(slot.startsAt).format("YYYY-MM-DD") === dateIso)),
   );
   const slotMessage = slotList?.message ?? null;
   const openedDate = initialDate ?? (presetStartsAt ? toDateIso(presetStartsAt) : null);
@@ -235,7 +268,7 @@ export default function CourtReservationModal({
   const isPending = reservation?.status === "pending";
   const title =
     mode === "create"
-      ? "Nueva reserva"
+      ? (createTitle ?? "Nueva reserva")
       : mode === "edit"
         ? "Editar reserva"
         : isPending
@@ -287,11 +320,16 @@ export default function CourtReservationModal({
     if (!selectedStartsAt) throw new Error("Elegí un turno");
     if (!player) throw new Error("Elegí un jugador");
     if (mode === "create" || !reservation) {
-      await Api.ReservationService().create({
+      const input = {
         courtId: selectedCourtId,
         bookedByPlayerId: player.id,
         startsAt: selectedStartsAt,
-      });
+      };
+      if (submitCreate) {
+        await submitCreate(input);
+        return;
+      }
+      await Api.ReservationService().create(input);
       return;
     }
     await Api.ReservationService().update(reservation.id, {
@@ -303,7 +341,11 @@ export default function CourtReservationModal({
   const handleSave = () =>
     run(async () => {
       await persistReservation();
-      toastSuccess(mode === "create" ? "Reserva creada" : "Reserva actualizada");
+      toastSuccess(
+        mode === "create"
+          ? (createSuccessMessage ?? "Reserva creada")
+          : "Reserva actualizada",
+      );
     });
 
   const handleCancelReservation = () => {
@@ -466,7 +508,17 @@ export default function CourtReservationModal({
                   </select>
                 </div>
 
-                <ReservationPlayerField value={player} onChange={setPlayer} />
+                {fixedPlayer ? (
+                  <div className="space-y-1.5">
+                    <Label>A nombre de</Label>
+                    <p className="text-sm font-medium" data-testid="reservation-fixed-player">
+                      {`${fixedPlayer.firstName} ${fixedPlayer.lastName}`.trim() ||
+                        "Tu cuenta"}
+                    </p>
+                  </div>
+                ) : (
+                  <ReservationPlayerField value={player} onChange={setPlayer} />
+                )}
 
                 <div className="space-y-1.5">
                   <Label htmlFor="reservation-date">Fecha</Label>
@@ -674,7 +726,7 @@ export default function CourtReservationModal({
                   disabled={!canSubmit}
                   onClick={() => void handleSave()}
                 >
-                  {busy || isSaving ? "Guardando…" : "Guardar"}
+                  {busy || isSaving ? "Guardando…" : saveLabel}
                 </Button>
               ) : null}
             </div>

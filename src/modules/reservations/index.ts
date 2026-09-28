@@ -3,6 +3,9 @@ export type {
   CourtSlotList,
   CreateReservationInput,
   ReservationPlayer,
+  PlayerReservation,
+  PlayerReservationClub,
+  PlayerReservationStatus,
   UpdateReservationInput,
 } from "./types";
 export { ReservationRepository } from "./repositories/ReservationRepository";

@@ -551,6 +551,12 @@ export interface CourtReservation {
   bookedByPlayerId?: string;
   playerFirstName?: string;
   playerLastName?: string;
+  /** URL publica del avatar. Null si no tiene cuenta o no hay foto. */
+  playerAvatarUrl?: string | null;
+  /** True si el jugador tiene cuenta en la app. */
+  playerHasAccount?: boolean;
+  /** True si ya es cliente de este club. */
+  isClubPlayer?: boolean;
   courtName?: string;
   startsAt: string;
   endsAt: string;

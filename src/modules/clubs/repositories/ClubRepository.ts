@@ -10,8 +10,14 @@ import type {
   Club,
   ClubContext,
   ClubSettings,
+  PublicClubAvailability,
+  PublicClubAvailabilityQuery,
+  PublicClubDetail,
   PublicClubListItem,
   PublicClubListQuery,
+  PublicClubSlot,
+  PublicCourt,
+  PublicCourtPriceRule,
   UpdateClubInput,
   UpdateClubSettingsInput,
 } from "../types";
@@ -27,6 +33,15 @@ export interface IClubRepository {
   deleteAvatar(): Promise<ClubSettings>;
   deleteCover(): Promise<ClubSettings>;
   listPublic(query: PublicClubListQuery): Promise<PaginatedResult<PublicClubListItem>>;
+  getPublic(id: string): Promise<PublicClubDetail>;
+  listPublicAvailability(
+    id: string,
+    query: PublicClubAvailabilityQuery,
+  ): Promise<PublicClubAvailability>;
+  requestPublicReservation(
+    id: string,
+    input: { courtId: string; startsAt: string },
+  ): Promise<void>;
   update(id: string, patch: UpdateClubInput): Promise<Club>;
 }
 
@@ -78,6 +93,86 @@ function normalizePublicClub(raw: Record<string, unknown>): PublicClubListItem {
       typeof raw.availableSlotsToday === "number" && Number.isFinite(raw.availableSlotsToday)
         ? Math.max(0, Math.trunc(raw.availableSlotsToday))
         : 0,
+  };
+}
+
+function normalizePublicCourt(raw: Record<string, unknown>): PublicCourt {
+  const rules = Array.isArray(raw.priceRules)
+    ? raw.priceRules
+        .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
+        .map(normalizePublicPriceRule)
+    : [];
+  return {
+    id: asString(raw.id),
+    name: asString(raw.name),
+    imageUrl: asNullableString(raw.imageUrl),
+    slotDurationMinutes:
+      typeof raw.slotDurationMinutes === "number" && Number.isFinite(raw.slotDurationMinutes)
+        ? Math.max(0, Math.trunc(raw.slotDurationMinutes))
+        : 0,
+    basePrice: asNullableNumber(raw.basePrice) ?? 0,
+    priceRules: rules,
+  };
+}
+
+function normalizePublicPriceRule(raw: Record<string, unknown>): PublicCourtPriceRule {
+  return {
+    startTime: asHour(raw.startTime) ?? "",
+    endTime: asHour(raw.endTime) ?? "",
+    daysOfWeek: asOpenDays(raw.daysOfWeek),
+    price: asNullableNumber(raw.price) ?? 0,
+    label: asNullableString(raw.label),
+  };
+}
+
+function normalizePublicSlot(raw: Record<string, unknown>): PublicClubSlot {
+  return {
+    courtId: asString(raw.courtId),
+    courtName: asString(raw.courtName),
+    startsAt: asString(raw.startsAt),
+    endsAt: asString(raw.endsAt),
+    label: asString(raw.label),
+    price: asNullableNumber(raw.price) ?? 0,
+    priceLabel: asNullableString(raw.priceLabel),
+    status: raw.status === "free" ? "free" : "occupied",
+  };
+}
+
+function asRecordList(value: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (item): item is Record<string, unknown> => Boolean(item) && typeof item === "object",
+  );
+}
+
+function normalizePublicClubDetail(raw: Record<string, unknown>): PublicClubDetail {
+  return {
+    id: asString(raw.id),
+    name: asString(raw.name),
+    avatarUrl: asNullableString(raw.avatarUrl),
+    coverUrl: asNullableString(raw.coverUrl),
+    provinceName: asNullableString(raw.provinceName),
+    municipalityName: asNullableString(raw.municipalityName),
+    street: asString(raw.street),
+    streetNumber: asString(raw.streetNumber),
+    latitude: asNullableNumber(raw.latitude),
+    longitude: asNullableNumber(raw.longitude),
+    googleMapsUrl: asNullableString(raw.googleMapsUrl),
+    phone: asString(raw.phone),
+    instagramHandle: asNullableString(raw.instagramHandle),
+    openTime: asHour(raw.openTime),
+    closeTime: asHour(raw.closeTime),
+    openDays: asOpenDays(raw.openDays),
+    courts: asRecordList(raw.courts).map(normalizePublicCourt),
+    freeSlotsToday: asRecordList(raw.freeSlotsToday).map(normalizePublicSlot),
+  };
+}
+
+function normalizePublicAvailability(raw: Record<string, unknown>): PublicClubAvailability {
+  return {
+    closed: raw.closed === true,
+    message: asNullableString(raw.message),
+    slots: asRecordList(raw.slots).map(normalizePublicSlot),
   };
 }
 
@@ -199,6 +294,39 @@ export class ClubRepository implements IClubRepository {
       },
     });
     return normalizePublicClubPage(readData(response) ?? {});
+  }
+
+  async getPublic(id: string): Promise<PublicClubDetail> {
+    const response = await this.axiosInstance.get<
+      ApiEnvelope<Record<string, unknown>>
+    >(`/public/clubs/${id}`);
+    return normalizePublicClubDetail(readData(response) ?? {});
+  }
+
+  async listPublicAvailability(
+    id: string,
+    query: PublicClubAvailabilityQuery,
+  ): Promise<PublicClubAvailability> {
+    const response = await this.axiosInstance.get<
+      ApiEnvelope<Record<string, unknown>>
+    >(`/public/clubs/${id}/availability`, {
+      params: {
+        from: query.from,
+        to: query.to,
+        courtId: query.courtId || undefined,
+      },
+    });
+    return normalizePublicAvailability(readData(response) ?? {});
+  }
+
+  async requestPublicReservation(
+    id: string,
+    input: { courtId: string; startsAt: string },
+  ): Promise<void> {
+    await this.axiosInstance.post<ApiEnvelope<unknown>>(
+      `/public/clubs/${id}/reservations`,
+      { courtId: input.courtId, startsAt: input.startsAt },
+    );
   }
 
   async update(_id: string, _patch: UpdateClubInput): Promise<Club> {

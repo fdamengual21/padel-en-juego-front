@@ -16,6 +16,8 @@ import CourtAgendaMonthDayCell from "./CourtAgendaMonthDayCell";
 interface CourtAgendaMonthGridProps {
   selectedDate: Dayjs;
   events: CalendarEventGridItemDto[];
+  /** Popover del día. Si viene, reemplaza la lista de `events`. */
+  listEvents?: CalendarEventGridItemDto[];
   loading?: boolean;
   turnsLoading?: boolean;
   jornada?: AgendaJornadaSchedule;
@@ -43,6 +45,7 @@ function useMaxVisibleChips(): number {
 export default function CourtAgendaMonthGrid({
   selectedDate,
   events,
+  listEvents,
   loading = false,
   turnsLoading = false,
   jornada,
@@ -54,6 +57,10 @@ export default function CourtAgendaMonthGrid({
   const buckets = useMemo(
     () => groupEventsByCalendarDays(events, days, jornada),
     [events, days, jornada],
+  );
+  const listBuckets = useMemo(
+    () => (listEvents ? groupEventsByCalendarDays(listEvents, days, jornada) : null),
+    [listEvents, days, jornada],
   );
   const weekdayLabels = useMemo(() => {
     const monday = startOfAgendaWeek(selectedDate);
@@ -97,6 +104,7 @@ export default function CourtAgendaMonthGrid({
             key={day.format("YYYY-MM-DD")}
             day={day}
             events={buckets[index] ?? []}
+            listEvents={listBuckets ? (listBuckets[index] ?? []) : undefined}
             inCurrentMonth={day.isSame(selectedDate, "month")}
             maxVisibleChips={maxVisibleChips}
             onSelectEvent={onSelectEvent}

@@ -1,5 +1,6 @@
 import type { IClubRepository } from "../repositories/ClubRepository";
 import type {
+  PublicClubAvailabilityQuery,
   PublicClubListQuery,
   UpdateClubInput,
   UpdateClubSettingsInput,
@@ -50,6 +51,18 @@ export class ClubService {
 
   listPublic(query: PublicClubListQuery) {
     return this.repository.listPublic(query);
+  }
+
+  getPublic(id: string) {
+    return this.repository.getPublic(id);
+  }
+
+  listPublicAvailability(id: string, query: PublicClubAvailabilityQuery) {
+    return this.repository.listPublicAvailability(id, query);
+  }
+
+  requestPublicReservation(id: string, input: { courtId: string; startsAt: string }) {
+    return this.repository.requestPublicReservation(id, input);
   }
 
   update(id: string, patch: UpdateClubInput) {

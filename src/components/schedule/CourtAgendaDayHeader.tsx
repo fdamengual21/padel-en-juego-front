@@ -1,14 +1,21 @@
 import dayjs, { type Dayjs } from "dayjs";
 import { cn } from "@/lib/utils";
 
+export interface CourtAgendaDayNote {
+  label: string;
+  tone: "available" | "unavailable";
+}
+
 interface CourtAgendaDayHeaderProps {
   day: Dayjs;
   selected: boolean;
+  note?: CourtAgendaDayNote | null;
 }
 
 export default function CourtAgendaDayHeader({
   day,
   selected,
+  note,
 }: CourtAgendaDayHeaderProps) {
   const isToday = day.isSame(dayjs(), "day");
   const weekday = day.format("ddd").replace(".", "");
@@ -35,6 +42,18 @@ export default function CourtAgendaDayHeader({
       ) : (
         <span className="h-3" aria-hidden />
       )}
+      {note ? (
+        <span
+          className={cn(
+            "w-full truncate rounded-md border-l-2 px-1 py-1 text-center text-[11px] font-semibold leading-tight",
+            note.tone === "unavailable"
+              ? "border-l-destructive bg-destructive/10 text-sidebar"
+              : "border-l-primary bg-primary/10 text-sidebar",
+          )}
+        >
+          {note.label}
+        </span>
+      ) : null}
     </div>
   );
 }

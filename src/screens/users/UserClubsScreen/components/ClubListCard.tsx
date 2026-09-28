@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { ChevronRight, Clock, MapPin } from "lucide-react";
 import type { PublicClubListItem } from "@/modules/clubs";
+import { ROUTES } from "@/router/routes";
 import { Badge } from "@/components/ui/badge";
 import { formatLocationEs } from "@/lib/dates";
 import { formatClubScheduleEs } from "@/lib/clubSchedule";
@@ -22,7 +24,8 @@ export default function ClubListCard({ club }: ClubListCardProps) {
   const showImage = Boolean(club.coverUrl) && !imageFailed;
 
   return (
-    <article
+    <Link
+      to={ROUTES.player.clubDetail(club.id)}
       className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card md:flex-row"
       data-testid={`public-club-card-${club.id}`}
     >
@@ -78,7 +81,7 @@ export default function ClubListCard({ club }: ClubListCardProps) {
           </p>
         </div>
       </div>
-    </article>
+    </Link>
   );
 }
 

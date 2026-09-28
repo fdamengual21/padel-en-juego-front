@@ -35,12 +35,14 @@ import {
   resolveClubOpenStatus,
 } from "@/utils";
 import type { ClubSession } from "@/stores/clubSessionStore";
-import CourtAgendaGrid from "./components/CourtAgendaGrid";
-import CourtAgendaMonthGrid from "./components/CourtAgendaMonthGrid";
-import CourtAgendaToolbar, {
+import {
+  CourtAgendaGrid,
+  CourtAgendaMonthGrid,
+  CourtAgendaToolbar,
   type CourtAgendaToolbarMode,
-} from "./components/CourtAgendaToolbar";
+} from "@/components/schedule";
 import CourtReservationModal from "./components/CourtReservationModal";
+import PendingReservationsCard from "./components/PendingReservationsCard";
 import CourtSummaryCard from "./components/CourtSummaryCard";
 import CourtsOverviewCard from "./components/CourtsOverviewCard";
 import CreateCourtDialog from "./components/CreateCourtDialog";
@@ -372,6 +374,7 @@ export default function ClubCourtsScreen() {
     void queryClient.invalidateQueries({ queryKey: ["courts-agenda-board"] });
     void queryClient.invalidateQueries({ queryKey: ["courts-day-overview"] });
     void queryClient.invalidateQueries({ queryKey: ["court-reservations"] });
+    void queryClient.invalidateQueries({ queryKey: ["court-reservations-pending"] });
     void queryClient.invalidateQueries({ queryKey: ["court-reservations-calendar"] });
     void queryClient.invalidateQueries({ queryKey: ["court-slots"] });
     void queryClient.invalidateQueries({ queryKey: ["courts", clubId] });
@@ -464,9 +467,9 @@ export default function ClubCourtsScreen() {
     enabled: Boolean(clubId),
   });
 
-  const reservationsQuery = useQuery({
-    queryKey: ["court-reservations", clubId, summaryDate],
-    queryFn: () => Api.ReservationService().list(summaryDate),
+  const pendingReservationsQuery = useQuery({
+    queryKey: ["court-reservations-pending", clubId],
+    queryFn: () => Api.ReservationService().listPending(),
     enabled: Boolean(clubId),
   });
 
@@ -504,7 +507,7 @@ export default function ClubCourtsScreen() {
 
   const openChip = (courtId: string, slot: CourtAvailableSlot) => {
     if (slot.status === "pending" && slot.reservationId) {
-      const reservation = (reservationsQuery.data ?? []).find(
+      const reservation = (pendingReservationsQuery.data ?? []).find(
         (item) => item.id === slot.reservationId,
       );
       if (reservation) {
@@ -692,60 +695,12 @@ export default function ClubCourtsScreen() {
         <p className="text-base text-muted-foreground">Cargando canchas…</p>
       ) : null}
 
-      <div className="space-y-2" data-testid="court-reservations-list">
-        <h3 className="text-lg font-semibold">Reservas del día</h3>
-        {reservationsQuery.isLoading ? (
-          <p className="text-sm text-muted-foreground">Cargando reservas…</p>
-        ) : (reservationsQuery.data ?? []).length === 0 ? (
-          <p className="text-sm text-muted-foreground">No hay reservas en esta jornada.</p>
-        ) : (
-          <ul className="divide-y divide-border rounded-xl border border-border">
-            {(reservationsQuery.data ?? []).map((reservation) => (
-              <li key={reservation.id}>
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-muted"
-                  onClick={() => {
-                    setSelectedCourtId(reservation.courtId);
-                    setReservationModal({
-                      mode: "view",
-                      event: null,
-                      reservation,
-                      client: null,
-                      presetStartsAt: null,
-                      initialDate: null,
-                      preselectSlot: false,
-                      courtId: reservation.courtId,
-                    });
-                  }}
-                >
-                  <span>
-                    {dayjs(reservation.startsAt).format("HH:mm")}
-                    {" – "}
-                    {dayjs(reservation.endsAt).format("HH:mm")}
-                    {" · "}
-                    {reservation.courtName || "Cancha"}
-                    {" · "}
-                    {`${reservation.playerFirstName ?? ""} ${reservation.playerLastName ?? ""}`.trim() ||
-                      "Jugador"}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {reservation.status === "booked"
-                      ? "Reservada"
-                      : reservation.status === "pending"
-                        ? "Pendiente"
-                        : reservation.status === "rejected"
-                          ? "Rechazada"
-                          : reservation.status === "completed"
-                            ? "Completada"
-                            : "Cancelada"}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <PendingReservationsCard
+        clubId={clubId}
+        reservations={pendingReservationsQuery.data ?? []}
+        canMutate={canWriteReservations}
+        onChanged={invalidateBoard}
+      />
 
       {courts.length > 0 ? (
         <>

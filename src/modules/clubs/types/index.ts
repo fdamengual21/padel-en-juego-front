@@ -68,3 +68,66 @@ export interface PublicClubListQuery {
   page?: number;
   pageSize?: number;
 }
+
+export interface PublicCourtPriceRule {
+  startTime: string;
+  endTime: string;
+  daysOfWeek: WeekdayIso[];
+  price: number;
+  label: string | null;
+}
+
+export interface PublicCourt {
+  id: string;
+  name: string;
+  imageUrl: string | null;
+  slotDurationMinutes: number;
+  basePrice: number;
+  priceRules: PublicCourtPriceRule[];
+}
+
+export type PublicClubSlotStatus = "free" | "occupied";
+
+export interface PublicClubSlot {
+  courtId: string;
+  courtName: string;
+  startsAt: string;
+  endsAt: string;
+  label: string;
+  price: number;
+  priceLabel: string | null;
+  status: PublicClubSlotStatus;
+}
+
+export interface PublicClubDetail {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+  coverUrl: string | null;
+  provinceName: string | null;
+  municipalityName: string | null;
+  street: string;
+  streetNumber: string;
+  latitude: number | null;
+  longitude: number | null;
+  googleMapsUrl: string | null;
+  phone: string;
+  instagramHandle: string | null;
+  openTime: string | null;
+  closeTime: string | null;
+  openDays: WeekdayIso[];
+  courts: PublicCourt[];
+  freeSlotsToday: PublicClubSlot[];
+}
+
+export interface PublicClubAvailability {
+  closed: boolean;
+  message: string | null;
+  slots: PublicClubSlot[];
+}
+
+export interface PublicClubAvailabilityQuery {
+  from: string;
+  to: string;
+  courtId?: string | null;
+}

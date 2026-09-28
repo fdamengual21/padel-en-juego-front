@@ -12,6 +12,10 @@ export class ReservationService {
     return this.repository.list(date, courtId);
   }
 
+  listPending() {
+    return this.repository.listPending();
+  }
+
   listCalendar(from: string, to: string, courtId?: string) {
     return this.repository.listCalendar(from, to, courtId);
   }
@@ -46,5 +50,13 @@ export class ReservationService {
 
   reject(id: string, reason?: string) {
     return this.repository.reject(id, reason);
+  }
+
+  listMine() {
+    return this.repository.listMine();
+  }
+
+  cancelMine(id: string) {
+    return this.repository.cancelMine(id);
   }
 }

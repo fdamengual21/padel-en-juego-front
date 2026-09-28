@@ -30,6 +30,7 @@ export {
   CALENDAR_AGENDA_NORMAL_MAX_HEIGHT,
   calendarAgendaEventStatusTone,
   calendarAgendaGroupStatusTone,
+  agendaJornadaColumnDay,
   startOfAgendaWeek,
   startOfAgendaMonthGrid,
   buildAgendaMonthGridDays,

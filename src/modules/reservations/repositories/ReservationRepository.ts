@@ -9,11 +9,15 @@ import type {
   CourtSlotList,
   CreateReservationInput,
   ReservationPlayer,
+  PlayerReservation,
+  PlayerReservationClub,
+  PlayerReservationStatus,
   UpdateReservationInput,
 } from "../types";
 
 export interface IReservationRepository {
   list(date: string, courtId?: string): Promise<CourtReservation[]>;
+  listPending(): Promise<CourtReservation[]>;
   listCalendar(from: string, to: string, courtId?: string): Promise<CourtReservation[]>;
   listSlots(
     date: string,
@@ -27,6 +31,8 @@ export interface IReservationRepository {
   complete(id: string): Promise<CourtReservation>;
   accept(id: string): Promise<CourtReservation>;
   reject(id: string, reason?: string): Promise<CourtReservation>;
+  listMine(): Promise<PlayerReservation[]>;
+  cancelMine(id: string): Promise<void>;
 }
 
 function asString(value: unknown): string {
@@ -55,6 +61,48 @@ function asStatus(value: unknown): CourtReservationStatus {
   return "booked";
 }
 
+function asNullable(value: unknown): string | null {
+  const text = asString(value).trim();
+  return text || null;
+}
+
+function asMineStatus(value: unknown): PlayerReservationStatus | null {
+  if (value === "pending" || value === "booked" || value === "rejected") return value;
+  return null;
+}
+
+function normalizeClub(raw: unknown): PlayerReservationClub | null {
+  if (!raw || typeof raw !== "object") return null;
+  const club = raw as Record<string, unknown>;
+  const id = asString(club.id);
+  if (!id) return null;
+  return {
+    id,
+    name: asString(club.name),
+    avatarUrl: asNullable(club.avatarUrl),
+    coverUrl: asNullable(club.coverUrl),
+    municipalityName: asNullable(club.municipalityName),
+    provinceName: asNullable(club.provinceName),
+  };
+}
+
+function normalizeMine(raw: Record<string, unknown>): PlayerReservation | null {
+  const status = asMineStatus(raw.status);
+  const id = asString(raw.id);
+  const club = normalizeClub(raw.club);
+  if (!status || !id || !club) return null;
+  return {
+    id,
+    club,
+    courtName: asString(raw.courtName),
+    startsAt: asString(raw.startsAt),
+    endsAt: asString(raw.endsAt),
+    status,
+    price: asNumber(raw.price),
+    rejectedReason: asNullable(raw.rejectedReason),
+  };
+}
+
 export function normalizeReservation(raw: Record<string, unknown>): CourtReservation {
   const playerId = asString(raw.bookedByPlayerId);
   return {
@@ -65,6 +113,9 @@ export function normalizeReservation(raw: Record<string, unknown>): CourtReserva
     bookedByPlayerId: playerId,
     playerFirstName: asString(raw.playerFirstName),
     playerLastName: asString(raw.playerLastName),
+    playerAvatarUrl: asString(raw.playerAvatarUrl) || null,
+    playerHasAccount: raw.playerHasAccount === true,
+    isClubPlayer: raw.isClubPlayer === true,
     courtName: asString(raw.courtName),
     startsAt: asString(raw.startsAt),
     endsAt: asString(raw.endsAt),
@@ -111,6 +162,16 @@ export class ReservationRepository implements IReservationRepository {
     const response = await this.axiosInstance.get<ApiEnvelope<Record<string, unknown>[]>>(
       "/club/reservations",
       { params: { date, courtId } },
+    );
+    return (readData(response) ?? [])
+      .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
+      .map(normalizeReservation);
+  }
+
+  async listPending(): Promise<CourtReservation[]> {
+    this.assertClubHeader();
+    const response = await this.axiosInstance.get<ApiEnvelope<Record<string, unknown>[]>>(
+      "/club/reservations/pending",
     );
     return (readData(response) ?? [])
       .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
@@ -211,6 +272,20 @@ export class ReservationRepository implements IReservationRepository {
       `/club/reservations/${id}/complete`,
     );
     return normalizeReservation(readData(response) ?? {});
+  }
+
+  async listMine() {
+    const response = await this.axiosInstance.get<ApiEnvelope<Record<string, unknown>[]>>(
+      "/users/me/reservations",
+    );
+    return (readData(response) ?? [])
+      .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
+      .map(normalizeMine)
+      .filter((item): item is PlayerReservation => item != null);
+  }
+
+  async cancelMine(id: string) {
+    await this.axiosInstance.post<ApiEnvelope<unknown>>(`/users/me/reservations/${id}/cancel`);
   }
 
   private assertClubHeader() {

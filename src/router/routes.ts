@@ -21,6 +21,8 @@ export const ROUTES = {
     history: "/historial",
     profile: "/perfil",
     clubs: "/clubes",
+    clubDetail: (id: string) => `/clubes/${id}`,
+    clubAvailability: (id: string) => `/clubes/${id}/disponibilidad`,
     match: (id: string) => `/partidos/${id}`,
   },
   club: {
