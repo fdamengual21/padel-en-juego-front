@@ -4,17 +4,14 @@ import "dayjs/locale/es";
 import { ChevronDown } from "lucide-react";
 import type { CourtReservation } from "@/domain";
 import Api from "@/api/Api";
-import { PERMISSION_CLUB_CLIENTS_READ, usePermissions } from "@/authorization";
-import Avatar from "@/components/Avatar";
 import { Button } from "@/components/ui/button";
 import { toastError, toastSuccess } from "@/lib/toast";
 import { cn } from "@/lib/utils";
-import ClientDetailModal from "@/screens/club/ClubClientDetailScreen/components/ClientDetailModal";
+import ClubPlayerLink from "@/screens/club/components/ClubPlayerLink";
 
 dayjs.locale("es");
 
 interface PendingReservationsCardProps {
-  clubId: string;
   reservations: CourtReservation[];
   canMutate: boolean;
   onChanged: () => void;
@@ -26,18 +23,14 @@ function playerName(reservation: CourtReservation): string {
 }
 
 export default function PendingReservationsCard({
-  clubId,
   reservations,
   canMutate,
   onChanged,
 }: PendingReservationsCardProps) {
-  const { can } = usePermissions();
-  const canOpenClient = can(PERMISSION_CLUB_CLIENTS_READ);
   const [open, setOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
-  const [clientId, setClientId] = useState<string | null>(null);
 
   if (reservations.length === 0) return null;
 
@@ -127,14 +120,11 @@ export default function PendingReservationsCard({
                       {reservation.courtName || "Cancha"}
                       {" ·"}
                     </span>
-                    <ReservationPlayer
-                      reservation={reservation}
-                      clickable={
-                        canOpenClient &&
-                        Boolean(reservation.bookedByPlayerId) &&
-                        (reservation.playerHasAccount === true || reservation.isClubPlayer === true)
-                      }
-                      onOpen={setClientId}
+                    <ClubPlayerLink
+                      playerId={reservation.bookedByPlayerId}
+                      name={playerName(reservation)}
+                      avatarUrl={reservation.playerAvatarUrl}
+                      size="xs"
                     />
                   </p>
                   {canMutate ? (
@@ -217,46 +207,6 @@ export default function PendingReservationsCard({
           </ul>
         </div>
       ) : null}
-      <ClientDetailModal
-        open={Boolean(clientId)}
-        clubId={clubId}
-        clientId={clientId}
-        onOpenChange={(next) => {
-          if (!next) setClientId(null);
-        }}
-      />
     </div>
-  );
-}
-
-function ReservationPlayer({
-  reservation,
-  clickable,
-  onOpen,
-}: {
-  reservation: CourtReservation;
-  clickable: boolean;
-  onOpen: (playerId: string) => void;
-}) {
-  const name = playerName(reservation);
-  const body = (
-    <>
-      <Avatar name={name} imageUrl={reservation.playerAvatarUrl} size="xs" alt={name} />
-      <span className="truncate text-sm font-medium text-foreground">{name}</span>
-    </>
-  );
-
-  if (!clickable || !reservation.bookedByPlayerId) {
-    return <span className="inline-flex min-w-0 items-center gap-2">{body}</span>;
-  }
-
-  return (
-    <button
-      type="button"
-      className="inline-flex min-w-0 items-center gap-2 rounded-md text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-      onClick={() => onOpen(reservation.bookedByPlayerId!)}
-    >
-      {body}
-    </button>
   );
 }

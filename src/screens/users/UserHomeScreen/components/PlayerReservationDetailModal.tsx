@@ -41,7 +41,8 @@ export default function PlayerReservationDetailModal({
     setCoverFailed(false);
   }, [reservationId]);
   const canCancel =
-    reservation?.status === "pending" || reservation?.status === "booked";
+    !reservation?.isFixed &&
+    (reservation?.status === "pending" || reservation?.status === "booked");
   const club = reservation?.club;
   const location = club
     ? formatLocationEs(club.municipalityName, club.provinceName)
@@ -132,6 +133,7 @@ export default function PlayerReservationDetailModal({
               </div>
               <PlayerReservationStatusChip
                 status={reservation.status}
+                isFixed={reservation.isFixed}
                 className="absolute top-3 right-3"
               />
             </div>
@@ -179,6 +181,11 @@ export default function PlayerReservationDetailModal({
             <span />
           )}
           <div className="flex flex-wrap justify-end gap-2">
+            {reservation?.isFixed ? (
+              <p className="mr-auto max-w-56 text-xs text-muted-foreground">
+                Turno fijo semanal. Si no vas a venir, avisale al club.
+              </p>
+            ) : null}
             {canCancel ? (
               <Button
                 type="button"

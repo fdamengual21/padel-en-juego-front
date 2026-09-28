@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { combinePhone, isValidOptionalPhone, splitE164, DEFAULT_PHONE_DIAL } from "@/lib/phone";
 import { toastError, toastSuccess } from "@/lib/toast";
+import type { ClubClient } from "@/modules/clients";
 
 interface ClientFormValues {
   firstName: string;
@@ -34,7 +35,7 @@ interface ClientFormDialogProps {
   open: boolean;
   clientId: string | null;
   onOpenChange: (open: boolean) => void;
-  onSaved: () => void;
+  onSaved: (saved?: ClubClient) => void;
   /** Dentro de otro diálogo: no abre uno propio. */
   embedded?: boolean;
   onCancel?: () => void;
@@ -135,13 +136,14 @@ export default function ClientFormDialog({
     };
     try {
       if (clientId) {
-        await Api.ClientService().update(clientId, input);
+        const updated = await Api.ClientService().update(clientId, input);
         toastSuccess("Cliente actualizado");
+        onSaved(updated);
       } else {
-        await Api.ClientService().create(input);
+        const created = await Api.ClientService().create(input);
         toastSuccess("Cliente añadido");
+        onSaved(created);
       }
-      onSaved();
       if (embedded) onCancel?.();
       else onOpenChange(false);
     } catch (err) {

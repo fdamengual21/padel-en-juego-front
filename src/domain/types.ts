@@ -557,6 +557,8 @@ export interface CourtReservation {
   playerHasAccount?: boolean;
   /** True si ya es cliente de este club. */
   isClubPlayer?: boolean;
+  /** True si el bloque sale de un turno fijo y no de una reserva persistida. */
+  isFixed?: boolean;
   courtName?: string;
   startsAt: string;
   endsAt: string;

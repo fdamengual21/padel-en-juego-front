@@ -1,9 +1,14 @@
 import { useCallback, useState } from "react";
+import { Plus } from "lucide-react";
 import Api from "@/api/Api";
+import { PERMISSION_CLUB_CLIENTS_WRITE } from "@/authorization";
+import { PermissionsGuard } from "@/components/guards";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAbortableSearch } from "@/hooks/useAbortableSearch";
 import type { ReservationPlayer } from "@/modules/reservations";
+import ClientFormDialog from "@/screens/club/ClubClientsScreen/components/ClientFormDialog";
 
 interface ReservationPlayerFieldProps {
   value: ReservationPlayer | null;
@@ -15,6 +20,7 @@ export default function ReservationPlayerField({
   onChange,
 }: ReservationPlayerFieldProps) {
   const [query, setQuery] = useState("");
+  const [creating, setCreating] = useState(false);
   const searchFn = useCallback(
     (q: string) => Api.ReservationService().searchPlayers(q),
     [],
@@ -49,13 +55,27 @@ export default function ReservationPlayerField({
   return (
     <div className="space-y-1.5">
       <Label htmlFor="reservation-player">Jugador</Label>
-      <Input
-        id="reservation-player"
-        value={query}
-        placeholder="Buscar por nombre"
-        onChange={(event) => setQuery(event.target.value)}
-        autoComplete="off"
-      />
+      <div className="flex items-center gap-2">
+        <Input
+          id="reservation-player"
+          className="min-w-0 flex-1"
+          value={query}
+          placeholder="Buscar por nombre"
+          onChange={(event) => setQuery(event.target.value)}
+          autoComplete="off"
+        />
+        <PermissionsGuard permission={PERMISSION_CLUB_CLIENTS_WRITE}>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            aria-label="Añadir jugador"
+            onClick={() => setCreating(true)}
+          >
+            <Plus />
+          </Button>
+        </PermissionsGuard>
+      </div>
       {query.trim().length >= 2 ? (
         <div className="max-h-40 overflow-auto rounded-lg border border-border">
           {isSearching ? (
@@ -85,6 +105,21 @@ export default function ReservationPlayerField({
           Escribí al menos dos letras del nombre.
         </p>
       )}
+      <ClientFormDialog
+        open={creating}
+        clientId={null}
+        onOpenChange={setCreating}
+        onSaved={(saved) => {
+          if (!saved) return;
+          onChange({
+            id: saved.id,
+            firstName: saved.firstName,
+            lastName: saved.lastName,
+            phone: saved.phone,
+          });
+          setQuery("");
+        }}
+      />
     </div>
   );
 }

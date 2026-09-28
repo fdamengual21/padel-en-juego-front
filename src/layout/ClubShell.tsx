@@ -6,6 +6,7 @@ import {
   LogOut,
   MapPin,
   Menu,
+  Repeat,
   Settings,
   Trophy,
   User,
@@ -16,6 +17,7 @@ import { useMockSession } from "@/app/MockSessionProvider";
 import { usePermissions } from "@/authorization";
 import {
   PERMISSION_CLUB_COURTS_READ,
+  PERMISSION_CLUB_RESERVATIONS_READ,
   PERMISSION_CLUB_SETTINGS_READ,
   PERMISSION_CLUB_TOURNAMENTS_READ,
 } from "@/authorization/permissionCodes";
@@ -48,7 +50,7 @@ interface NavItem {
 const items: NavItem[] = [
   {
     to: ROUTES.club.dashboard,
-    label: "Dashboard",
+    label: "Resumen",
     icon: LayoutDashboard,
     end: true,
     feature: "clubDashboard",
@@ -67,6 +69,13 @@ const items: NavItem[] = [
     icon: MapPin,
     feature: "courts",
     permission: PERMISSION_CLUB_COURTS_READ,
+  },
+  {
+    to: ROUTES.club.fixedReservations,
+    label: "Fijos",
+    icon: Repeat,
+    feature: "courts",
+    permission: PERMISSION_CLUB_RESERVATIONS_READ,
   },
   {
     to: ROUTES.club.settings,

@@ -10,12 +10,14 @@ interface CourtAgendaDayHeaderProps {
   day: Dayjs;
   selected: boolean;
   note?: CourtAgendaDayNote | null;
+  onNoteClick?: () => void;
 }
 
 export default function CourtAgendaDayHeader({
   day,
   selected,
   note,
+  onNoteClick,
 }: CourtAgendaDayHeaderProps) {
   const isToday = day.isSame(dayjs(), "day");
   const weekday = day.format("ddd").replace(".", "");
@@ -43,16 +45,26 @@ export default function CourtAgendaDayHeader({
         <span className="h-3" aria-hidden />
       )}
       {note ? (
-        <span
-          className={cn(
-            "w-full truncate rounded-md border-l-2 px-1 py-1 text-center text-[11px] font-semibold leading-tight",
-            note.tone === "unavailable"
-              ? "border-l-destructive bg-destructive/10 text-sidebar"
-              : "border-l-primary bg-primary/10 text-sidebar",
-          )}
-        >
-          {note.label}
-        </span>
+        onNoteClick && note.tone === "available" ? (
+          <button
+            type="button"
+            className="w-full truncate rounded-md border-l-2 border-l-primary bg-primary/10 px-1 py-1 text-center text-[11px] font-semibold leading-tight text-sidebar hover:brightness-95"
+            onClick={onNoteClick}
+          >
+            {note.label}
+          </button>
+        ) : (
+          <span
+            className={cn(
+              "w-full truncate rounded-md border-l-2 px-1 py-1 text-center text-[11px] font-semibold leading-tight",
+              note.tone === "unavailable"
+                ? "border-l-destructive bg-destructive/10 text-sidebar"
+                : "border-l-primary bg-primary/10 text-sidebar",
+            )}
+          >
+            {note.label}
+          </span>
+        )
       ) : null}
     </div>
   );

@@ -5,6 +5,7 @@ import type { PlayerReservationStatus } from "@/modules/reservations";
 
 interface PlayerReservationStatusChipProps {
   status: PlayerReservationStatus;
+  isFixed?: boolean;
   className?: string;
 }
 
@@ -28,6 +29,7 @@ const chips: Record<PlayerReservationStatus, { label: string; className: string 
 
 export default function PlayerReservationStatusChip({
   status,
+  isFixed = false,
   className,
 }: PlayerReservationStatusChipProps) {
   const chip = chips[status];
@@ -37,9 +39,9 @@ export default function PlayerReservationStatusChip({
       className={cn("h-auto max-w-full gap-1 px-1.5 py-0.5 text-xs font-medium", chip.className, className)}
       data-testid="player-reservation-status"
     >
-      {status === "booked" ? <Check aria-hidden /> : null}
+      {status === "booked" && !isFixed ? <Check aria-hidden /> : null}
       {status === "rejected" ? <X aria-hidden /> : null}
-      <span className="truncate">{chip.label}</span>
+      <span className="truncate">{isFixed ? "Fijo" : chip.label}</span>
     </Badge>
   );
 }

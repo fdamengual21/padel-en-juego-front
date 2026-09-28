@@ -1,5 +1,10 @@
 import type { IReservationRepository } from "../repositories/ReservationRepository";
-import type { CreateReservationInput, UpdateReservationInput } from "../types";
+import type {
+  CourtFixedReservationQuery,
+  CreateFixedReservationInput,
+  CreateReservationInput,
+  UpdateReservationInput,
+} from "../types";
 
 export class ReservationService {
   private readonly repository: IReservationRepository;
@@ -14,6 +19,14 @@ export class ReservationService {
 
   listPending() {
     return this.repository.listPending();
+  }
+
+  getSummary() {
+    return this.repository.getSummary();
+  }
+
+  listToday() {
+    return this.repository.listToday();
   }
 
   listCalendar(from: string, to: string, courtId?: string) {
@@ -58,5 +71,25 @@ export class ReservationService {
 
   cancelMine(id: string) {
     return this.repository.cancelMine(id);
+  }
+
+  listFixed(query?: CourtFixedReservationQuery) {
+    return this.repository.listFixed(query);
+  }
+
+  createFixed(input: CreateFixedReservationInput) {
+    return this.repository.createFixed(input);
+  }
+
+  cancelFixed(id: string, note?: string) {
+    return this.repository.cancelFixed(id, note);
+  }
+
+  skipFixed(id: string, date: string, note?: string) {
+    return this.repository.skipFixed(id, date, note);
+  }
+
+  restoreFixed(id: string, date: string) {
+    return this.repository.restoreFixed(id, date);
   }
 }

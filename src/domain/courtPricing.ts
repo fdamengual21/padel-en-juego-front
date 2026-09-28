@@ -154,6 +154,81 @@ export function validateCourtPriceRules(
   return null;
 }
 
+export interface DayPriceRange {
+  startTime: string;
+  endTime: string;
+  price: number;
+  label: string | null;
+}
+
+function formatClock(totalMinutes: number): string {
+  const wrapped = ((totalMinutes % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY;
+  const hours = Math.floor(wrapped / 60);
+  const minutes = wrapped % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+/**
+ * Tarifas del día dentro del horario del club. Los huecos sin franja
+ * quedan como rangos al precio base, sin etiqueta.
+ */
+export function listDayPriceRanges(input: {
+  openTime: string | null;
+  closeTime: string | null;
+  openDays: readonly WeekdayIso[];
+  weekday: WeekdayIso;
+  basePrice: number;
+  rules: readonly CourtPriceRuleDraft[];
+}): DayPriceRange[] {
+  const openMin = input.openTime ? parseHm(input.openTime) : NaN;
+  const closeMin = input.closeTime ? parseHm(input.closeTime) : NaN;
+  if (!Number.isFinite(openMin) || !Number.isFinite(closeMin) || openMin === closeMin) {
+    return [];
+  }
+  if (!input.openDays.includes(input.weekday)) return [];
+
+  const windowEnd = closeMin > openMin ? closeMin : closeMin + MINUTES_PER_DAY;
+  const covered: Array<{ start: number; end: number; price: number; label: string | null }> = [];
+
+  for (const rule of input.rules) {
+    if (!rule.daysOfWeek.includes(input.weekday)) continue;
+    const from = parseHm(rule.startTime);
+    const to = parseHm(rule.endTime);
+    if (!Number.isFinite(from) || !Number.isFinite(to) || from === to) continue;
+    let start = from;
+    let end = to > from ? to : to + MINUTES_PER_DAY;
+    if (end <= openMin || start >= windowEnd) continue;
+    start = Math.max(start, openMin);
+    end = Math.min(end, windowEnd);
+    if (start >= end) continue;
+    covered.push({ start, end, price: rule.price, label: rule.label ?? null });
+  }
+
+  covered.sort((left, right) => left.start - right.start || left.end - right.end);
+
+  const ranges: Array<{ start: number; end: number; price: number; label: string | null }> = [];
+  let cursor = openMin;
+  for (const band of covered) {
+    if (band.end <= cursor) continue;
+    const start = Math.max(band.start, cursor);
+    if (start > cursor) {
+      ranges.push({ start: cursor, end: start, price: input.basePrice, label: null });
+    }
+    ranges.push({ start, end: band.end, price: band.price, label: band.label });
+    cursor = band.end;
+  }
+  if (cursor < windowEnd) {
+    ranges.push({ start: cursor, end: windowEnd, price: input.basePrice, label: null });
+  }
+
+  return ranges.map((range) => ({
+    startTime: formatClock(range.start),
+    endTime: formatClock(range.end),
+    price: range.price,
+    label: range.label,
+  }));
+}
+
 /**
  * Precio del turno según día y hora de inicio.
  * 1) Si una franja cubre el inicio → esa tarifa.

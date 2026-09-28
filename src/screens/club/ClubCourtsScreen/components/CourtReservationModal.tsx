@@ -28,7 +28,7 @@ import type {
   CreateReservationInput,
   ReservationPlayer,
 } from "@/modules/reservations";
-import ReservationPlayerField from "./ReservationPlayerField";
+import ReservationPlayerField from "@/screens/club/components/ReservationPlayerField";
 
 type ModalMode = "view" | "edit" | "create";
 

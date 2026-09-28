@@ -1,4 +1,4 @@
-import type { CourtAvailableSlot, CourtReservation, CourtReservationStatus } from "@/domain";
+import type { CourtAvailableSlot } from "@/domain";
 
 export interface ReservationPlayer {
   id: string;
@@ -53,6 +53,85 @@ export interface PlayerReservation {
   status: PlayerReservationStatus;
   price: number;
   rejectedReason: string | null;
+  /** Ocurrencia de un turno fijo. No se cancela como una reserva suelta. */
+  isFixed?: boolean;
 }
 
-export type { CourtReservation, CourtReservationStatus };
+/** Card de ocupación del mes. */
+export interface ClubMonthOccupancy {
+  percent: number | null;
+}
+
+/** Card de ocupación de hoy: mañana, tarde y punta. */
+export interface ClubTodayOccupancy {
+  morningPercent: number | null;
+  afternoonPercent: number | null;
+  peakPercent: number | null;
+}
+
+/** Card de turnos libres de hoy. */
+export interface ClubFreeSlots {
+  count: number;
+}
+
+/** Cards del resumen. Los turnos de hoy y los pendientes llegan por otro request. */
+export interface ClubReservationSummary {
+  month: ClubMonthOccupancy;
+  today: ClubTodayOccupancy;
+  freeSlots: ClubFreeSlots;
+}
+
+/** Turno de hoy en el resumen del club. */
+export type ClubTodayTurnStatus = "free" | "pending" | "booked" | "completed";
+
+export interface ClubTodayTurn {
+  reservationId: string | null;
+  courtId: string;
+  courtName: string;
+  startsAt: string;
+  endsAt: string;
+  status: ClubTodayTurnStatus;
+  playerFirstName: string | null;
+  playerLastName: string | null;
+}
+
+export interface CourtFixedSkip {
+  date: string;
+  note: string | null;
+}
+
+export interface CourtFixedReservation {
+  id: string;
+  playerId: string;
+  playerFirstName: string;
+  playerLastName: string;
+  courtId: string;
+  courtName: string;
+  weekday: number;
+  startTime: string;
+  endTime: string;
+  startsOn: string;
+  skippedDays: CourtFixedSkip[];
+}
+
+export interface CourtFixedReservationPlayer {
+  playerId: string;
+  playerFirstName: string;
+  playerLastName: string;
+  playerAvatarUrl: string | null;
+  series: CourtFixedReservation[];
+}
+
+export interface CourtFixedReservationQuery {
+  q?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface CreateFixedReservationInput {
+  playerId: string;
+  courtId: string;
+  weekday: number;
+  startTime: string;
+  startsOn?: string;
+}

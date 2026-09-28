@@ -1,4 +1,5 @@
 import axios, { type AxiosResponse } from "axios";
+import { handleGlobal401ResponseError } from "./handleGlobal401ResponseError";
 import {
   ApiHttpError,
   messageFromEnvelope,
@@ -46,18 +47,31 @@ axiosInstance.interceptors.response.use(
     }
     return response;
   },
-  (error) => {
+  async (error) => {
     if (!axios.isAxiosError(error)) {
       return Promise.reject(error);
     }
-    const status = error.response?.status ?? 0;
-    const body = (error.response?.data ?? null) as ApiEnvelope<unknown> | null;
-    return Promise.reject(
-      new ApiHttpError(
-        messageFromEnvelope(body, "No se pudo completar la operación"),
-        status,
-      ),
-    );
+
+    try {
+      return await handleGlobal401ResponseError(error, (config) =>
+        axiosInstance.request(config),
+      );
+    } catch (handled) {
+      if (handled instanceof ApiHttpError) {
+        return Promise.reject(handled);
+      }
+      if (!axios.isAxiosError(handled)) {
+        return Promise.reject(handled);
+      }
+      const status = handled.response?.status ?? 0;
+      const body = (handled.response?.data ?? null) as ApiEnvelope<unknown> | null;
+      return Promise.reject(
+        new ApiHttpError(
+          messageFromEnvelope(body, "No se pudo completar la operación"),
+          status,
+        ),
+      );
+    }
   },
 );
 

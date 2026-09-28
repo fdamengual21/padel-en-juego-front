@@ -27,6 +27,7 @@ interface CourtAgendaGridProps {
   jornada?: AgendaJornadaSchedule;
   dayNotes?: Readonly<Record<string, CourtAgendaDayNote>>;
   onSelectEvent?: (eventId: string) => void;
+  onDayNoteClick?: (day: Dayjs) => void;
   onEmptySlotClick?: (day: Dayjs, hour: number) => void;
 }
 
@@ -41,6 +42,7 @@ export default function CourtAgendaGrid({
   jornada,
   dayNotes,
   onSelectEvent,
+  onDayNoteClick,
   onEmptySlotClick,
 }: CourtAgendaGridProps) {
   const mode = viewMode === "month" ? "week" : viewMode;
@@ -92,6 +94,9 @@ export default function CourtAgendaGrid({
                   day={day}
                   selected={day.isSame(selectedDate, "day")}
                   note={dayNotes?.[day.format("YYYY-MM-DD")]}
+                  onNoteClick={
+                    onDayNoteClick ? () => onDayNoteClick(day) : undefined
+                  }
                 />
               </div>
             );
@@ -112,7 +117,11 @@ export default function CourtAgendaGrid({
                   startHour={startHour}
                   modules={modules}
                   onSelectEvent={onSelectEvent}
-                  onEmptySlotClick={(hour) => onEmptySlotClick?.(day, hour)}
+                  onEmptySlotClick={
+                    onEmptySlotClick
+                      ? (hour) => onEmptySlotClick(day, hour)
+                      : undefined
+                  }
                 />
               );
             })}

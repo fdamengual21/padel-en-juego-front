@@ -1,4 +1,5 @@
 import { Clock, MapPin, Phone } from "lucide-react";
+import WhatsAppLink from "@/components/WhatsAppLink";
 import type { PublicClubDetail } from "@/modules/clubs";
 import { formatClubScheduleEs } from "@/lib/clubSchedule";
 import { formatLocationEs } from "@/lib/dates";
@@ -52,6 +53,7 @@ export default function PublicClubFacts({ club }: PublicClubFactsProps) {
           >
             {club.phone}
           </a>
+          <WhatsAppLink phone={club.phone} />
         </p>
       ) : null}
       {instagram ? (

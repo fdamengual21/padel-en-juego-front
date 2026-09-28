@@ -3,7 +3,7 @@ import { readData } from "@/config/axiosInstance";
 import type { ApiEnvelope } from "@/lib/apiClient";
 import { resolveClubHeaderId } from "@/modules/auth/clubContext";
 import { useAuthStore } from "@/stores/authStore";
-import type { CourtReservation, CourtReservationStatus } from "@/domain";
+import type { CourtReservation, CourtReservationStatus, PaginatedResult } from "@/domain";
 import type {
   CourtSlot,
   CourtSlotList,
@@ -12,12 +12,21 @@ import type {
   PlayerReservation,
   PlayerReservationClub,
   PlayerReservationStatus,
+  ClubReservationSummary,
+  ClubTodayTurn,
+  ClubTodayTurnStatus,
+  CourtFixedReservation,
+  CourtFixedReservationPlayer,
+  CourtFixedReservationQuery,
+  CreateFixedReservationInput,
   UpdateReservationInput,
 } from "../types";
 
 export interface IReservationRepository {
   list(date: string, courtId?: string): Promise<CourtReservation[]>;
   listPending(): Promise<CourtReservation[]>;
+  getSummary(): Promise<ClubReservationSummary>;
+  listToday(): Promise<ClubTodayTurn[]>;
   listCalendar(from: string, to: string, courtId?: string): Promise<CourtReservation[]>;
   listSlots(
     date: string,
@@ -33,6 +42,11 @@ export interface IReservationRepository {
   reject(id: string, reason?: string): Promise<CourtReservation>;
   listMine(): Promise<PlayerReservation[]>;
   cancelMine(id: string): Promise<void>;
+  listFixed(query?: CourtFixedReservationQuery): Promise<PaginatedResult<CourtFixedReservationPlayer>>;
+  createFixed(input: CreateFixedReservationInput): Promise<CourtFixedReservation>;
+  cancelFixed(id: string, note?: string): Promise<void>;
+  skipFixed(id: string, date: string, note?: string): Promise<void>;
+  restoreFixed(id: string, date: string): Promise<void>;
 }
 
 function asString(value: unknown): string {
@@ -64,6 +78,50 @@ function asStatus(value: unknown): CourtReservationStatus {
 function asNullable(value: unknown): string | null {
   const text = asString(value).trim();
   return text || null;
+}
+
+function asTodayStatus(value: unknown): ClubTodayTurnStatus {
+  if (value === "free" || value === "pending" || value === "booked" || value === "completed") {
+    return value;
+  }
+  return "free";
+}
+
+function asPercent(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object") return null;
+  return value as Record<string, unknown>;
+}
+
+function normalizeTodayTurn(item: Record<string, unknown>): ClubTodayTurn {
+  return {
+    reservationId: asString(item.reservationId) || null,
+    courtId: asString(item.courtId),
+    courtName: asString(item.courtName),
+    startsAt: asString(item.startsAt),
+    endsAt: asString(item.endsAt),
+    status: asTodayStatus(item.status),
+    playerFirstName: asNullable(item.playerFirstName),
+    playerLastName: asNullable(item.playerLastName),
+  };
+}
+
+function normalizeSummary(raw: Record<string, unknown> | null): ClubReservationSummary {
+  const month = asRecord(raw?.month);
+  const today = asRecord(raw?.today);
+  const freeSlots = asRecord(raw?.freeSlots);
+  return {
+    month: { percent: asPercent(month?.percent) },
+    today: {
+      morningPercent: asPercent(today?.morningPercent),
+      afternoonPercent: asPercent(today?.afternoonPercent),
+      peakPercent: asPercent(today?.peakPercent),
+    },
+    freeSlots: { count: asNumber(freeSlots?.count) },
+  };
 }
 
 function asMineStatus(value: unknown): PlayerReservationStatus | null {
@@ -100,6 +158,7 @@ function normalizeMine(raw: Record<string, unknown>): PlayerReservation | null {
     status,
     price: asNumber(raw.price),
     rejectedReason: asNullable(raw.rejectedReason),
+    isFixed: raw.isFixed === true,
   };
 }
 
@@ -116,6 +175,7 @@ export function normalizeReservation(raw: Record<string, unknown>): CourtReserva
     playerAvatarUrl: asString(raw.playerAvatarUrl) || null,
     playerHasAccount: raw.playerHasAccount === true,
     isClubPlayer: raw.isClubPlayer === true,
+    isFixed: raw.isFixed === true,
     courtName: asString(raw.courtName),
     startsAt: asString(raw.startsAt),
     endsAt: asString(raw.endsAt),
@@ -138,6 +198,53 @@ function normalizeSlot(raw: Record<string, unknown>): CourtSlot {
     priceLabel: asString(raw.priceLabel) || null,
     status: raw.status === "pending" ? "pending" : "available",
     reservationId: asString(raw.reservationId) || null,
+  };
+}
+
+function normalizeFixedPlayer(raw: Record<string, unknown>): CourtFixedReservationPlayer | null {
+  const playerId = asString(raw.playerId);
+  if (!playerId) return null;
+  const seriesRaw = Array.isArray(raw.series) ? raw.series : [];
+  return {
+    playerId,
+    playerFirstName: asString(raw.playerFirstName),
+    playerLastName: asString(raw.playerLastName),
+    playerAvatarUrl: asString(raw.playerAvatarUrl) || null,
+    series: seriesRaw
+      .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
+      .map(normalizeFixed)
+      .filter((item): item is CourtFixedReservation => item != null),
+  };
+}
+
+function normalizeSkips(value: unknown): CourtFixedReservation["skippedDays"] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const raw = item as Record<string, unknown>;
+    const date = asString(raw.date).slice(0, 10);
+    if (!date) return [];
+    return [{ date, note: asString(raw.note) || null }];
+  });
+}
+
+function normalizeFixed(raw: Record<string, unknown>): CourtFixedReservation | null {
+  const id = asString(raw.id);
+  const playerId = asString(raw.playerId);
+  const courtId = asString(raw.courtId);
+  if (!id || !playerId || !courtId) return null;
+  return {
+    id,
+    playerId,
+    playerFirstName: asString(raw.playerFirstName),
+    playerLastName: asString(raw.playerLastName),
+    courtId,
+    courtName: asString(raw.courtName),
+    weekday: asNumber(raw.weekday),
+    startTime: asString(raw.startTime).slice(0, 5),
+    endTime: asString(raw.endTime).slice(0, 5),
+    startsOn: asString(raw.startsOn).slice(0, 10),
+    skippedDays: normalizeSkips(raw.skippedDays),
   };
 }
 
@@ -176,6 +283,24 @@ export class ReservationRepository implements IReservationRepository {
     return (readData(response) ?? [])
       .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
       .map(normalizeReservation);
+  }
+
+  async getSummary(): Promise<ClubReservationSummary> {
+    this.assertClubHeader();
+    const response = await this.axiosInstance.get<ApiEnvelope<Record<string, unknown>>>(
+      "/club/reservations/summary",
+    );
+    return normalizeSummary(readData(response));
+  }
+
+  async listToday(): Promise<ClubTodayTurn[]> {
+    this.assertClubHeader();
+    const response = await this.axiosInstance.get<ApiEnvelope<Record<string, unknown>[]>>(
+      "/club/reservations/today",
+    );
+    return (readData(response) ?? [])
+      .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
+      .map(normalizeTodayTurn);
   }
 
   async listCalendar(from: string, to: string, courtId?: string): Promise<CourtReservation[]> {
@@ -286,6 +411,72 @@ export class ReservationRepository implements IReservationRepository {
 
   async cancelMine(id: string) {
     await this.axiosInstance.post<ApiEnvelope<unknown>>(`/users/me/reservations/${id}/cancel`);
+  }
+
+  async listFixed(query?: CourtFixedReservationQuery) {
+    this.assertClubHeader();
+    const response = await this.axiosInstance.get<ApiEnvelope<Record<string, unknown>>>(
+      "/club/reservations/fixed",
+      {
+        params: {
+          q: query?.q?.trim() || undefined,
+          page: query?.page,
+          pageSize: query?.pageSize,
+        },
+      },
+    );
+    const data = readData(response) ?? {};
+    const itemsRaw = Array.isArray(data.items) ? data.items : [];
+    const totalPages = asNumber(data.totalPages);
+    return {
+      items: itemsRaw
+        .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
+        .map(normalizeFixedPlayer)
+        .filter((item): item is CourtFixedReservationPlayer => item != null),
+      page: asNumber(data.page) || 1,
+      pageSize: asNumber(data.pageSize) || query?.pageSize || 8,
+      totalItems: asNumber(data.totalItems),
+      totalPages: totalPages > 0 ? totalPages : 1,
+    };
+  }
+
+  async createFixed(input: CreateFixedReservationInput) {
+    this.assertClubHeader();
+    const response = await this.axiosInstance.post<ApiEnvelope<Record<string, unknown>>>(
+      "/club/reservations/fixed",
+      {
+        playerId: input.playerId,
+        courtId: input.courtId,
+        weekday: input.weekday,
+        startTime: input.startTime,
+        startsOn: input.startsOn || null,
+      },
+    );
+    const created = normalizeFixed(readData(response) ?? {});
+    if (!created) throw new Error("No se pudo leer el turno fijo creado");
+    return created;
+  }
+
+  async cancelFixed(id: string, note?: string) {
+    this.assertClubHeader();
+    await this.axiosInstance.post<ApiEnvelope<unknown>>(`/club/reservations/fixed/${id}/cancel`, {
+      note: note?.trim() || null,
+    });
+  }
+
+  async skipFixed(id: string, date: string, note?: string) {
+    this.assertClubHeader();
+    await this.axiosInstance.post<ApiEnvelope<unknown>>(`/club/reservations/fixed/${id}/skip`, {
+      date,
+      note: note?.trim() || null,
+    });
+  }
+
+  async restoreFixed(id: string, date: string) {
+    this.assertClubHeader();
+    await this.axiosInstance.post<ApiEnvelope<unknown>>(`/club/reservations/fixed/${id}/restore`, {
+      date,
+    });
   }
 
   private assertClubHeader() {

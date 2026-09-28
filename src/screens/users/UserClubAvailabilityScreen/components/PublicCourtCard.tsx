@@ -1,7 +1,7 @@
 import { useState } from "react";
 import dayjs, { type Dayjs } from "dayjs";
 import { Clock3 } from "lucide-react";
-import { isoWeekdayFromDate } from "@/domain";
+import { isoWeekdayFromDate, listDayPriceRanges, type WeekdayIso } from "@/domain";
 import type { PublicClubSlot, PublicCourt } from "@/modules/clubs";
 import { formatArs } from "@/lib/money";
 import { cn } from "@/lib/utils";
@@ -9,6 +9,9 @@ import { cn } from "@/lib/utils";
 interface PublicCourtCardProps {
   court: PublicCourt;
   selectedDate: Dayjs;
+  openTime: string | null;
+  closeTime: string | null;
+  openDays: readonly WeekdayIso[];
   freeSlots: PublicClubSlot[];
   onSelectSlot: (slot: PublicClubSlot) => void;
 }
@@ -16,13 +19,24 @@ interface PublicCourtCardProps {
 export default function PublicCourtCard({
   court,
   selectedDate,
+  openTime,
+  closeTime,
+  openDays,
   freeSlots,
   onSelectSlot,
 }: PublicCourtCardProps) {
   const [imageFailed, setImageFailed] = useState(false);
   const showImage = Boolean(court.imageUrl) && !imageFailed;
   const weekday = isoWeekdayFromDate(selectedDate.toDate());
-  const bands = court.priceRules.filter((rule) => rule.daysOfWeek.includes(weekday));
+  const priceRanges = listDayPriceRanges({
+    openTime,
+    closeTime,
+    openDays,
+    weekday,
+    basePrice: court.basePrice,
+    rules: court.priceRules,
+  });
+  const clubOpensToday = openDays.includes(weekday);
 
   return (
     <article
@@ -30,7 +44,7 @@ export default function PublicCourtCard({
       data-testid={`public-court-card-${court.id}`}
     >
       <div className="grid lg:grid-cols-[minmax(220px,32%)_minmax(0,1fr)]">
-        <div className="relative min-h-40 bg-muted lg:min-h-full">
+        <div className="relative min-h-28 bg-muted lg:min-h-full">
           {showImage ? (
             <img
               src={court.imageUrl ?? ""}
@@ -48,14 +62,7 @@ export default function PublicCourtCard({
           </div>
         </div>
 
-        <div className="flex flex-col gap-4 p-4 sm:p-5">
-          <div className="space-y-1">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              Cancha
-            </p>
-            <h3 className="text-xl font-semibold tracking-tight">{court.name}</h3>
-          </div>
-
+        <div className="flex flex-col gap-3 p-3 sm:p-4">
           <div className="grid gap-3 rounded-xl border border-border p-3 sm:grid-cols-2 sm:gap-0 sm:divide-x sm:divide-border sm:p-0 sm:py-3">
             <div className="space-y-1 sm:px-3">
               <div className="flex items-center gap-1.5 text-muted-foreground">
@@ -63,19 +70,18 @@ export default function PublicCourtCard({
                 <p className="text-xs">Duración del turno</p>
               </div>
               <p className="text-base font-semibold">{court.slotDurationMinutes} min</p>
-              <p className="text-xs text-muted-foreground">
-                Base: {formatArs(court.basePrice)}
-              </p>
             </div>
             <div className="space-y-1 sm:px-3">
               <p className="text-xs text-muted-foreground">Precios del día</p>
-              {bands.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Solo precio base</p>
+              {!clubOpensToday ? (
+                <p className="text-sm text-muted-foreground">El club no abre este día.</p>
+              ) : priceRanges.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Sin horario de precios.</p>
               ) : (
                 <ul className="space-y-0.5">
-                  {bands.map((band) => (
+                  {priceRanges.map((band) => (
                     <li
-                      key={`${band.startTime}-${band.endTime}-${band.price}`}
+                      key={`${band.startTime}-${band.endTime}-${band.price}-${band.label ?? ""}`}
                       className="flex items-baseline justify-between gap-2 text-sm"
                     >
                       <span className="text-muted-foreground">

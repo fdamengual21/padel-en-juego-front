@@ -53,7 +53,11 @@ export default function PlayerReservationCard({
           <p className="truncate pl-4 text-[11px] leading-none text-muted-foreground">
             {formatTurnoCompact(reservation)}
           </p>
-          <PlayerReservationStatusChip status={reservation.status} className="self-start" />
+          <PlayerReservationStatusChip
+            status={reservation.status}
+            isFixed={reservation.isFixed}
+            className="self-start"
+          />
         </div>
         <ChevronRight className="size-4 shrink-0 self-center text-muted-foreground" aria-hidden />
       </button>

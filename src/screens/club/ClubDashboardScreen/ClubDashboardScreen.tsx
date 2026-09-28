@@ -1,104 +1,185 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import dayjs from "dayjs";
+import { MapPin, Plus, Users } from "lucide-react";
 import Api from "@/api/Api";
 import { useMockSession } from "@/app/MockSessionProvider";
-import { buttonVariants } from "@/components/ui/button";
-import ClientDetailModal from "@/screens/club/ClubClientDetailScreen/components/ClientDetailModal";
-import { ROUTES } from "@/router/routes";
+import {
+  PERMISSION_CLUB_CLIENTS_READ,
+  PERMISSION_CLUB_COURTS_READ,
+  PERMISSION_CLUB_RESERVATIONS_READ,
+  PERMISSION_CLUB_RESERVATIONS_WRITE,
+  usePermissions,
+} from "@/authorization";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import DashboardMatchCard from "./components/DashboardMatchCard";
-import DashboardReservationCard from "./components/DashboardReservationCard";
+import type { ClubTodayTurn } from "@/modules/reservations";
+import type { CourtReservation as DomainReservation } from "@/domain";
+import CourtReservationModal from "@/screens/club/ClubCourtsScreen/components/CourtReservationModal";
+import { ROUTES } from "@/router/routes";
+import DashboardPendingTray from "./components/DashboardPendingTray";
+import DashboardSummaryCards, {
+  CardSkeleton,
+  PendingCountCard,
+  PendingTraySkeleton,
+  TodayTurnsSkeleton,
+} from "./components/DashboardSummaryCards";
+import DashboardTodayTurns from "./components/DashboardTodayTurns";
 
 export default function ClubDashboardScreen() {
+  const { can } = usePermissions();
   const { clubId } = useMockSession();
-  const [clientDetailId, setClientDetailId] = useState<string | null>(null);
-  const { data, isLoading } = useQuery({
-    queryKey: ["dashboard", clubId],
-    queryFn: () => Api.TournamentOpsService().getDashboard(clubId),
+  const queryClient = useQueryClient();
+  const canRead = can(PERMISSION_CLUB_RESERVATIONS_READ);
+  const canWrite = can(PERMISSION_CLUB_RESERVATIONS_WRITE);
+  const [creating, setCreating] = useState(false);
+  const [view, setView] = useState<DomainReservation | null>(null);
+  const [createSlot, setCreateSlot] = useState<ClubTodayTurn | null>(null);
+
+  const summaryQuery = useQuery({
+    queryKey: ["club-reservation-summary", clubId],
+    queryFn: () => Api.ReservationService().getSummary(),
+    enabled: canRead && Boolean(clubId),
+  });
+  const todayQuery = useQuery({
+    queryKey: ["club-reservation-today", clubId],
+    queryFn: () => Api.ReservationService().listToday(),
+    enabled: canRead && Boolean(clubId),
+  });
+  const pendingQuery = useQuery({
+    queryKey: ["court-reservations-pending", clubId],
+    queryFn: () => Api.ReservationService().listPending(),
+    enabled: canRead && Boolean(clubId),
+  });
+  const courtsQuery = useQuery({
+    queryKey: ["club-courts", clubId],
+    queryFn: () => Api.CourtService().list(),
+    enabled: canWrite && Boolean(clubId),
   });
 
-  if (isLoading || !data) {
-    return <p className="text-muted-foreground">Cargando dashboard…</p>;
-  }
+  const refresh = () => {
+    void queryClient.invalidateQueries({ queryKey: ["club-reservation-summary", clubId] });
+    void queryClient.invalidateQueries({ queryKey: ["club-reservation-today", clubId] });
+    void queryClient.invalidateQueries({ queryKey: ["court-reservations-pending", clubId] });
+    void queryClient.invalidateQueries({ queryKey: ["court-reservations-calendar"] });
+    void queryClient.invalidateQueries({ queryKey: ["court-slots"] });
+  };
+
+  const openTurn = (turn: ClubTodayTurn) => {
+    if (turn.status === "free") {
+      if (!canWrite) return;
+      setCreateSlot(turn);
+      return;
+    }
+    if (!turn.reservationId) return;
+    setView(turnAsReservation(turn));
+  };
 
   return (
     <div className="space-y-6" data-testid="club-dashboard">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Dashboard</h2>
-          <p className="text-sm text-muted-foreground">Qué está pasando ahora</p>
+      <section className="space-y-3">
+        <h3 className="text-sm font-medium text-foreground">Accesos rápidos</h3>
+        <div className="flex flex-wrap gap-2">
+          {canWrite ? (
+            <Button type="button" onClick={() => setCreating(true)}>
+              <Plus />
+              Nueva reserva
+            </Button>
+          ) : null}
+          {can(PERMISSION_CLUB_CLIENTS_READ) ? (
+            <Link to={ROUTES.club.clients} className={cn(buttonVariants({ variant: "outline" }))}>
+              <Users />
+              Clientes
+            </Link>
+          ) : null}
+          {can(PERMISSION_CLUB_COURTS_READ) ? (
+            <Link to={ROUTES.club.courts} className={cn(buttonVariants({ variant: "outline" }))}>
+              <MapPin />
+              Canchas
+            </Link>
+          ) : null}
         </div>
-        <Link to={ROUTES.club.tournamentNew} className={cn(buttonVariants())}>
-          Nuevo torneo
-        </Link>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Stat label="Inscritos" value={String(data.registeredPairs)} />
-        <Stat label="En juego" value={String(data.liveMatches)} />
-        <Stat label="Canchas" value={`${data.courtsInUse}/${data.courtsTotal}`} />
-      </div>
-
-      <section className="space-y-3">
-        <h3 className="text-lg font-medium">Próximas reservas</h3>
-        {data.upcomingReservations.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No hay reservas próximas.
-          </p>
-        ) : (
-          <div className="grid gap-3 md:grid-cols-2">
-            {data.upcomingReservations.map((item) => (
-              <DashboardReservationCard
-                key={item.reservation.id}
-                item={item}
-                onOpenClient={setClientDetailId}
-              />
-            ))}
-          </div>
-        )}
       </section>
 
-      <section className="space-y-3">
-        <h3 className="text-lg font-medium">Próximos partidos de torneo</h3>
-        {data.upcomingMatches.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No hay partidos de torneo programados.
-          </p>
-        ) : (
-          <div className="grid gap-3 md:grid-cols-2">
-            {data.upcomingMatches.map((item) => (
-              <DashboardMatchCard
-                key={item.match.id}
-                item={item}
-                onOpenClient={setClientDetailId}
-              />
-            ))}
-          </div>
-        )}
-      </section>
+      {canRead ? (
+        <>
+          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <DashboardSummaryCards
+              summary={summaryQuery.data}
+              isLoading={summaryQuery.isLoading}
+              isError={summaryQuery.isError}
+            />
+            {pendingQuery.isLoading ? (
+              <CardSkeleton hero emphasis />
+            ) : (
+              <PendingCountCard count={(pendingQuery.data ?? []).length} />
+            )}
+          </section>
 
-      <ClientDetailModal
-        open={Boolean(clientDetailId)}
-        clubId={clubId}
-        clientId={clientDetailId}
+          {pendingQuery.isLoading ? (
+            <PendingTraySkeleton />
+          ) : (
+            <DashboardPendingTray
+              reservations={pendingQuery.data ?? []}
+              canMutate={canWrite}
+              viewAllTo={can(PERMISSION_CLUB_COURTS_READ) ? ROUTES.club.courts : undefined}
+              onChanged={refresh}
+            />
+          )}
+
+          {todayQuery.isLoading ? (
+            <TodayTurnsSkeleton />
+          ) : todayQuery.isError ? (
+            <p className="text-sm text-muted-foreground">No se pudieron cargar los turnos de hoy.</p>
+          ) : (
+            <DashboardTodayTurns turns={todayQuery.data ?? []} onOpen={openTurn} />
+          )}
+        </>
+      ) : null}
+
+      <CourtReservationModal
+        open={creating || createSlot != null || view != null}
+        clubId={clubId ?? ""}
+        courts={courtsQuery.data ?? []}
+        initialCourtId={createSlot?.courtId ?? view?.courtId ?? null}
+        mode={view ? "view" : "create"}
+        presetStartsAt={createSlot?.startsAt ?? null}
+        initialDate={createSlot ? dayjs(createSlot.startsAt).format("YYYY-MM-DD") : null}
+        preselectSlot={createSlot != null}
+        reservation={view}
+        canMutate={canWrite}
         onOpenChange={(open) => {
-          if (!open) setClientDetailId(null);
+          if (open) return;
+          setCreating(false);
+          setCreateSlot(null);
+          setView(null);
+        }}
+        onSaved={() => {
+          setCreating(false);
+          setCreateSlot(null);
+          setView(null);
+          refresh();
         }}
       />
     </div>
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-        {label}
-      </p>
-      <p className="mt-1 text-2xl font-semibold tracking-tight text-foreground tabular-nums">
-        {value}
-      </p>
-    </div>
-  );
+function turnAsReservation(turn: ClubTodayTurn): DomainReservation {
+  const status = turn.status === "free" ? "booked" : turn.status;
+  return {
+    id: turn.reservationId ?? "",
+    clubId: "",
+    clientId: "",
+    courtId: turn.courtId,
+    courtName: turn.courtName,
+    playerFirstName: turn.playerFirstName ?? "",
+    playerLastName: turn.playerLastName ?? "",
+    startsAt: turn.startsAt,
+    endsAt: turn.endsAt,
+    status,
+    price: null,
+    createdAt: turn.startsAt,
+  };
 }

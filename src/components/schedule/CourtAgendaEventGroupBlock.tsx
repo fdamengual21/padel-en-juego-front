@@ -116,6 +116,11 @@ export default function CourtAgendaEventGroupBlock({
         aria-label={ariaLabel}
         onClick={(event) => {
           event.stopPropagation();
+          const availability = group.events.every((item) => item.type === "availability");
+          if (availability && group.events[0]) {
+            onSelectEvent?.(group.events[0].id);
+            return;
+          }
           setOpen((current) => !current);
         }}
       >
@@ -160,15 +165,19 @@ export default function CourtAgendaEventGroupBlock({
                 }}
               >
                 {group.events.map((event) => {
-                  const title =
-                    event.title.trim() || calendarEventTypeLabelEs(event.type);
+                  const availability = event.type === "availability";
+                  const title = availability
+                    ? `${formatAgendaBlockClock(event.startAt)} – ${formatAgendaBlockClock(event.endAt)}`
+                    : event.title.trim() || calendarEventTypeLabelEs(event.type);
                   const clock = formatAgendaBlockClock(event.startAt);
                   const typeLabel = calendarEventTypeLabelEs(event.type);
-                  const secondary = event.allDay
-                    ? `Todo el día · ${typeLabel}`
-                    : clock
-                      ? `${clock} · ${typeLabel}`
-                      : typeLabel;
+                  const secondary = availability
+                    ? [event.title.trim(), event.subtitle?.trim()].filter(Boolean).join(" · ")
+                    : event.allDay
+                      ? `Todo el día · ${typeLabel}`
+                      : clock
+                        ? `${clock} · ${typeLabel}`
+                        : typeLabel;
                   const cancelled = event.status === "Cancelled";
                   return (
                     <li key={event.id} role="option">
@@ -193,9 +202,11 @@ export default function CourtAgendaEventGroupBlock({
                             {title}
                           </p>
                           <p className="truncate text-xs text-muted-foreground">
-                            {event.subtitle?.trim()
-                              ? `${secondary} · ${event.subtitle}`
-                              : secondary}
+                            {availability
+                              ? secondary
+                              : event.subtitle?.trim()
+                                ? `${secondary} · ${event.subtitle}`
+                                : secondary}
                           </p>
                         </div>
                         {event.type === "availability" ? null : (

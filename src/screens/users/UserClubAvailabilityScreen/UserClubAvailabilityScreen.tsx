@@ -22,9 +22,10 @@ import {
   startOfAgendaWeek,
 } from "@/modules/schedule";
 import { ROUTES } from "@/router/routes";
-import PlayerReservationModal from "./components/PlayerReservationModal";
+import PlayerReservationModal from "@/screens/users/components/PlayerReservationModal";
+import ReserveIntentPanel from "@/screens/users/components/ReserveIntentPanel";
 import PublicCourtCard from "./components/PublicCourtCard";
-import ReserveIntentPanel from "./components/ReserveIntentPanel";
+import DayFreeSlotsDialog from "./components/DayFreeSlotsDialog";
 import {
   summarizeOpenDays,
   toDaySummaryEvent,
@@ -46,6 +47,7 @@ export default function UserClubAvailabilityScreen() {
     return parsed.isValid() ? parsed : dayjs();
   });
   const [intent, setIntent] = useState<PublicClubSlot | "browse" | null>(null);
+  const [listDate, setListDate] = useState<string | null>(null);
 
   const detailQuery = useQuery({
     queryKey: ["public-club", clubId],
@@ -91,6 +93,7 @@ export default function UserClubAvailabilityScreen() {
 
   useEffect(() => {
     setIntent(null);
+    setListDate(null);
   }, [cursorDate, mode, courtFilter]);
 
   const openHours = useMemo(() => openHoursOf(club?.openTime, club?.closeTime, club?.openDays ?? []), [club]);
@@ -148,6 +151,21 @@ export default function UserClubAvailabilityScreen() {
   const selectListedSlot = (eventId: string) => {
     const slot = slotsById.get(eventId);
     if (slot) setIntent(slot);
+  };
+
+  const listedDay = daySummaries.find((summary) => summary.dateKey === listDate) ?? null;
+
+  const openDayList = (dateKey: string) => {
+    const summary = daySummaries.find((item) => item.dateKey === dateKey);
+    if (!summary || summary.freeSlots.length === 0) return;
+    setListDate(dateKey);
+  };
+
+  const openEventDayList = (eventId: string) => {
+    const summary = daySummaries.find((item) =>
+      item.freeSlots.some((slot) => slotEventId(slot) === eventId),
+    );
+    if (summary) openDayList(summary.dateKey);
   };
 
   const bookableSlots = useMemo(
@@ -228,6 +246,9 @@ export default function UserClubAvailabilityScreen() {
                 key={court.id}
                 court={court}
                 selectedDate={cursorDate}
+                openTime={club.openTime}
+                closeTime={club.closeTime}
+                openDays={club.openDays}
                 freeSlots={freeToday.filter((slot) => slot.courtId === court.id)}
                 onSelectSlot={setIntent}
               />
@@ -276,9 +297,19 @@ export default function UserClubAvailabilityScreen() {
                   closeHour={openHours.closeHour}
                   jornada={openHours.jornada}
                   dayNotes={dayNotes}
-                  onSelectEvent={selectListedSlot}
+                  onSelectEvent={openEventDayList}
+                  onDayNoteClick={(day) => openDayList(day.format("YYYY-MM-DD"))}
                 />
               )}
+              <DayFreeSlotsDialog
+                dateKey={listDate}
+                slots={listedDay?.freeSlots ?? []}
+                onClose={() => setListDate(null)}
+                onSelect={(slot) => {
+                  setListDate(null);
+                  setIntent(slot);
+                }}
+              />
             </>
           )}
         </>

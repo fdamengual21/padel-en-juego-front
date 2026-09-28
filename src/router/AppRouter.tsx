@@ -22,6 +22,7 @@ import ClubTournamentDetailScreen from "@/screens/club/ClubTournamentDetailScree
 import ClubClientsScreen from "@/screens/club/ClubClientsScreen";
 import ClubClientDetailScreen from "@/screens/club/ClubClientDetailScreen";
 import ClubCourtsScreen from "@/screens/club/ClubCourtsScreen";
+import ClubFixedReservationsScreen from "@/screens/club/ClubFixedReservationsScreen";
 import ClubCourtConfigScreen from "@/screens/club/ClubCourtConfigScreen";
 import ClubSettingsScreen from "@/screens/club/ClubSettingsScreen";
 import UserHomeScreen from "@/screens/users/UserHomeScreen";
@@ -41,6 +42,7 @@ import LegacyPlayerRedirect from "@/router/LegacyPlayerRedirect";
 import {
   PERMISSION_CLUB_CLIENTS_READ,
   PERMISSION_CLUB_COURTS_READ,
+  PERMISSION_CLUB_RESERVATIONS_READ,
   PERMISSION_CLUB_SETTINGS_READ,
   PERMISSION_CLUB_TOURNAMENTS_READ,
   PERMISSION_CLUB_TOURNAMENTS_WRITE,
@@ -185,6 +187,13 @@ const router = createBrowserRouter(
           >
             <Route path="canchas" element={<ClubCourtsScreen />} />
             <Route path="canchas/:courtId" element={<ClubCourtConfigScreen />} />
+          </Route>
+          <Route
+            element={
+              <RequirePermission permission={PERMISSION_CLUB_RESERVATIONS_READ} />
+            }
+          >
+            <Route path="turnos-fijos" element={<ClubFixedReservationsScreen />} />
           </Route>
         </Route>
         <Route

@@ -114,6 +114,7 @@ export default function PlayerReservationModal({
           queryKey: ["public-club-availability", clubId],
         });
         void queryClient.invalidateQueries({ queryKey: ["public-club", clubId] });
+        void queryClient.invalidateQueries({ queryKey: ["player-reservations"] });
       }}
     />
   );

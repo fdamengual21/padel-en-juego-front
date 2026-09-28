@@ -10,6 +10,10 @@ import {
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import Api from "@/api/Api";
+import {
+  isAccessTokenExpired,
+  refreshAuthSession,
+} from "@/config/sessionTokenRefresh";
 import { ApiHttpError } from "@/lib/apiClient";
 import type { ConfirmEmailInput, LoginInput } from "@/modules/auth";
 import {
@@ -129,19 +133,50 @@ export function UserProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
-    const run = () => {
+    let cancelled = false;
+
+    const run = async () => {
+      const { token, refreshToken, expiresAt } = useAuthStore.getState();
+      if (
+        refreshToken?.trim() &&
+        isAccessTokenExpired(token, expiresAt)
+      ) {
+        try {
+          await refreshAuthSession();
+        } catch {
+          if (cancelled) return;
+          queryClient.clear();
+          clearAuth();
+          void useAuthStore.persist.clearStorage();
+          setIsResolvingUser(false);
+          return;
+        }
+      }
+
+      if (cancelled) return;
       if (!useAuthStore.getState().token?.trim()) {
         setIsResolvingUser(false);
         return;
       }
       void resolveCurrentUser();
     };
+
     if (useAuthStore.persist.hasHydrated()) {
-      run();
-      return;
+      void run();
+    } else {
+      const unsubscribe = useAuthStore.persist.onFinishHydration(() => {
+        void run();
+      });
+      return () => {
+        cancelled = true;
+        unsubscribe();
+      };
     }
-    return useAuthStore.persist.onFinishHydration(run);
-  }, [resolveCurrentUser]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [clearAuth, queryClient, resolveCurrentUser]);
 
   const value = useMemo<UserContextValue>(
     () => ({

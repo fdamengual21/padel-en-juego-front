@@ -202,7 +202,9 @@ function reservationToGridEvent(item: CourtReservation): CalendarEventGridItemDt
     id: item.id,
     type: "reservation",
     title: player || "Turno",
-    subtitle: item.courtName ?? null,
+    subtitle: item.isFixed
+      ? `Fijo · ${item.courtName ?? ""}`.replace(/\s·\s$/, "")
+      : (item.courtName ?? null),
     startAt: item.startsAt,
     endAt: item.endsAt,
     allDay: false,
@@ -532,6 +534,10 @@ export default function ClubCourtsScreen() {
     const reservation = (calendarReservationsQuery.data ?? []).find(
       (item) => item.id === eventId,
     );
+    if (reservation?.isFixed) {
+      navigate(ROUTES.club.fixedReservations);
+      return;
+    }
     if (reservation) {
       openReservation(reservation);
       return;
@@ -696,7 +702,6 @@ export default function ClubCourtsScreen() {
       ) : null}
 
       <PendingReservationsCard
-        clubId={clubId}
         reservations={pendingReservationsQuery.data ?? []}
         canMutate={canWriteReservations}
         onChanged={invalidateBoard}

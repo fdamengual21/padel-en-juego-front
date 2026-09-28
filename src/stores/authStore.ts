@@ -23,6 +23,8 @@ interface AuthPersisted {
 interface AuthStore extends AuthPersisted {
   user: UserMeDto | null;
   setAuthSession: (payload: SetAuthPayload) => void;
+  /** Rota access + refresh sin tocar el club elegido ni el perfil en memoria. */
+  rotateAuthTokens: (payload: SetAuthPayload) => void;
   setUserProfile: (user: UserMeDto) => void;
   enterClub: (clubId: string) => void;
   exitClubMode: () => void;
@@ -58,6 +60,14 @@ export const useAuthStore = create<AuthStore>()(
           isClubMode: false,
         });
         useClubSessionStore.getState().clear();
+      },
+
+      rotateAuthTokens: ({ token, refreshToken, expiresAt }) => {
+        set({
+          token: token.trim(),
+          refreshToken: refreshToken.trim(),
+          expiresAt: String(expiresAt).trim(),
+        });
       },
 
       setUserProfile: (user) => {

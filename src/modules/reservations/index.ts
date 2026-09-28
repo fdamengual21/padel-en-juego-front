@@ -6,7 +6,18 @@ export type {
   PlayerReservation,
   PlayerReservationClub,
   PlayerReservationStatus,
+  ClubReservationSummary,
+  ClubMonthOccupancy,
+  ClubTodayOccupancy,
+  ClubFreeSlots,
+  ClubTodayTurn,
+  ClubTodayTurnStatus,
   UpdateReservationInput,
+  CourtFixedReservation,
+  CourtFixedSkip,
+  CourtFixedReservationPlayer,
+  CourtFixedReservationQuery,
+  CreateFixedReservationInput,
 } from "./types";
 export { ReservationRepository } from "./repositories/ReservationRepository";
 export type { IReservationRepository } from "./repositories/ReservationRepository";
