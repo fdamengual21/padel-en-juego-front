@@ -160,6 +160,7 @@ export default function CourtSummaryCard({
                     >
                       <span className="text-muted-foreground">
                         {band.startTime} — {band.endTime}
+                        {band.label ? ` · ${band.label}` : ""}
                       </span>
                       <span className="font-semibold tabular-nums text-foreground">
                         {formatMoney(band.price)}

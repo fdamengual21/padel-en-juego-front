@@ -3,7 +3,7 @@ import { readData } from "@/config/axiosInstance";
 import type { ApiEnvelope } from "@/lib/apiClient";
 import { resolveClubHeaderId } from "@/modules/auth/clubContext";
 import { useAuthStore } from "@/stores/authStore";
-import type { CourtReservation, CourtReservationStatus, PaginatedResult } from "@/domain";
+import type { CourtReservation, CourtReservationStatus } from "@/domain";
 import type {
   CourtSlot,
   CourtSlotList,
@@ -18,6 +18,7 @@ import type {
   CourtFixedReservation,
   CourtFixedReservationPlayer,
   CourtFixedReservationQuery,
+  CourtFixedReservationPage,
   CreateFixedReservationInput,
   UpdateReservationInput,
 } from "../types";
@@ -42,7 +43,7 @@ export interface IReservationRepository {
   reject(id: string, reason?: string): Promise<CourtReservation>;
   listMine(): Promise<PlayerReservation[]>;
   cancelMine(id: string): Promise<void>;
-  listFixed(query?: CourtFixedReservationQuery): Promise<PaginatedResult<CourtFixedReservationPlayer>>;
+  listFixed(query?: CourtFixedReservationQuery): Promise<CourtFixedReservationPage>;
   createFixed(input: CreateFixedReservationInput): Promise<CourtFixedReservation>;
   cancelFixed(id: string, note?: string): Promise<void>;
   skipFixed(id: string, date: string, note?: string): Promise<void>;
@@ -113,14 +114,25 @@ function normalizeSummary(raw: Record<string, unknown> | null): ClubReservationS
   const month = asRecord(raw?.month);
   const today = asRecord(raw?.today);
   const freeSlots = asRecord(raw?.freeSlots);
+  const income = asRecord(raw?.income);
   return {
-    month: { percent: asPercent(month?.percent) },
+    month: {
+      percent: asPercent(month?.percent),
+      deltaPercent: asPercent(month?.deltaPercent),
+    },
     today: {
       morningPercent: asPercent(today?.morningPercent),
       afternoonPercent: asPercent(today?.afternoonPercent),
       peakPercent: asPercent(today?.peakPercent),
     },
-    freeSlots: { count: asNumber(freeSlots?.count) },
+    freeSlots: {
+      count: asNumber(freeSlots?.count),
+      withinThreeHours: asNumber(freeSlots?.withinThreeHours),
+    },
+    income: {
+      amount: asNumber(income?.amount),
+      deltaPercent: asPercent(income?.deltaPercent),
+    },
   };
 }
 
@@ -153,6 +165,7 @@ function normalizeMine(raw: Record<string, unknown>): PlayerReservation | null {
     id,
     club,
     courtName: asString(raw.courtName),
+    courtImageUrl: asNullable(raw.courtImageUrl),
     startsAt: asString(raw.startsAt),
     endsAt: asString(raw.endsAt),
     status,
@@ -177,6 +190,7 @@ export function normalizeReservation(raw: Record<string, unknown>): CourtReserva
     isClubPlayer: raw.isClubPlayer === true,
     isFixed: raw.isFixed === true,
     courtName: asString(raw.courtName),
+    courtImageUrl: asString(raw.courtImageUrl) || null,
     startsAt: asString(raw.startsAt),
     endsAt: asString(raw.endsAt),
     status: asStatus(raw.status),
@@ -437,6 +451,7 @@ export class ReservationRepository implements IReservationRepository {
       pageSize: asNumber(data.pageSize) || query?.pageSize || 8,
       totalItems: asNumber(data.totalItems),
       totalPages: totalPages > 0 ? totalPages : 1,
+      seriesCount: asNumber(data.seriesCount),
     };
   }
 

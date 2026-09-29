@@ -13,7 +13,7 @@ import type {
   CourtDaySummary,
   CourtReservation,
 } from "@/domain";
-import { COURT_STATUS_LABELS, isoWeekdayFromDate } from "@/domain";
+import { COURT_STATUS_LABELS, isoWeekdayFromDate, listDayPriceRanges } from "@/domain";
 import Api from "@/api/Api";
 import { useMockSession } from "@/app/MockSessionProvider";
 import { useAuthStore } from "@/stores/authStore";
@@ -42,7 +42,7 @@ import {
   type CourtAgendaToolbarMode,
 } from "@/components/schedule";
 import CourtReservationModal from "./components/CourtReservationModal";
-import PendingReservationsCard from "./components/PendingReservationsCard";
+import DashboardPendingTray from "@/screens/club/components/ClubPendingTray";
 import CourtSummaryCard from "./components/CourtSummaryCard";
 import CourtsOverviewCard from "./components/CourtsOverviewCard";
 import CreateCourtDialog from "./components/CreateCourtDialog";
@@ -87,16 +87,14 @@ function clubViewFromSettings(
   };
 }
 
-function priceBandsForDate(court: Court, date: string) {
+function priceBandsForDate(court: Court, date: string, session: ClubSession | null) {
   const weekday = isoWeekdayFromDate(new Date(`${date}T12:00:00`));
-  return (court.priceRules ?? [])
-    .filter((rule) => rule.daysOfWeek.includes(weekday))
-    .map((rule) => ({
-      startTime: rule.startTime,
-      endTime: rule.endTime,
-      price: rule.price,
-      label: rule.label,
-    }));
+  return listDayPriceRanges({
+    ...scheduleOf(session),
+    weekday,
+    basePrice: court.basePrice,
+    rules: court.priceRules ?? [],
+  });
 }
 
 function scheduleOf(session: ClubSession | null) {
@@ -132,7 +130,7 @@ function daySummaryFromCourt(
   date: string,
   session: ClubSession | null,
 ): CourtDaySummary {
-  const priceBands = priceBandsForDate(court, date);
+  const priceBands = priceBandsForDate(court, date, session);
   const schedule = scheduleOf(session);
   const availableSlots =
     session && court.status === "active"
@@ -701,8 +699,10 @@ export default function ClubCourtsScreen() {
         <p className="text-base text-muted-foreground">Cargando canchas…</p>
       ) : null}
 
-      <PendingReservationsCard
+      <DashboardPendingTray
         reservations={pendingReservationsQuery.data ?? []}
+        isLoading={pendingReservationsQuery.isLoading}
+        isError={pendingReservationsQuery.isError}
         canMutate={canWriteReservations}
         onChanged={invalidateBoard}
       />

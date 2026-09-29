@@ -16,7 +16,9 @@ export interface ClubSettings {
   name: string;
   isActive: boolean;
   provinceId: number | null;
+  provinceName: string | null;
   municipalityId: number | null;
+  municipalityName: string | null;
   street: string | null;
   streetNumber: string | null;
   latitude: number | null;

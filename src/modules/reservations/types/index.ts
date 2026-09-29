@@ -1,4 +1,4 @@
-import type { CourtAvailableSlot } from "@/domain";
+import type { CourtAvailableSlot, PaginatedResult } from "@/domain";
 
 export interface ReservationPlayer {
   id: string;
@@ -48,6 +48,7 @@ export interface PlayerReservation {
   id: string;
   club: PlayerReservationClub;
   courtName: string;
+  courtImageUrl: string | null;
   startsAt: string;
   endsAt: string;
   status: PlayerReservationStatus;
@@ -60,6 +61,8 @@ export interface PlayerReservation {
 /** Card de ocupación del mes. */
 export interface ClubMonthOccupancy {
   percent: number | null;
+  /** Puntos contra el mes anterior. Null si alguno de los dos meses no tiene turnos. */
+  deltaPercent: number | null;
 }
 
 /** Card de ocupación de hoy: mañana, tarde y punta. */
@@ -72,6 +75,15 @@ export interface ClubTodayOccupancy {
 /** Card de turnos libres de hoy. */
 export interface ClubFreeSlots {
   count: number;
+  /** Libres cuyo inicio cae dentro de las próximas 3 horas. */
+  withinThreeHours: number;
+}
+
+/** Ingresos del día según el precio del turno, no una caja. */
+export interface ClubDayIncome {
+  amount: number;
+  /** Porcentaje contra ayer. Null si ayer no hubo ingresos. */
+  deltaPercent: number | null;
 }
 
 /** Cards del resumen. Los turnos de hoy y los pendientes llegan por otro request. */
@@ -79,6 +91,7 @@ export interface ClubReservationSummary {
   month: ClubMonthOccupancy;
   today: ClubTodayOccupancy;
   freeSlots: ClubFreeSlots;
+  income: ClubDayIncome;
 }
 
 /** Turno de hoy en el resumen del club. */
@@ -126,6 +139,11 @@ export interface CourtFixedReservationQuery {
   q?: string;
   page?: number;
   pageSize?: number;
+}
+
+/** Página de fijos. totalItems cuenta jugadores; seriesCount cuenta series. */
+export interface CourtFixedReservationPage extends PaginatedResult<CourtFixedReservationPlayer> {
+  seriesCount: number;
 }
 
 export interface CreateFixedReservationInput {

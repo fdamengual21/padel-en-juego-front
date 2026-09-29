@@ -10,6 +10,7 @@ export type {
   ClubMonthOccupancy,
   ClubTodayOccupancy,
   ClubFreeSlots,
+  ClubDayIncome,
   ClubTodayTurn,
   ClubTodayTurnStatus,
   UpdateReservationInput,
@@ -17,6 +18,7 @@ export type {
   CourtFixedSkip,
   CourtFixedReservationPlayer,
   CourtFixedReservationQuery,
+  CourtFixedReservationPage,
   CreateFixedReservationInput,
 } from "./types";
 export { ReservationRepository } from "./repositories/ReservationRepository";

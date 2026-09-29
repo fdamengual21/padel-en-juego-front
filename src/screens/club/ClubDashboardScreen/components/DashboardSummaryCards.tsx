@@ -1,225 +1,252 @@
 import { useState } from "react";
-import { Info } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Link } from "react-router-dom";
+import { Calendar, CalendarRange, ChevronRight, CircleDollarSign, Clock, Info } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { ClubReservationSummary } from "@/modules/reservations";
+import DashboardIconWell from "@/screens/club/components/DashboardIconWell";
+import { OccupancyDetailDialog } from "./DashboardOccupancyHelp";
 
-interface DashboardSummaryCardsProps {
+interface OccupancyCardProps {
   summary: ClubReservationSummary | undefined;
   isLoading: boolean;
   isError: boolean;
 }
 
-type HelpTopic = "month" | "today";
+export function OccupancyCard({ summary, isLoading, isError }: OccupancyCardProps) {
+  const [open, setOpen] = useState(false);
 
-export default function DashboardSummaryCards({
-  summary,
-  isLoading,
-  isError,
-}: DashboardSummaryCardsProps) {
-  const [help, setHelp] = useState<HelpTopic | null>(null);
-
-  if (isLoading) {
-    return (
-      <>
-        <CardSkeleton lines={1} />
-        <CardSkeleton lines={3} />
-        <CardSkeleton hero />
-      </>
-    );
-  }
-
-  if (isError || !summary) {
-    return (
-      <p className="text-sm text-muted-foreground sm:col-span-2 xl:col-span-3">
-        No se pudo cargar la ocupación.
-      </p>
-    );
-  }
+  if (isLoading) return <OccupancySkeleton />;
 
   return (
     <>
       <button
         type="button"
-        className="cursor-pointer rounded-xl border border-border bg-card p-4 text-left"
-        aria-label="Qué mide la ocupación del mes"
-        onClick={() => setHelp("month")}
+        className="flex h-full w-full cursor-pointer flex-col rounded-xl border border-border bg-card p-4 text-left"
+        onClick={() => setOpen(true)}
       >
-        <CardHeading label="Ocupación" />
-        <p className="mt-3 text-sm font-medium tabular-nums">
-          {formatPercent(summary.month.percent)} Este mes
-        </p>
-      </button>
-
-      <button
-        type="button"
-        className="cursor-pointer rounded-xl border border-border bg-card p-4 text-left"
-        aria-label="Qué mide la ocupación de hoy"
-        onClick={() => setHelp("today")}
-      >
-        <CardHeading label="Hoy" />
-        <div className="mt-3 space-y-1">
-          <BandLine percent={summary.today.morningPercent} label="Mañana" />
-          <BandLine percent={summary.today.afternoonPercent} label="Tarde" />
-          <BandLine percent={summary.today.peakPercent} label="Punta" peak />
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <DashboardIconWell icon={CalendarRange} />
+            <p className="text-sm text-muted-foreground">Ocupación</p>
+          </div>
+          <Info className="size-4 text-muted-foreground" aria-hidden />
         </div>
+        {isError || !summary ? (
+          <p className="mt-3 text-sm text-muted-foreground">No se pudo cargar la ocupación.</p>
+        ) : (
+          <>
+            <p className="mt-3 text-3xl font-semibold leading-none tabular-nums tracking-tight">
+              {formatPercent(summary.month.percent)}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">este mes</p>
+            {summary.month.deltaPercent != null ? (
+              <p className={cn("mt-1 text-xs font-medium", deltaTone(summary.month.deltaPercent))}>
+                {formatDelta(summary.month.deltaPercent)}
+              </p>
+            ) : null}
+            <div className="mt-4 space-y-2">
+              <BandRow label="Mañana" percent={summary.today.morningPercent} />
+              <BandRow label="Tarde" percent={summary.today.afternoonPercent} />
+              <BandRow label="Pico" percent={summary.today.peakPercent} peak />
+            </div>
+            <span className="mt-3 self-end text-sm font-medium text-primary-strong">Ver detalle</span>
+          </>
+        )}
       </button>
-
-      <article className="rounded-xl border border-border bg-card p-4">
-        <p className="text-sm text-muted-foreground">Turnos libres</p>
-        <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">{summary.freeSlots.count}</p>
-        <p className="mt-1 text-xs text-muted-foreground">hoy</p>
-        <Dialog open={help != null} onOpenChange={(open) => { if (!open) setHelp(null); }}>
-          <DialogContent>
-            {help === "month" ? <MonthHelp /> : null}
-            {help === "today" ? <TodayHelp /> : null}
-          </DialogContent>
-        </Dialog>
-      </article>
+      <OccupancyDetailDialog open={open} onOpenChange={setOpen} />
     </>
   );
 }
 
-export function PendingCountCard({ count }: { count: number }) {
+interface FreeSlotsCardProps {
+  summary: ClubReservationSummary | undefined;
+  isLoading: boolean;
+  isError: boolean;
+  href?: string;
+}
+
+const compactCard = "flex h-full min-h-0 flex-1 flex-col rounded-xl border border-border bg-card p-3";
+
+export function FreeSlotsCard({ summary, isLoading, isError, href }: FreeSlotsCardProps) {
+  if (isLoading) return <CompactSkeleton />;
+
+  const body = (
+    <>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <DashboardIconWell icon={Calendar} />
+          <p className="text-sm text-muted-foreground">Turnos libres</p>
+        </div>
+        {href ? <ChevronRight className="size-4 text-muted-foreground" aria-hidden /> : null}
+      </div>
+      {isError || !summary ? (
+        <p className="mt-2 text-sm text-muted-foreground">No se pudieron cargar los turnos libres.</p>
+      ) : (
+        <>
+          <p className="mt-2 text-2xl font-semibold leading-none tabular-nums tracking-tight">
+            {summary.freeSlots.count}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">hoy</p>
+          <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Clock className="size-3.5" aria-hidden />
+            {`${summary.freeSlots.withinThreeHours} en las próximas 3 h`}
+          </p>
+        </>
+      )}
+    </>
+  );
+
+  if (!href || isError || !summary) {
+    return <article className={compactCard}>{body}</article>;
+  }
+
   return (
-    <article className="rounded-xl border border-warning/50 bg-warning/15 p-4">
-      <p className="text-sm text-muted-foreground">Pendientes</p>
-      <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">{count}</p>
-      <p className="mt-1 text-xs text-muted-foreground">atención</p>
+    <Link to={href} className={cn(compactCard, "transition-colors hover:bg-muted/40")}>
+      {body}
+    </Link>
+  );
+}
+
+interface IncomeCardProps {
+  summary: ClubReservationSummary | undefined;
+  isLoading: boolean;
+  isError: boolean;
+}
+
+export function IncomeCard({ summary, isLoading, isError }: IncomeCardProps) {
+  if (isLoading) return <CompactSkeleton />;
+
+  const income = summary?.income;
+  return (
+    <article className={cn(compactCard, "bg-success/10")}>
+      <div className="flex items-center gap-2">
+        <DashboardIconWell icon={CircleDollarSign} tone="accent" />
+        <p className="text-sm text-muted-foreground">Ingresos del día</p>
+      </div>
+      {isError || !income ? (
+        <p className="mt-2 text-sm text-muted-foreground">No se pudieron cargar los ingresos.</p>
+      ) : (
+        <>
+          <p className="mt-2 text-2xl font-semibold leading-none tabular-nums tracking-tight">
+            {formatMoney(income.amount)}
+          </p>
+          {income.deltaPercent != null ? (
+            <p className={cn("mt-1 text-xs font-medium", deltaTone(income.deltaPercent))}>
+              {formatDelta(income.deltaPercent, "ayer")}
+            </p>
+          ) : (
+            <p className="mt-1 text-xs text-muted-foreground">hoy</p>
+          )}
+        </>
+      )}
     </article>
   );
 }
 
-export function CardSkeleton({
-  lines = 1,
-  hero = false,
-  emphasis = false,
-}: {
-  lines?: number;
-  hero?: boolean;
-  emphasis?: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        "rounded-xl border p-4",
-        emphasis ? "border-warning/50 bg-warning/15" : "border-border bg-card",
-      )}
-      aria-hidden
-    >
-      <div className="h-4 w-24 animate-pulse rounded bg-muted" />
-      {hero ? <div className="mt-3 h-8 w-12 animate-pulse rounded bg-muted" /> : null}
-      {Array.from({ length: lines }, (_, index) => (
-        <div key={index} className="mt-2 h-4 w-28 animate-pulse rounded bg-muted" />
-      ))}
-    </div>
-  );
-}
-
-export function PendingTraySkeleton() {
-  return (
-    <div className="rounded-xl border border-warning/50 bg-warning/15 p-4" aria-hidden>
-      <div className="h-4 w-40 animate-pulse rounded bg-muted" />
-      <div className="mt-3 h-14 animate-pulse rounded-lg bg-card" />
-      <div className="mt-2 h-14 animate-pulse rounded-lg bg-card" />
-    </div>
-  );
-}
-
-export function TodayTurnsSkeleton() {
-  return (
-    <div className="space-y-3" aria-hidden>
-      <div className="h-4 w-28 animate-pulse rounded bg-muted" />
-      <div className="flex gap-3 rounded-2xl bg-primary/15 p-4">
-        <div className="h-14 flex-1 animate-pulse rounded-lg bg-card/70" />
-        <div className="h-14 flex-1 animate-pulse rounded-lg bg-card/70" />
-        <div className="h-14 flex-1 animate-pulse rounded-lg bg-card/70" />
-      </div>
-    </div>
-  );
-}
-
-function CardHeading({ label }: { label: string }) {
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <Info className="size-3.5 text-muted-foreground" aria-hidden />
-    </div>
-  );
-}
-
-function BandLine({
-  percent,
+function BandRow({
   label,
+  percent,
   peak = false,
 }: {
-  percent: number | null;
   label: string;
+  percent: number | null;
   peak?: boolean;
 }) {
+  const tone = peak ? peakTone(percent) : null;
   return (
-    <p className={cn("text-sm font-medium tabular-nums", peak && peakTone(percent))}>
-      {`${formatPercent(percent)} ${label}`}
-    </p>
+    <div className="grid grid-cols-[4.25rem_2.25rem_1fr_auto] items-center gap-2">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-xs font-medium tabular-nums">{formatPercent(percent)}</span>
+      <span className="h-1.5 overflow-hidden rounded-full bg-muted">
+        <span
+          className={cn("block h-full rounded-full", tone?.bar ?? "bg-foreground/25")}
+          style={{ width: percent == null ? "0%" : `${Math.max(0, Math.min(100, percent))}%` }}
+        />
+      </span>
+      {tone ? (
+        <Badge variant="secondary" className={cn("h-auto px-1.5 py-0.5 text-xs", tone.badge)}>
+          {tone.label}
+        </Badge>
+      ) : (
+        <span />
+      )}
+    </div>
   );
 }
 
-function peakTone(percent: number | null): string {
-  if (percent == null) return "text-foreground";
-  if (percent < 55) return "text-destructive";
-  if (percent < 75) return "text-warning";
-  if (percent < 90) return "text-success";
-  return "text-primary-strong";
+function peakTone(percent: number | null): { bar: string; badge: string; label: string } | null {
+  if (percent == null) return null;
+  if (percent < 55) {
+    return {
+      bar: "bg-destructive",
+      badge: "border-transparent! bg-destructive/15! text-destructive",
+      label: "Baja",
+    };
+  }
+  if (percent < 75) {
+    return {
+      bar: "bg-warning",
+      badge: "border-transparent! bg-warning/20! text-warning",
+      label: "Regular",
+    };
+  }
+  if (percent < 90) {
+    return {
+      bar: "bg-success",
+      badge: "border-transparent! bg-success/15! text-success",
+      label: "Buena",
+    };
+  }
+  return {
+    bar: "bg-primary-strong",
+    badge: "border-transparent! bg-primary/30! text-primary-strong",
+    label: "Casi llena",
+  };
+}
+
+function deltaTone(delta: number): string {
+  if (delta > 0) return "text-success";
+  if (delta < 0) return "text-destructive";
+  return "text-muted-foreground";
+}
+
+function formatDelta(delta: number, against = "mes anterior"): string {
+  const sign = delta > 0 ? "+" : "";
+  return `${sign}${delta} % vs. ${against}`;
+}
+
+function formatMoney(value: number): string {
+  return new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: "ARS",
+    maximumFractionDigits: 0,
+  }).format(value);
 }
 
 function formatPercent(percent: number | null): string {
   return percent == null ? "—" : `${percent}%`;
 }
 
-function MonthHelp() {
+function OccupancySkeleton() {
   return (
-    <DialogHeader>
-      <DialogTitle>Ocupación</DialogTitle>
-      <DialogDescription>
-        Turnos aceptados o completados, y los fijos vigentes, sobre todos los que genera el horario del mes, de la apertura al cierre. La mañana y la siesta vacías bajan el número y es esperable. No se compara con la punta.
-      </DialogDescription>
-    </DialogHeader>
+    <div className="rounded-xl border border-border bg-card p-4" aria-hidden>
+      <div className="h-8 w-32 animate-pulse rounded-lg bg-muted" />
+      <div className="mt-3 h-8 w-16 animate-pulse rounded bg-muted" />
+      <div className="mt-4 space-y-2">
+        <div className="h-2 animate-pulse rounded-full bg-muted" />
+        <div className="h-2 animate-pulse rounded-full bg-muted" />
+        <div className="h-2 animate-pulse rounded-full bg-muted" />
+      </div>
+    </div>
   );
 }
 
-function TodayHelp() {
+function CompactSkeleton() {
   return (
-    <>
-      <DialogHeader>
-        <DialogTitle>Hoy</DialogTitle>
-        <DialogDescription>
-          Mañana es de 08:00 a 14:00 y tarde de 14:00 a 18:00. Esas dos se muestran sin alarma. La punta es desde las 18:00 e incluye el turno de las 22:00, confirmado o ya en juego. El de las 00:00 no entra.
-        </DialogDescription>
-      </DialogHeader>
-      <ul className="space-y-1.5 text-sm">
-        <Legend dot="bg-destructive" label="Menos de 55 % Baja" />
-        <Legend dot="bg-warning" label="55–74 % Regular" />
-        <Legend dot="bg-success" label="75–89 % Buena" />
-        <Legend dot="bg-primary-strong" label="90 % o más Casi llena" />
-      </ul>
-      <p className="text-xs text-muted-foreground">
-        Playtomic, Global Padel Report 2026. En Argentina el pico de lunes a viernes es de 19:00 a 23:00.
-      </p>
-    </>
-  );
-}
-
-function Legend({ dot, label }: { dot: string; label: string }) {
-  return (
-    <li className="flex items-center gap-2">
-      <span className={cn("size-2 shrink-0 rounded-full", dot)} aria-hidden />
-      <span>{label}</span>
-    </li>
+    <div className="min-h-24 flex-1 rounded-xl border border-border bg-card p-3" aria-hidden>
+      <div className="h-8 w-28 animate-pulse rounded-lg bg-muted" />
+      <div className="mt-2 h-7 w-16 animate-pulse rounded bg-muted" />
+    </div>
   );
 }

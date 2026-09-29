@@ -560,6 +560,8 @@ export interface CourtReservation {
   /** True si el bloque sale de un turno fijo y no de una reserva persistida. */
   isFixed?: boolean;
   courtName?: string;
+  /** URL pública de la foto de la cancha. */
+  courtImageUrl?: string | null;
   startsAt: string;
   endsAt: string;
   status: CourtReservationStatus;

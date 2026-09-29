@@ -1,48 +1,75 @@
+import { Link } from "react-router-dom";
 import dayjs from "dayjs";
-import { ChevronRight, MapPin, User } from "lucide-react";
-import Avatar from "@/components/Avatar";
+import { ChevronRight, Clock } from "lucide-react";
+import { EmptyState } from "@/components/EmptyState";
+import { Badge } from "@/components/ui/badge";
 import { PlayerReservationStatusChip } from "@/components/reservations";
 import type { ClubTodayTurn } from "@/modules/reservations";
+import DashboardIconWell from "@/screens/club/components/DashboardIconWell";
 
 interface DashboardTodayTurnsProps {
   turns: ClubTodayTurn[];
+  isLoading: boolean;
+  isError: boolean;
+  agendaTo?: string;
   onOpen: (turn: ClubTodayTurn) => void;
 }
 
-export default function DashboardTodayTurns({ turns, onOpen }: DashboardTodayTurnsProps) {
+export default function DashboardTodayTurns({
+  turns,
+  isLoading,
+  isError,
+  agendaTo,
+  onOpen,
+}: DashboardTodayTurnsProps) {
   return (
-    <section className="space-y-3">
-      <h3 className="text-sm font-medium text-foreground">Turnos de hoy</h3>
-      {turns.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No hay turnos para el resto del día.</p>
+    <section className="min-w-0 rounded-xl border border-border bg-card p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <DashboardIconWell icon={Clock} />
+          <h3 className="text-sm font-semibold">Turnos de hoy</h3>
+        </div>
+        {agendaTo ? (
+          <Link to={agendaTo} className="text-sm text-muted-foreground hover:text-foreground">
+            Ver agenda
+          </Link>
+        ) : null}
+      </div>
+      {isLoading ? (
+        <TodayTurnsSkeleton />
+      ) : isError ? (
+        <EmptyState
+          className="mt-3"
+          icon={Clock}
+          tone="error"
+          title="No se pudieron cargar los turnos"
+          description="Reintentá en un momento."
+        />
+      ) : turns.length === 0 ? (
+        <EmptyState
+          className="mt-3"
+          icon={Clock}
+          title="No hay turnos para el resto del día"
+          description="Los que siguen aparecen acá a medida que abre el club."
+        />
       ) : (
-        <div className="flex items-stretch overflow-x-auto rounded-2xl bg-primary/15 p-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {turns.map((turn, index) => (
-            <div key={`${turn.courtId}-${turn.startsAt}`} className="flex min-w-56 flex-1">
-              {index > 0 ? <div className="mx-3 w-px shrink-0 self-stretch bg-border" aria-hidden /> : null}
-              <button
-                type="button"
-                className="flex w-full cursor-pointer items-center gap-2.5 px-1 py-1 text-left"
-                onClick={() => onOpen(turn)}
-              >
-                {turn.status === "free" ? (
-                  <span className="flex size-11 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                    <User className="size-5" aria-hidden />
-                  </span>
-                ) : (
-                  <Avatar name={playerName(turn)} size="sm" className="size-11 rounded-md" />
-                )}
-                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                  <p className="truncate text-sm font-semibold tracking-tight">{formatRange(turn)}</p>
-                  <p className="flex items-center gap-1 truncate text-[11px] leading-none text-muted-foreground">
-                    <MapPin className="size-3 shrink-0" aria-hidden />
-                    <span className="truncate">{turn.courtName || "Cancha"}</span>
-                  </p>
-                  <TurnChip status={turn.status} />
-                </div>
-                <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-              </button>
-            </div>
+        <div className="mt-3 grid min-w-0 gap-1 sm:grid-cols-2">
+          {turns.map((turn) => (
+            <button
+              key={`${turn.courtId}-${turn.startsAt}`}
+              type="button"
+              className="flex w-full min-w-0 cursor-pointer items-center gap-3 rounded-lg px-2 py-2 text-left hover:bg-muted"
+              onClick={() => onOpen(turn)}
+            >
+              <span className="w-12 shrink-0 text-sm font-semibold tabular-nums">
+                {formatHour(turn)}
+              </span>
+              <TurnPill status={turn.status} />
+              <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
+                {detail(turn)}
+              </span>
+              <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+            </button>
           ))}
         </div>
       )}
@@ -50,32 +77,45 @@ export default function DashboardTodayTurns({ turns, onOpen }: DashboardTodayTur
   );
 }
 
-function TurnChip({ status }: { status: ClubTodayTurn["status"] }) {
-  if (status === "pending" || status === "booked") {
-    return <PlayerReservationStatusChip status={status} className="self-start" />;
+function TurnPill({ status }: { status: ClubTodayTurn["status"] }) {
+  if (status === "pending") {
+    return <PlayerReservationStatusChip status="pending" className="shrink-0" />;
   }
-  if (status === "completed") {
+  if (status === "free") {
     return (
-      <span className="self-start rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
-        Completada
-      </span>
+      <Badge variant="secondary" className="shrink-0">
+        Libre
+      </Badge>
     );
   }
   return (
-    <span className="self-start rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
-      Libre
-    </span>
+    <Badge
+      variant="secondary"
+      className="shrink-0 border-transparent! bg-success/15! text-success"
+    >
+      {status === "completed" ? "Jugado" : "Ocupado"}
+    </Badge>
   );
 }
 
-function playerName(turn: ClubTodayTurn): string {
-  if (turn.status === "free") return "Libre";
-  return `${turn.playerFirstName ?? ""} ${turn.playerLastName ?? ""}`.trim() || "Jugador";
+function detail(turn: ClubTodayTurn): string {
+  const court = turn.courtName || "Cancha";
+  if (turn.status === "free") return court;
+  const name = `${turn.playerFirstName ?? ""} ${turn.playerLastName ?? ""}`.trim();
+  return name ? `${court} · ${name}` : court;
 }
 
-function formatRange(turn: ClubTodayTurn): string {
+function formatHour(turn: ClubTodayTurn): string {
   const start = dayjs(turn.startsAt);
-  const end = dayjs(turn.endsAt);
-  if (!start.isValid()) return "Sin horario";
-  return `${start.format("HH:mm")} – ${end.format("HH:mm")}`;
+  return start.isValid() ? start.format("HH:mm") : "—";
+}
+
+function TodayTurnsSkeleton() {
+  return (
+    <div className="mt-3 grid gap-2 sm:grid-cols-2" aria-hidden>
+      {Array.from({ length: 6 }, (_, index) => (
+        <div key={index} className="h-10 animate-pulse rounded-lg bg-muted" />
+      ))}
+    </div>
+  );
 }

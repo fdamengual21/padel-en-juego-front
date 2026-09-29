@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Calendar, ChevronRight, CircleAlert } from "lucide-react";
+import { Calendar, CircleAlert } from "lucide-react";
 import Api from "@/api/Api";
 import { useMockSession } from "@/app/MockSessionProvider";
 import { EmptyState } from "@/components/EmptyState";
@@ -81,28 +81,21 @@ export default function UserHomeScreen() {
             />
           ) : (
             <div className="space-y-3">
-              <UpcomingTurnsMobileHeader />
-              <div className="flex items-start gap-6 rounded-2xl bg-primary/15 p-5">
-                <UpcomingTurnsSummary
-                  count={(reservationsQuery.data ?? []).length}
-                  loading={reservationsQuery.isLoading}
-                />
-                {(reservationsQuery.data ?? []).length > 0 ? (
-                  <div className="flex min-w-0 flex-1 items-stretch overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    {(reservationsQuery.data ?? []).map((reservation, index) => (
-                      <div key={reservation.id} className="flex min-w-60 flex-1">
-                        {index > 0 ? (
-                          <div className="mx-3 w-px shrink-0 self-stretch bg-border" aria-hidden />
-                        ) : null}
-                        <PlayerReservationCard
-                          reservation={reservation}
-                          onOpen={setSelected}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
+              <UpcomingTurnsSummary
+                count={(reservationsQuery.data ?? []).length}
+                loading={reservationsQuery.isLoading}
+              />
+              {(reservationsQuery.data ?? []).length > 0 ? (
+                <div className="flex items-stretch gap-3 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {(reservationsQuery.data ?? []).map((reservation) => (
+                    <PlayerReservationCard
+                      key={reservation.id}
+                      reservation={reservation}
+                      onOpen={setSelected}
+                    />
+                  ))}
+                </div>
+              ) : null}
             </div>
           )}
           <PlayerReservationDetailModal
@@ -138,42 +131,18 @@ export default function UserHomeScreen() {
   );
 }
 
-function UpcomingTurnsMobileHeader() {
-  return (
-    <div className="flex items-center justify-between gap-3 md:hidden">
-      <p className="flex items-center gap-2 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-        <Calendar className="size-3.5 shrink-0" aria-hidden />
-        Próximos turnos · 7 días
-      </p>
-      <span className="inline-flex items-center gap-0.5 text-xs font-medium text-muted-foreground">
-        Ver todos
-        <ChevronRight className="size-3.5" aria-hidden />
-      </span>
-    </div>
-  );
-}
-
 function UpcomingTurnsSummary({ count, loading }: { count: number; loading: boolean }) {
-  const line = loading
-    ? "Cargando turnos…"
-    : count === 0
-      ? "No tenés turnos próximos"
-      : count === 1
-        ? "Tenés 1 turno próximo"
-        : `Tenés ${count} turnos próximos`;
-
   return (
-    <div className="hidden shrink-0 items-start gap-2.5 md:flex">
-      <Calendar className="mt-px size-3.5 shrink-0 text-foreground" aria-hidden />
-      <div className="flex min-w-0 flex-col gap-2.5">
-        <p className="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
-          Próximos turnos · 7 días
-        </p>
-        <p className="flex items-center gap-0.5 text-sm font-medium whitespace-nowrap text-foreground">
-          {line}
-          {count > 0 ? <ChevronRight className="size-3.5 shrink-0" aria-hidden /> : null}
-        </p>
-      </div>
+    <div className="flex items-center gap-2">
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+        <Calendar className="size-4" aria-hidden />
+      </span>
+      <h3 className="text-lg font-semibold tracking-tight text-foreground">Próximos 7 días</h3>
+      {!loading ? (
+        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-success px-1.5 text-[11px] font-semibold leading-none text-white tabular-nums">
+          {count}
+        </span>
+      ) : null}
     </div>
   );
 }
