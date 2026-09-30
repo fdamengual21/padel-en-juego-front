@@ -3,7 +3,12 @@ import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import * as yup from "yup";
-import { CATEGORY_LEVELS, formatCategoryLevel } from "@/domain";
+import {
+  CATEGORY_LEVELS,
+  formatCategoryLevel,
+  isPlayerSidePreference,
+  PLAYER_SIDE_PREFERENCE_OPTIONS,
+} from "@/domain";
 import Api from "@/api/Api";
 import {
   DateField,
@@ -68,6 +73,13 @@ const schema = yup.object({
     })
     .min(1, "Elegí tu categoría")
     .max(8, "Elegí tu categoría"),
+  sidePreference: yup
+    .string()
+    .nullable()
+    .transform((value) => (value == null || value === "" ? null : value))
+    .test("side", "Elegí un lado válido", (value) =>
+      value == null || isPlayerSidePreference(value),
+    ),
   provinceId: yup.number().nullable(),
   municipalityId: yup
     .number()
@@ -95,6 +107,7 @@ function toFormValues(user: UserMeDto) {
     sexId: user.sexId ?? undefined,
     dateOfBirth: user.dateOfBirth ?? null,
     categoryLevel: user.categoryLevel ?? null,
+    sidePreference: user.sidePreference ?? null,
     provinceId: user.provinceId ?? null,
     municipalityId: user.municipalityId ?? null,
     phoneDialCode: phone.dialCode,
@@ -164,6 +177,7 @@ export default function ApiPlayerAccountForm({ user }: ApiPlayerAccountFormProps
         sexId: values.sexId,
         dateOfBirth: hasPlayer ? values.dateOfBirth || null : null,
         categoryLevel: hasPlayer ? values.categoryLevel : null,
+        sidePreference: hasPlayer ? values.sidePreference : null,
         provinceId: values.provinceId,
         municipalityId: values.municipalityId,
         phone: phone || null,
@@ -258,6 +272,15 @@ export default function ApiPlayerAccountForm({ user }: ApiPlayerAccountFormProps
               value: String(level),
               label: formatCategoryLevel(level),
             }))}
+          />
+          <SelectField
+            control={control}
+            name="sidePreference"
+            label="Lado (opcional)"
+            id="account-side"
+            allowEmpty
+            emptyLabel="Sin preferencia"
+            options={PLAYER_SIDE_PREFERENCE_OPTIONS}
           />
         </>
       ) : null}

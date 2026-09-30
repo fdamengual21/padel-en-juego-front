@@ -4,7 +4,12 @@ import { yupResolver } from "@hookform/resolvers/yup";
 import { useQuery } from "@tanstack/react-query";
 import * as yup from "yup";
 import Api from "@/api/Api";
-import { CATEGORY_LEVELS, formatCategoryLevel } from "@/domain";
+import {
+  CATEGORY_LEVELS,
+  formatCategoryLevel,
+  isPlayerSidePreference,
+  PLAYER_SIDE_PREFERENCE_OPTIONS,
+} from "@/domain";
 import { InputField, PhoneField, SelectField } from "@/components/Form";
 import { PERMISSION_CLUB_CLIENTS_WRITE } from "@/authorization";
 import { PermissionsGuard } from "@/components/guards";
@@ -29,6 +34,7 @@ interface ClientFormValues {
   phoneDialCode: string;
   phoneNational: string;
   categoryLevel: number | null;
+  sidePreference: string | null;
 }
 
 interface ClientFormDialogProps {
@@ -66,6 +72,14 @@ const schema: yup.ObjectSchema<ClientFormValues> = yup.object({
     .required("Elegí la categoría")
     .min(1, "Elegí la categoría")
     .max(8, "Elegí la categoría"),
+  sidePreference: yup
+    .string()
+    .nullable()
+    .defined()
+    .transform((value) => (value == null || value === "" ? null : value))
+    .test("side", "Elegí un lado válido", (value) =>
+      value == null || isPlayerSidePreference(value),
+    ),
 });
 
 const emptyValues: ClientFormValues = {
@@ -76,6 +90,7 @@ const emptyValues: ClientFormValues = {
   phoneDialCode: DEFAULT_PHONE_DIAL,
   phoneNational: "",
   categoryLevel: null,
+  sidePreference: null,
 };
 
 export default function ClientFormDialog({
@@ -122,6 +137,7 @@ export default function ClientFormDialog({
       phoneDialCode: phone.dialCode,
       phoneNational: phone.national,
       categoryLevel: client.categoryLevel,
+      sidePreference: client.sidePreference,
     });
   }, [open, clientId, detailQuery.data, form]);
 
@@ -133,6 +149,7 @@ export default function ClientFormDialog({
       sexId: values.sexId!,
       phone: combinePhone(values.phoneDialCode, values.phoneNational),
       categoryLevel: values.categoryLevel!,
+      sidePreference: values.sidePreference,
     };
     try {
       if (clientId) {
@@ -200,6 +217,14 @@ export default function ClientFormDialog({
           }))}
           allowEmpty
           emptyLabel="Elegí la categoría"
+        />
+        <SelectField
+          control={form.control}
+          name="sidePreference"
+          label="Lado (opcional)"
+          allowEmpty
+          emptyLabel="Sin preferencia"
+          options={PLAYER_SIDE_PREFERENCE_OPTIONS}
         />
         <DialogFooter className="gap-2 sm:justify-between">
           {embedded ? (

@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import type { Tournament } from "@/domain";
 import StatusBadge from "@/components/tournaments/StatusBadge";
 import { buttonVariants } from "@/components/ui/button";
+import { parseIsoDateOnly } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 
 interface TournamentCardProps {
@@ -17,6 +18,9 @@ export default function TournamentCard({
   pairsCount,
   to,
 }: TournamentCardProps) {
+  const embedded =
+    tournament.categories?.map((category) => category.name).filter(Boolean).join(" · ") ||
+    undefined;
   return (
     <article
       data-testid={`tournament-card-${tournament.id}`}
@@ -26,16 +30,17 @@ export default function TournamentCard({
         <div>
           <h3 className="text-lg font-semibold tracking-tight">{tournament.name}</h3>
           <p className="text-sm text-muted-foreground">
-            {new Date(tournament.startDate).toLocaleDateString("es-AR", {
-              day: "2-digit",
-              month: "short",
-            })}
+            {tournament.clubName ? `${tournament.clubName} · ` : ""}
+            {(parseIsoDateOnly(tournament.startDate) ?? new Date(tournament.startDate)).toLocaleDateString(
+              "es-AR",
+              { day: "2-digit", month: "short" },
+            )}
           </p>
         </div>
         <StatusBadge status={tournament.status} />
       </div>
       <p className="text-sm text-muted-foreground">
-        {categoryLabel ?? "Sin categoría"}
+        {categoryLabel ?? embedded ?? "Sin categoría"}
         {typeof pairsCount === "number" ? ` · ${pairsCount} parejas` : ""}
       </p>
       <Link to={to} className={cn(buttonVariants({ variant: "outline" }), "self-start")}>

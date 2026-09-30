@@ -1,7 +1,7 @@
 import type { AxiosInstance } from "axios";
 import { readData } from "@/config/axiosInstance";
 import type { PaginatedResult } from "@/domain";
-import { isCategoryLevel } from "@/domain";
+import { isCategoryLevel, isPlayerSidePreference } from "@/domain";
 import type { ApiEnvelope } from "@/lib/apiClient";
 import { resolveClubHeaderId } from "@/modules/auth/clubContext";
 import { useAuthStore } from "@/stores/authStore";
@@ -56,6 +56,7 @@ function normalizeClient(raw: Record<string, unknown>): ClubClient {
     documentNumber: asNullableString(raw.documentNumber),
     sexId: sexId != null && sexId > 0 ? sexId : null,
     categoryLevel: item.categoryLevel,
+    sidePreference: isPlayerSidePreference(raw.sidePreference) ? raw.sidePreference : null,
     hasAccount: raw.hasAccount === true,
     reservationsCount: asNullableNumber(raw.reservationsCount) ?? 0,
   };

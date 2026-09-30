@@ -156,7 +156,7 @@ function normalizeClub(raw: unknown): PlayerReservationClub | null {
   };
 }
 
-function normalizeMine(raw: Record<string, unknown>): PlayerReservation | null {
+export function normalizeMine(raw: Record<string, unknown>): PlayerReservation | null {
   const status = asMineStatus(raw.status);
   const id = asString(raw.id);
   const club = normalizeClub(raw.club);

@@ -44,13 +44,13 @@ const Api = {
   },
   TournamentService() {
     if (!tournamentService) {
-      tournamentService = new TournamentService(new TournamentRepository())
+      tournamentService = new TournamentService(new TournamentRepository(axiosInstance))
     }
     return tournamentService
   },
   TournamentOpsService() {
     if (!tournamentOpsService) {
-      tournamentOpsService = new TournamentOpsService(new TournamentOpsRepository())
+      tournamentOpsService = new TournamentOpsService(new TournamentOpsRepository(axiosInstance))
     }
     return tournamentOpsService
   },

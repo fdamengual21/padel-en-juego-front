@@ -78,9 +78,24 @@ function pairSideFromPlayerPrimary(
   return primary === "drive" || primary === "reves" ? primary : "any";
 }
 
+function pairSideFromPlayer(
+  player: Pick<Player, "sidePreference" | "sidePreferencePrimary"> | null | undefined,
+): PairSidePreference {
+  switch (player?.sidePreference) {
+    case "left":
+      return "reves";
+    case "right":
+      return "drive";
+    case "both":
+      return "any";
+    default:
+      return pairSideFromPlayerPrimary(player?.sidePreferencePrimary);
+  }
+}
+
 function sidePreferenceFromSlot(slot: PlayerSlotValue): PairSidePreference {
   if (slot.mode === "search") {
-    return pairSideFromPlayerPrimary(slot.player?.sidePreferencePrimary);
+    return pairSideFromPlayer(slot.player);
   }
   return pairSideFromPlayerPrimary(slot.draft.sidePreferencePrimary);
 }

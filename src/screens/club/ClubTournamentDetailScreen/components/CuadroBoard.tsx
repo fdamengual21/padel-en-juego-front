@@ -36,7 +36,7 @@ export default function CuadroBoard({
             {sectionTrail}
             {readOnly
               ? ". Consultá horarios, estado y resultados."
-              : ". Misma tabla que Zonas: tocá una fila para cargar el resultado. 1° a cuartos; 2° a octavos."}
+              : ". Tocá una fila para cargar el resultado. Los primeros de zona entran cruzados al cuadro."}
           </p>
           <p className="mt-1 text-[11px] text-muted-foreground">
             Actualizado{" "}

@@ -1,20 +1,18 @@
 import { useQueries, useQuery } from "@tanstack/react-query";
 import Api from "@/api/Api";
-import { useMockSession } from "@/app/MockSessionProvider";
 import TournamentCard from "@/components/tournaments/TournamentCard";
 import { ROUTES } from "@/router/routes";
 
 export default function UserTournamentsScreen() {
-  const { clubId } = useMockSession();
   const { data: tournaments = [] } = useQuery({
-    queryKey: ["tournaments", clubId],
-    queryFn: () => Api.TournamentService().list(clubId),
+    queryKey: ["public-tournaments"],
+    queryFn: () => Api.TournamentService().listPublic(),
   });
 
   const categoryQueries = useQueries({
     queries: tournaments.map((t) => ({
-      queryKey: ["categories", t.id],
-      queryFn: () => Api.TournamentOpsService().listCategories(t.id),
+      queryKey: ["public-categories", t.id],
+      queryFn: () => Api.TournamentOpsService().listPublicCategories(t.id),
     })),
   });
 

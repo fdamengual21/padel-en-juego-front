@@ -10,9 +10,8 @@ import {
   resolveMatchDurationMinutes,
 } from "@/domain";
 import Api from "@/api/Api";
-import { useMockSession } from "@/app/MockSessionProvider";
-import RequirePlayerAuth from "@/components/auth/RequirePlayerAuth";
 import MatchCard from "@/components/tournaments/MatchCard";
+import PlayerRegistrationPanel from "@/components/tournaments/PlayerRegistrationPanel";
 import StatusBadge from "@/components/tournaments/StatusBadge";
 import { Button } from "@/components/ui/button";
 import {
@@ -83,7 +82,6 @@ export default function TournamentDetailView({
 }: TournamentDetailViewProps) {
   const isClub = audience === "club";
   const readOnly = !isClub;
-  const { isAuthenticated } = useMockSession();
   const qc = useQueryClient();
   const [resultMatchId, setResultMatchId] = useState<string | null>(null);
   const [pendingStructureValues, setPendingStructureValues] =
@@ -98,54 +96,77 @@ export default function TournamentDetailView({
   const [editingPair, setEditingPair] = useState<TournamentPair | null>(null);
   const [confirmAddStartedOpen, setConfirmAddStartedOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("grupos");
+  const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [clientDetailId, setClientDetailId] = useState<string | null>(null);
 
   const { data: tournament } = useQuery({
-    queryKey: ["tournament", tournamentId],
-    queryFn: () => Api.TournamentService().getById(tournamentId),
+    queryKey: ["tournament", tournamentId, isClub],
+    queryFn: () =>
+      isClub
+        ? Api.TournamentService().getById(tournamentId)
+        : Api.TournamentService().getPublic(tournamentId),
   });
   const { data: categories = [] } = useQuery({
-    queryKey: ["categories", tournamentId],
-    queryFn: () => Api.TournamentOpsService().listCategories(tournamentId),
+    queryKey: ["categories", tournamentId, isClub],
+    queryFn: () =>
+      isClub
+        ? Api.TournamentOpsService().listCategories(tournamentId)
+        : Api.TournamentOpsService().listPublicCategories(tournamentId),
     enabled: Boolean(tournamentId),
   });
-  const categoryId = categories[0]?.id ?? "";
-  const category = categories[0];
+  const categoryId = (!isClub && selectedCategoryId) || categories[0]?.id || "";
+  const category = categories.find((item) => item.id === categoryId) ?? categories[0];
 
   const { data: pairs = [] } = useQuery({
     queryKey: ["pairs", categoryId],
-    queryFn: () => Api.TournamentOpsService().listPairs(categoryId),
+    queryFn: () =>
+      isClub
+        ? Api.TournamentOpsService().listPairs(categoryId)
+        : Api.TournamentOpsService().listPublicPairs(categoryId),
     enabled: Boolean(categoryId),
   });
   const { data: registrations = [] } = useQuery({
     queryKey: ["registrations", categoryId],
-    queryFn: () => Api.TournamentOpsService().listRegistrations(categoryId),
+    queryFn: () =>
+      isClub
+        ? Api.TournamentOpsService().listRegistrations(categoryId)
+        : Api.TournamentOpsService().listPublicRegistrations(categoryId),
     enabled: Boolean(categoryId),
   });
   const { data: groups = [] } = useQuery({
     queryKey: ["groups", categoryId],
-    queryFn: () => Api.TournamentOpsService().listGroups(categoryId),
+    queryFn: () =>
+      isClub
+        ? Api.TournamentOpsService().listGroups(categoryId)
+        : Api.TournamentOpsService().listPublicGroups(categoryId),
     enabled: Boolean(categoryId),
   });
   const { data: matches = [] } = useQuery({
     queryKey: ["matches", categoryId],
-    queryFn: () => Api.TournamentOpsService().listMatches(categoryId),
+    queryFn: () =>
+      isClub
+        ? Api.TournamentOpsService().listMatches(categoryId)
+        : Api.TournamentOpsService().listPublicMatches(categoryId),
     enabled: Boolean(categoryId),
   });
   const { data: players = [] } = useQuery({
     queryKey: ["players"],
     queryFn: () => Api.TournamentOpsService().listPlayers(),
+    enabled: isClub,
   });
   const { data: ruleset } = useQuery({
     queryKey: ["ruleset", categoryId],
-    queryFn: () => Api.TournamentOpsService().getRuleset(categoryId),
+    queryFn: () =>
+      isClub
+        ? Api.TournamentOpsService().getRuleset(categoryId)
+        : Api.TournamentOpsService().getPublicRuleset(categoryId),
     enabled: Boolean(categoryId),
   });
   const { data: courtReservations = [] } = useQuery({
     queryKey: ["court-reservations", tournament?.clubId],
     queryFn: () =>
       Api.TournamentOpsService().listCourtReservations(tournament!.clubId),
-    enabled: Boolean(tournament?.clubId),
+    enabled: isClub && Boolean(tournament?.clubId),
   });
 
   const matchDurationMinutes = resolveMatchDurationMinutes(ruleset?.preset);
@@ -156,7 +177,10 @@ export default function TournamentDetailView({
     refetch: refetchZonesBoard,
   } = useQuery({
     queryKey: ["zones-board", categoryId],
-    queryFn: () => Api.TournamentOpsService().getZonesBoard(categoryId),
+    queryFn: () =>
+      isClub
+        ? Api.TournamentOpsService().getZonesBoard(categoryId)
+        : Api.TournamentOpsService().getPublicZonesBoard(categoryId),
     enabled: Boolean(categoryId) && activeTab === "grupos",
     refetchOnMount: "always",
   });
@@ -165,7 +189,10 @@ export default function TournamentDetailView({
     refetch: refetchParticipantsBoard,
   } = useQuery({
     queryKey: ["participants-board", categoryId],
-    queryFn: () => Api.TournamentOpsService().getParticipantsBoard(categoryId),
+    queryFn: () =>
+      isClub
+        ? Api.TournamentOpsService().getParticipantsBoard(categoryId)
+        : Api.TournamentOpsService().getPublicParticipantsBoard(categoryId),
     enabled: Boolean(categoryId) && activeTab === "participantes",
     refetchOnMount: "always",
   });
@@ -195,7 +222,10 @@ export default function TournamentDetailView({
     refetch: refetchCuadro,
   } = useQuery({
     queryKey: ["cuadro", categoryId],
-    queryFn: () => Api.TournamentOpsService().getCuadroBoard(categoryId),
+    queryFn: () =>
+      isClub
+        ? Api.TournamentOpsService().getCuadroBoard(categoryId)
+        : Api.TournamentOpsService().getPublicCuadroBoard(categoryId),
     enabled: Boolean(categoryId) && activeTab === "cuadro",
     refetchOnMount: "always",
   });
@@ -204,7 +234,10 @@ export default function TournamentDetailView({
     refetch: refetchMatchesBoard,
   } = useQuery({
     queryKey: ["matches-board", categoryId],
-    queryFn: () => Api.TournamentOpsService().getMatchesBoard(categoryId),
+    queryFn: () =>
+      isClub
+        ? Api.TournamentOpsService().getMatchesBoard(categoryId)
+        : Api.TournamentOpsService().getPublicMatchesBoard(categoryId),
     enabled: Boolean(categoryId) && activeTab === "partidos",
     refetchOnMount: "always",
   });
@@ -304,7 +337,7 @@ export default function TournamentDetailView({
             : "Inscripción cargada",
           vars.mode === "edit"
             ? undefined
-            : "Queda aceptada (alta de club)",
+            : "Queda pendiente hasta que la aceptes",
         );
       }
       await invalidateOps();
@@ -432,6 +465,22 @@ export default function TournamentDetailView({
     },
     onError: (err: Error) => {
       toastError("No se pudo guardar la agenda", err.message);
+    },
+  });
+
+  const scheduleMutation = useMutation({
+    mutationFn: () => Api.TournamentOpsService().scheduleCategory(categoryId),
+    onSuccess: async (result) => {
+      toastSuccess(
+        "Horarios generados",
+        result.pendingCount > 0
+          ? `${result.scheduledCount} partidos ubicados. ${result.pendingCount} quedaron sin cancha libre.`
+          : `${result.scheduledCount} partidos ubicados.`,
+      );
+      await invalidateOps();
+    },
+    onError: (err: Error) => {
+      toastError("No se pudo programar", err.message);
     },
   });
 
@@ -731,38 +780,12 @@ export default function TournamentDetailView({
       </div>
 
       {readOnly ? (
-        <section
-          className="rounded-xl border border-border bg-card p-4 space-y-3"
-          data-testid="tournament-subscribe-cta"
-        >
-          {isAuthenticated ? (
-            <>
-              <p className="text-sm text-muted-foreground">
-                ¿Querés jugar este torneo? Pedile al club que te anote en la
-                categoría, o usá la inscripción online cuando esté habilitada.
-              </p>
-              <Button
-                type="button"
-                size="sm"
-                onClick={() =>
-                  toastInfo(
-                    "Inscripción",
-                    "La inscripción online se habilitará pronto. Mientras tanto, pedile al club que te anote.",
-                  )
-                }
-              >
-                Inscribirme
-              </Button>
-            </>
-          ) : (
-            <RequirePlayerAuth
-              nextPath={ROUTES.player.tournamentDetail(tournamentId)}
-              actionLabel="Inscribirte"
-            >
-              <span className="sr-only">Inscripción</span>
-            </RequirePlayerAuth>
-          )}
-        </section>
+        <PlayerRegistrationPanel
+          tournament={tournament}
+          categories={categories}
+          categoryId={categoryId}
+          onCategoryChange={setSelectedCategoryId}
+        />
       ) : null}
 
       <section
@@ -1104,6 +1127,21 @@ export default function TournamentDetailView({
         </TabsContent>
 
         <TabsContent value="partidos" className="space-y-3 pt-4">
+          {isClub && !readOnly ? (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm text-muted-foreground">
+                El generador usa canchas libres, los días de cada fase y la disponibilidad de las parejas.
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                disabled={scheduleMutation.isPending || !categoryId}
+                onClick={() => scheduleMutation.mutate()}
+              >
+                {scheduleMutation.isPending ? "Programando…" : "Programar horarios"}
+              </Button>
+            </div>
+          ) : null}
           {matchesBoard?.notice ? (
             <p className="text-sm text-muted-foreground">{matchesBoard.notice}</p>
           ) : null}

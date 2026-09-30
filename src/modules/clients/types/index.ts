@@ -15,6 +15,7 @@ export interface ClubClient {
   sexId: number | null;
   phone: string | null;
   categoryLevel: number | null;
+  sidePreference: string | null;
   avatarUrl: string | null;
   hasAccount: boolean;
   reservationsCount: number;
@@ -34,4 +35,5 @@ export interface SaveClubClientInput {
   sexId: number;
   phone: string;
   categoryLevel: number;
+  sidePreference?: string | null;
 }

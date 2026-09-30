@@ -16,10 +16,9 @@ export default function UserHistoryScreen() {
   const { data, isLoading } = useQuery({
     queryKey: ["player-home", playerId],
     queryFn: () => Api.TournamentOpsService().getPlayerHome(playerId!),
-    enabled: Boolean(playerId) && !hasApiSession,
+    enabled: Boolean(playerId) && hasApiSession,
   });
-  const dashboard =
-    hasApiSession && player ? emptyPlayerDashboard(player) : data;
+  const dashboard = data ?? (player ? emptyPlayerDashboard(player) : null);
 
   return (
     <div className="space-y-4 p-4" data-testid="player-history">

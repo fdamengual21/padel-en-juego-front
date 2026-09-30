@@ -12,8 +12,16 @@ export class TournamentService {
     return this.repository.list(clubId);
   }
 
+  listPublic() {
+    return this.repository.listPublic();
+  }
+
   getById(id: string) {
     return this.repository.getById(id);
+  }
+
+  getPublic(id: string) {
+    return this.repository.getPublic(id);
   }
 
   create(input: CreateTournamentRequest) {

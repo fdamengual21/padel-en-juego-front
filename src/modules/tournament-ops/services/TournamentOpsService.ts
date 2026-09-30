@@ -198,6 +198,10 @@ export class TournamentOpsService {
     return this.repository.getPlayerFeed(clubId, playerId);
   }
 
+  getMyWeek() {
+    return this.repository.getMyWeek();
+  }
+
   listProvinces() {
     return this.repository.listProvinces();
   }
@@ -259,6 +263,50 @@ export class TournamentOpsService {
 
   registerPairByPlayer(input: import("@/domain").RegisterPairInput) {
     return this.repository.registerPairByPlayer(input);
+  }
+
+  listPublicCategories(tournamentId: string) {
+    return this.repository.listPublicCategories(tournamentId);
+  }
+
+  listPublicPairs(categoryId: string) {
+    return this.repository.listPublicPairs(categoryId);
+  }
+
+  listPublicRegistrations(categoryId: string) {
+    return this.repository.listPublicRegistrations(categoryId);
+  }
+
+  getPublicRuleset(categoryId: string) {
+    return this.repository.getPublicRuleset(categoryId);
+  }
+
+  listPublicGroups(categoryId: string) {
+    return this.repository.listPublicGroups(categoryId);
+  }
+
+  listPublicMatches(categoryId: string) {
+    return this.repository.listPublicMatches(categoryId);
+  }
+
+  getPublicCuadroBoard(categoryId: string) {
+    return this.repository.getPublicCuadroBoard(categoryId);
+  }
+
+  getPublicZonesBoard(categoryId: string) {
+    return this.repository.getPublicZonesBoard(categoryId);
+  }
+
+  getPublicParticipantsBoard(categoryId: string) {
+    return this.repository.getPublicParticipantsBoard(categoryId);
+  }
+
+  getPublicMatchesBoard(categoryId: string) {
+    return this.repository.getPublicMatchesBoard(categoryId);
+  }
+
+  getMyRegistration(categoryId: string) {
+    return this.repository.getMyRegistration(categoryId);
   }
 
   updatePairPlayers(

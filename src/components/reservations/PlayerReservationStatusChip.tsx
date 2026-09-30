@@ -17,7 +17,7 @@ const chips: Record<PlayerReservationStatus, { label: string; className: string 
       "border-transparent! bg-[color-mix(in_oklch,var(--warning)_18%,var(--card))]! text-warning",
   },
   booked: {
-    label: "Confirmada",
+    label: "Confirmado",
     className: "border-transparent! bg-success/15! text-success",
   },
   rejected: {

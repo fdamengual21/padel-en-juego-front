@@ -4,7 +4,12 @@ import { FormProvider, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { useQuery } from "@tanstack/react-query";
 import * as yup from "yup";
-import { CATEGORY_LEVELS, formatCategoryLevel } from "@/domain";
+import {
+  CATEGORY_LEVELS,
+  formatCategoryLevel,
+  isPlayerSidePreference,
+  PLAYER_SIDE_PREFERENCE_OPTIONS,
+} from "@/domain";
 import Api from "@/api/Api";
 import { InputField, SelectField, DateField } from "@/components/Form";
 import GeographySelectFields from "@/components/GeographySelectFields";
@@ -74,6 +79,13 @@ const schema = yup.object({
     })
     .min(1, "Elegí tu categoría")
     .max(8, "Elegí tu categoría"),
+  sidePreference: yup
+    .string()
+    .nullable()
+    .transform((value) => (value == null || value === "" ? null : value))
+    .test("side", "Elegí un lado válido", (value) =>
+      value == null || isPlayerSidePreference(value),
+    ),
   provinceId: yup.number().nullable(),
   municipalityId: yup
     .number()
@@ -123,6 +135,7 @@ export default function RegisterScreen() {
       password: "",
       passwordConfirm: "",
       categoryLevel: null,
+      sidePreference: null,
       provinceId: null,
       municipalityId: null,
       acceptedLegal: false,
@@ -166,6 +179,7 @@ export default function RegisterScreen() {
           password: values.password,
           dateOfBirth: values.dateOfBirth,
           categoryLevel: values.categoryLevel,
+          sidePreference: values.sidePreference,
           provinceId: values.provinceId,
           municipalityId: values.municipalityId,
           acceptedPrivacyDocumentId: legalDocuments.privacy.id,
@@ -195,6 +209,7 @@ export default function RegisterScreen() {
         formErrors.password?.message ||
         formErrors.passwordConfirm?.message ||
         formErrors.categoryLevel?.message ||
+        formErrors.sidePreference?.message ||
         formErrors.provinceId?.message ||
         formErrors.municipalityId?.message ||
         formErrors.acceptedLegal?.message;
@@ -294,6 +309,15 @@ export default function RegisterScreen() {
                   value: String(level),
                   label: formatCategoryLevel(level),
                 }))}
+              />
+              <SelectField
+                control={control}
+                name="sidePreference"
+                label="Lado (opcional)"
+                id="reg-side"
+                allowEmpty
+                emptyLabel="Sin preferencia"
+                options={PLAYER_SIDE_PREFERENCE_OPTIONS}
               />
             </div>
 

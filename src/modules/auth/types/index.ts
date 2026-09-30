@@ -31,6 +31,7 @@ export interface RegisterInput {
   password: string;
   dateOfBirth?: string | null;
   categoryLevel?: number | null;
+  sidePreference?: string | null;
   provinceId?: number | null;
   municipalityId?: number | null;
   acceptedPrivacyDocumentId: string;

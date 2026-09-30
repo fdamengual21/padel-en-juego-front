@@ -1,5 +1,5 @@
 import type { AuthSession, Player, PlayerDashboard, PublicUser } from "@/domain";
-import { parseCategoryLevel } from "@/domain";
+import { isPlayerSidePreference, parseCategoryLevel } from "@/domain";
 import type { UserMeDto } from "@/modules/users";
 
 export function displayNameFromMe(user: UserMeDto): string {
@@ -35,6 +35,7 @@ export function toPlayerFromMe(user: UserMeDto): Player {
     categoryHistory: [],
     sidePreferencePrimary: null,
     sidePreferenceSecondary: null,
+    sidePreference: isPlayerSidePreference(user.sidePreference) ? user.sidePreference : null,
     avatarUrl: user.avatarUrl,
     coverUrl: user.coverUrl,
     createdAt: new Date().toISOString(),

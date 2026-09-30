@@ -26,6 +26,7 @@ function compactRegister(input: RegisterInput): RegisterInput {
     password: input.password,
     ...(input.dateOfBirth ? { dateOfBirth: input.dateOfBirth } : {}),
     ...(input.categoryLevel != null ? { categoryLevel: input.categoryLevel } : {}),
+    ...(input.sidePreference ? { sidePreference: input.sidePreference } : {}),
     ...(input.provinceId != null ? { provinceId: input.provinceId } : {}),
     ...(input.municipalityId != null ? { municipalityId: input.municipalityId } : {}),
     acceptedPrivacyDocumentId: input.acceptedPrivacyDocumentId,

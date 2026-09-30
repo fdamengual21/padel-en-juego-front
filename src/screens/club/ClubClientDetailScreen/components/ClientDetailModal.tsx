@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { formatCategoryLevel, isCategoryLevel } from "@/domain";
+import { formatCategoryLevel, isCategoryLevel, playerSidePreferenceLabel } from "@/domain";
 import { cn } from "@/lib/utils";
 import ClientFormDialog from "@/screens/club/ClubClientsScreen/components/ClientFormDialog";
 
@@ -48,6 +48,7 @@ export default function ClientDetailModal({
   const category = isCategoryLevel(data?.categoryLevel)
     ? formatCategoryLevel(data.categoryLevel)
     : null;
+  const sideLabel = playerSidePreferenceLabel(data?.sidePreference);
 
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: ["club-client", clubId, clientId] });
@@ -99,13 +100,20 @@ export default function ClientDetailModal({
                       <h2 className="text-2xl font-semibold tracking-tight text-foreground">
                         {data.fullName}
                       </h2>
-                      {category ? (
-                        <span className="inline-flex rounded-md bg-muted px-2.5 py-1 text-xs font-medium text-foreground">
-                          Categoría {category}
-                        </span>
-                      ) : (
-                        <p className="text-sm text-muted-foreground">Sin categoría</p>
-                      )}
+                      <div className="flex flex-wrap gap-2">
+                        {category ? (
+                          <span className="inline-flex rounded-md bg-muted px-2.5 py-1 text-xs font-medium text-foreground">
+                            Categoría {category}
+                          </span>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">Sin categoría</p>
+                        )}
+                        {sideLabel ? (
+                          <span className="inline-flex rounded-md bg-muted px-2.5 py-1 text-xs font-medium text-foreground">
+                            Lado {sideLabel}
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
                     <div className="grid gap-4 border-t border-border pt-4 sm:grid-cols-2">
                       <div className="space-y-1">

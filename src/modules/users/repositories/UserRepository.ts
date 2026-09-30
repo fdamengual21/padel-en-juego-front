@@ -1,6 +1,7 @@
 import type { AxiosInstance } from "axios";
 import { readData } from "@/config/axiosInstance";
 import type { ApiEnvelope } from "@/lib/apiClient";
+import { isPlayerSidePreference } from "@/domain";
 import type { UpdateMeInput, UserClubContext, UserMeDto } from "../types";
 
 function asString(value: unknown): string {
@@ -65,6 +66,7 @@ export function normalizeUserMeDto(raw: Record<string, unknown>): UserMeDto {
     isPhonePublic: raw.isPhonePublic === true,
     dateOfBirth: asNullableString(raw.dateOfBirth),
     categoryLevel: asNullableNumber(raw.categoryLevel),
+    sidePreference: isPlayerSidePreference(raw.sidePreference) ? raw.sidePreference : null,
     age: asNullableNumber(raw.age),
     canPublishPhone: raw.canPublishPhone === true,
   };

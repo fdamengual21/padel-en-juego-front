@@ -190,6 +190,11 @@ export interface Player {
    * Indica que también juega el otro lado.
    */
   sidePreferenceSecondary: SidePosition | null;
+  /**
+   * Lado de la ficha (`left` | `right` | `both`). Opcional.
+   * Si está, precarga la inscripción de un solo.
+   */
+  sidePreference?: import("./playerSidePreference").PlayerSidePreference | null;
   /** URL de avatar (mock local / CDN). */
   avatarUrl: string | null;
   /** URL de portada del perfil (mock local / CDN). */
@@ -232,6 +237,32 @@ export interface Tournament {
   registrationFee: number;
   createdAt: string;
   updatedAt: string;
+  /** Nombre del predio. Lo trae el listado publico. */
+  clubName?: string | null;
+  /** Avatar publico del club, cuando el listado lo trae. */
+  clubAvatarUrl?: string | null;
+  /** Portada publica del club, cuando el listado la trae. */
+  clubCoverUrl?: string | null;
+  /** Inscripcion del jugador logueado en alguna categoria del torneo. */
+  myRegistrationStatus?: "PENDING" | "ACCEPTED" | "WAITLIST" | null;
+  /** Categorias, cuando el listado publico las trae. */
+  categories?: Array<{ id: string; name: string }>;
+}
+
+/** Partido o torneo Quality dentro de la semana del jugador. */
+export interface PlayerWeekEvent {
+  kind: "match" | "quality";
+  id: string;
+  tournamentId: string;
+  tournamentName: string;
+  categoryName: string;
+  clubName: string;
+  imageUrl: string | null;
+  phaseLabel: string | null;
+  courtName: string | null;
+  detail: string | null;
+  startsAt: string;
+  endsAt: string | null;
 }
 
 /** Circuito de ranking asociado a la categoría (MVP: snapshot manual). */
@@ -330,6 +361,13 @@ export interface RegisterPairResult {
 export interface AcceptRegistrationResult {
   registration: TournamentRegistration;
   autoMatch: SoloPairAutoMatchResult | null;
+}
+
+/** Inscripcion del jugador autenticado en una categoria. */
+export interface MyTournamentRegistration {
+  registration: TournamentRegistration | null;
+  pair: TournamentPair | null;
+  partnerName: string | null;
 }
 
 /** Detalle de un auto-match de dos solos por preferencia de lado. */

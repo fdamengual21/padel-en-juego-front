@@ -34,6 +34,8 @@ export interface UserMeDto {
   isPhonePublic: boolean;
   dateOfBirth: string | null;
   categoryLevel: number | null;
+  /** `left` | `right` | `both`. Null si no lo cargó. */
+  sidePreference: string | null;
   age: number | null;
   canPublishPhone: boolean;
 }
@@ -45,6 +47,7 @@ export interface UpdateMeInput {
   sexId: number;
   dateOfBirth: string | null;
   categoryLevel: number | null;
+  sidePreference: string | null;
   provinceId: number | null;
   municipalityId: number | null;
   phone: string | null;

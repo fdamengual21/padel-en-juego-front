@@ -1,16 +1,14 @@
+import type { AxiosInstance } from "axios";
+import { readData } from "@/config/axiosInstance";
+import type { ApiEnvelope } from "@/lib/apiClient";
+import type { PlayerReservation } from "@/modules/reservations";
+import { normalizeMine, normalizeReservation } from "@/modules/reservations/repositories/ReservationRepository";
 import {
   PLAYER_COVER_PATHS,
   emptyClubDashboard,
   emptyCourtsAgendaBoard,
   emptyCourtsDayOverview,
-  emptyCuadroBoard,
-  emptyMatchesBoard,
   emptyPaginated,
-  emptyParticipantsBoard,
-  emptyPlayer,
-  emptyPlayerDashboard,
-  emptyPlayerFeed,
-  emptyZonesBoard,
   notConnectedError,
   type AuthSession,
   type Club,
@@ -41,6 +39,7 @@ import {
   type MatchSlot,
   type MatchStatus,
   type MatchesBoardView,
+  type MyTournamentRegistration,
   type PageQuery,
   type PaginatedResult,
   type PairAvailability,
@@ -48,6 +47,7 @@ import {
   type Player,
   type PlayerDashboard,
   type PlayerFeed,
+  type PlayerWeekEvent,
   type RegisterAccountInput,
   type RegisterPairInput,
   type RegisterPairResult,
@@ -162,6 +162,7 @@ export interface ITournamentOpsRepository {
     clubId: string,
     playerId: string | null,
   ): Promise<PlayerFeed>;
+  getMyWeek(): Promise<{ reservations: PlayerReservation[]; events: PlayerWeekEvent[] }>;
   listProvinces(): Promise<Array<{ id: string; name: string }>>;
   listCities(
     provinceIdOrName: string,
@@ -227,63 +228,96 @@ export interface ITournamentOpsRepository {
     patch: Partial<Omit<TournamentCategory, "id" | "tournamentId">>,
   ): Promise<TournamentCategory>;
   upsertRuleset(ruleset: TournamentRuleset): Promise<TournamentRuleset>;
+  listPublicCategories(tournamentId: string): Promise<TournamentCategory[]>;
+  listPublicPairs(categoryId: string): Promise<TournamentPair[]>;
+  listPublicRegistrations(categoryId: string): Promise<TournamentRegistration[]>;
+  getPublicRuleset(categoryId: string): Promise<TournamentRuleset | null>;
+  listPublicGroups(categoryId: string): Promise<TournamentGroup[]>;
+  listPublicMatches(categoryId: string): Promise<Match[]>;
+  getPublicCuadroBoard(categoryId: string): Promise<CuadroBoardView>;
+  getPublicZonesBoard(categoryId: string): Promise<ZonesBoardView>;
+  getPublicParticipantsBoard(categoryId: string): Promise<ParticipantsBoardView>;
+  getPublicMatchesBoard(categoryId: string): Promise<MatchesBoardView>;
+  getMyRegistration(categoryId: string): Promise<MyTournamentRegistration>;
 }
 
 export class TournamentOpsRepository implements ITournamentOpsRepository {
-  async listCategories(_tournamentId: string) {
-    return [];
+  private readonly http: AxiosInstance;
+
+  constructor(http: AxiosInstance) {
+    this.http = http;
   }
 
-  async createCategory(_input: Omit<TournamentCategory, "id">) {
-    return notConnectedError();
+  private async read<T>(path: string, method: "get" | "post" | "patch" | "put" = "get", body?: unknown): Promise<T> {
+    const response = await this.http.request<ApiEnvelope<T>>({ url: path, method, data: body });
+    return readData(response);
+  }
+  async listCategories(tournamentId: string) {
+    return this.read<TournamentCategory[]>(`/club/tournaments/${tournamentId}/categories`);
   }
 
-  async listPairs(_categoryId: string) {
-    return [];
+  async createCategory(input: Omit<TournamentCategory, "id">) {
+    return this.read<TournamentCategory>(
+      `/club/tournaments/${input.tournamentId}/categories`,
+      "post",
+      input,
+    );
   }
 
-  async listRegistrations(_categoryId: string) {
-    return [];
+  async listPairs(categoryId: string) {
+    return this.read<TournamentPair[]>(`/club/tournaments/categories/${categoryId}/pairs`);
   }
 
-  async getRuleset(_categoryId: string) {
-    return null;
+  async listRegistrations(categoryId: string) {
+    return this.read<TournamentRegistration[]>(
+      `/club/tournaments/categories/${categoryId}/registrations`,
+    );
   }
 
-  async listGroups(_categoryId: string) {
-    return [];
+  async getRuleset(categoryId: string) {
+    return this.read<TournamentRuleset | null>(
+      `/club/tournaments/categories/${categoryId}/ruleset`,
+    );
   }
 
-  async listStandings(_categoryId: string) {
-    return [];
+  async listGroups(categoryId: string) {
+    return this.read<TournamentGroup[]>(`/club/tournaments/categories/${categoryId}/groups`);
   }
 
-  async listMatches(_categoryId: string) {
-    return [];
+  async listStandings(categoryId: string) {
+    return this.read<GroupStanding[]>(`/club/tournaments/categories/${categoryId}/standings`);
   }
 
-  async getBracket(_categoryId: string) {
-    return { rounds: [], matches: [], slots: [] };
+  async listMatches(categoryId: string) {
+    return this.read<Match[]>(`/club/tournaments/categories/${categoryId}/matches`);
+  }
+
+  async getBracket(categoryId: string) {
+    return this.read<{ rounds: TournamentRound[]; matches: Match[]; slots: MatchSlot[] }>(
+      `/club/tournaments/categories/${categoryId}/bracket`,
+    );
   }
 
   async getCuadroBoard(categoryId: string) {
-    return emptyCuadroBoard(categoryId);
+    return this.read<CuadroBoardView>(`/club/tournaments/categories/${categoryId}/boards/cuadro`);
   }
 
   async getZonesBoard(categoryId: string) {
-    return emptyZonesBoard(categoryId);
+    return this.read<ZonesBoardView>(`/club/tournaments/categories/${categoryId}/boards/zones`);
   }
 
   async getParticipantsBoard(categoryId: string) {
-    return emptyParticipantsBoard(categoryId);
+    return this.read<ParticipantsBoardView>(
+      `/club/tournaments/categories/${categoryId}/boards/participants`,
+    );
   }
 
   async getMatchesBoard(categoryId: string) {
-    return emptyMatchesBoard(categoryId);
+    return this.read<MatchesBoardView>(`/club/tournaments/categories/${categoryId}/boards/matches`);
   }
 
-  async getConfigBoard(_categoryId: string): Promise<ConfigBoardView> {
-    return notConnectedError();
+  async getConfigBoard(categoryId: string): Promise<ConfigBoardView> {
+    return this.read<ConfigBoardView>(`/club/tournaments/categories/${categoryId}/boards/config`);
   }
 
   async generateGroups(
@@ -297,16 +331,16 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
     return notConnectedError();
   }
 
-  async submitMatchResult(_matchId: string, _input: MatchResultInput) {
-    return notConnectedError();
+  async submitMatchResult(matchId: string, input: MatchResultInput) {
+    return this.read<Match>(`/club/tournaments/matches/${matchId}/result`, "post", input);
   }
 
   async generateBracket(_categoryId: string) {
     return notConnectedError();
   }
 
-  async scheduleCategory(_categoryId: string) {
-    return notConnectedError();
+  async scheduleCategory(categoryId: string) {
+    return this.read<ScheduleResult>(`/club/tournaments/categories/${categoryId}/schedule`, "post");
   }
 
   async listCourts(_clubId: string) {
@@ -342,9 +376,17 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
 
   async listCourtReservations(
     _clubId: string,
-    _options?: { from?: string; to?: string; courtId?: string },
+    options?: { from?: string; to?: string; courtId?: string },
   ) {
-    return [];
+    const from = options?.from ?? new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const to = options?.to ?? new Date(Date.now() + 120 * 24 * 60 * 60 * 1000).toISOString();
+    const response = await this.http.get<ApiEnvelope<Record<string, unknown>[]>>(
+      "/club/reservations/calendar",
+      { params: { from, to, courtId: options?.courtId } },
+    );
+    return (readData(response) ?? [])
+      .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
+      .map(normalizeReservation);
   }
 
   async listPairAvailability(_pairId: string) {
@@ -421,12 +463,38 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
     return [];
   }
 
-  async getPlayerHome(playerId: string) {
-    return emptyPlayerDashboard(emptyPlayer(playerId));
+  async getPlayerHome(_playerId: string) {
+    return this.read<PlayerDashboard>("/users/me/tournaments/home");
   }
 
   async getPlayerFeed(_clubId: string, _playerId: string | null) {
-    return emptyPlayerFeed();
+    const response = await this.http.get<ApiEnvelope<import("@/domain").Tournament[]>>(
+      "/public/tournaments",
+    );
+    const today = new Date().toISOString().slice(0, 10);
+    const upcoming = (readData(response) ?? []).filter(
+      (tournament) =>
+        tournament.status === "registrationOpen" ||
+        tournament.status === "inProgress" ||
+        (tournament.status !== "finished" && tournament.startDate >= today),
+    );
+    return { upcomingTournaments: upcoming.slice(0, 6), upcomingReservations: [] };
+  }
+
+  async getMyWeek() {
+    const response = await this.http.get<
+      ApiEnvelope<{ reservations?: unknown[]; events?: unknown[] }>
+    >("/users/me/week");
+    const data = readData(response);
+    const reservations = (data?.reservations ?? [])
+      .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
+      .map(normalizeMine)
+      .filter((item): item is PlayerReservation => item !== null);
+    const events = (data?.events ?? [])
+      .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
+      .map(asWeekEvent)
+      .filter((item): item is PlayerWeekEvent => item !== null);
+    return { reservations, events };
   }
 
   async listProvinces() {
@@ -442,7 +510,7 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
   }
 
   async listPlayers() {
-    return [];
+    return this.read<Player[]>("/club/tournaments/players");
   }
 
   async listClubClients(_clubId: string, _query?: PageQuery) {
@@ -453,19 +521,20 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
     return null;
   }
 
-  async searchPlayers(
-    _query: string,
-    _options?: { signal?: AbortSignal },
-  ) {
-    return [];
+  async searchPlayers(query: string, options?: { signal?: AbortSignal }) {
+    const response = await this.http.get<ApiEnvelope<Player[]>>("/club/tournaments/players", {
+      params: { q: query },
+      signal: options?.signal,
+    });
+    return readData(response) ?? [];
   }
 
   async findIdentityMatches(_input: FindIdentityMatchesInput) {
     return { matches: [] };
   }
 
-  async createPlayer(_input: CreatePlayerInput) {
-    return notConnectedError();
+  async createPlayer(input: CreatePlayerInput) {
+    return this.read<Player>("/club/tournaments/players", "post", input);
   }
 
   async login(_input: LoginInput) {
@@ -484,67 +553,171 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
     return notConnectedError();
   }
 
-  async registerPairByAdmin(_input: RegisterPairInput) {
-    return notConnectedError();
+  async registerPairByAdmin(input: RegisterPairInput) {
+    return this.read<RegisterPairResult>(
+      `/club/tournaments/categories/${input.tournamentCategoryId}/pairs`,
+      "post",
+      input,
+    );
   }
 
-  async registerPairByPlayer(_input: RegisterPairInput) {
-    return notConnectedError();
+  async registerPairByPlayer(input: RegisterPairInput) {
+    return this.read<RegisterPairResult>(
+      `/users/me/tournaments/categories/${input.tournamentCategoryId}`,
+      "post",
+      {
+        sidePreference: input.sidePreference ?? null,
+        player2Id: input.player2Id ?? null,
+        availability: input.availability ?? [],
+      },
+    );
   }
 
-  async updatePairPlayers(
-    _pairId: string,
-    _input: UpdatePairPlayersInput,
-  ) {
-    return notConnectedError();
+  async listPublicCategories(tournamentId: string) {
+    return this.read<TournamentCategory[]>(`/public/tournaments/${tournamentId}/categories`);
   }
 
-  async syncCategoryStructure(
-    _categoryId: string,
-    _options?: SyncCategoryStructureOptions,
-  ) {
-    return notConnectedError();
+  async listPublicPairs(categoryId: string) {
+    return this.read<TournamentPair[]>(`/public/tournaments/categories/${categoryId}/pairs`);
   }
 
-  async acceptRegistration(_registrationId: string) {
-    return notConnectedError();
+  async listPublicRegistrations(categoryId: string) {
+    return this.read<TournamentRegistration[]>(
+      `/public/tournaments/categories/${categoryId}/registrations`,
+    );
   }
 
-  async rejectRegistration(
-    _registrationId: string,
-    _note?: string | null,
-  ) {
-    return notConnectedError();
+  async getPublicRuleset(categoryId: string) {
+    return this.read<TournamentRuleset | null>(
+      `/public/tournaments/categories/${categoryId}/ruleset`,
+    );
   }
 
-  async disqualifyRegistration(_registrationId: string, _note: string) {
-    return notConnectedError();
+  async listPublicGroups(categoryId: string) {
+    return this.read<TournamentGroup[]>(`/public/tournaments/categories/${categoryId}/groups`);
   }
 
-  async removeRegistration(_registrationId: string, _note: string) {
-    return notConnectedError();
+  async listPublicMatches(categoryId: string) {
+    return this.read<Match[]>(`/public/tournaments/categories/${categoryId}/matches`);
+  }
+
+  async getPublicCuadroBoard(categoryId: string) {
+    return this.read<CuadroBoardView>(`/public/tournaments/categories/${categoryId}/boards/cuadro`);
+  }
+
+  async getPublicZonesBoard(categoryId: string) {
+    return this.read<ZonesBoardView>(`/public/tournaments/categories/${categoryId}/boards/zones`);
+  }
+
+  async getPublicParticipantsBoard(categoryId: string) {
+    return this.read<ParticipantsBoardView>(
+      `/public/tournaments/categories/${categoryId}/boards/participants`,
+    );
+  }
+
+  async getPublicMatchesBoard(categoryId: string) {
+    return this.read<MatchesBoardView>(
+      `/public/tournaments/categories/${categoryId}/boards/matches`,
+    );
+  }
+
+  async getMyRegistration(categoryId: string) {
+    return this.read<MyTournamentRegistration>(
+      `/users/me/tournaments/categories/${categoryId}`,
+    );
+  }
+
+  async updatePairPlayers(pairId: string, input: UpdatePairPlayersInput) {
+    return this.read<TournamentPair>(`/club/tournaments/pairs/${pairId}`, "patch", input);
+  }
+
+  async syncCategoryStructure(categoryId: string, _options?: SyncCategoryStructureOptions) {
+    return this.read<{
+      synced: boolean;
+      message: string;
+      groups: TournamentGroup[];
+      matches: Match[];
+    }>(`/club/tournaments/categories/${categoryId}/sync`, "post");
+  }
+
+  async acceptRegistration(registrationId: string) {
+    return this.read<AcceptRegistrationResult>(
+      `/club/tournaments/registrations/${registrationId}/accept`,
+      "post",
+    );
+  }
+
+  async rejectRegistration(registrationId: string, note?: string | null) {
+    return this.read<TournamentRegistration>(
+      `/club/tournaments/registrations/${registrationId}/reject`,
+      "post",
+      { note },
+    );
+  }
+
+  async disqualifyRegistration(registrationId: string, note: string) {
+    return this.read<TournamentRegistration>(
+      `/club/tournaments/registrations/${registrationId}/disqualify`,
+      "post",
+      { note },
+    );
+  }
+
+  async removeRegistration(registrationId: string, note: string) {
+    return this.read<TournamentRegistration>(
+      `/club/tournaments/registrations/${registrationId}/remove`,
+      "post",
+      { note },
+    );
   }
 
   async updateMatchSchedule(
-    _matchId: string,
-    _input: { scheduledAt: string | null; courtId: string | null },
+    matchId: string,
+    input: { scheduledAt: string | null; courtId: string | null },
     _options?: { force?: boolean; pairLabels?: Record<string, string> },
   ) {
-    return notConnectedError();
+    return this.read<Match>(`/club/tournaments/matches/${matchId}/schedule`, "patch", input);
   }
 
-  async setMatchStatus(_matchId: string, _status: MatchStatus) {
-    return notConnectedError();
+  async setMatchStatus(matchId: string, status: MatchStatus) {
+    return this.read<Match>(`/club/tournaments/matches/${matchId}/status`, "patch", { status });
   }
 
   async updateCategory(
-    _id: string,
-    _patch: Partial<Omit<TournamentCategory, "id" | "tournamentId">>,
+    id: string,
+    patch: Partial<Omit<TournamentCategory, "id" | "tournamentId">>,
   ) {
-    return notConnectedError();
+    return this.read<TournamentCategory>(`/club/tournaments/categories/${id}`, "patch", patch);
   }
 
-  async upsertRuleset(_ruleset: TournamentRuleset) {
-    return notConnectedError();
+  async upsertRuleset(ruleset: TournamentRuleset) {
+    return this.read<TournamentRuleset>(
+      `/club/tournaments/categories/${ruleset.tournamentCategoryId}/ruleset`,
+      "put",
+      ruleset,
+    );
   }
+}
+
+function asWeekEvent(raw: Record<string, unknown>): PlayerWeekEvent | null {
+  const id = typeof raw.id === "string" ? raw.id : "";
+  const tournamentId = typeof raw.tournamentId === "string" ? raw.tournamentId : "";
+  const startsAt = typeof raw.startsAt === "string" ? raw.startsAt : "";
+  const kind = raw.kind === "quality" ? "quality" : raw.kind === "match" ? "match" : null;
+  if (!id || !tournamentId || !startsAt || !kind) return null;
+  const text = (value: unknown) => (typeof value === "string" && value.trim() ? value : null);
+  return {
+    kind,
+    id,
+    tournamentId,
+    tournamentName: text(raw.tournamentName) ?? "Torneo",
+    categoryName: text(raw.categoryName) ?? "",
+    clubName: text(raw.clubName) ?? "Club",
+    imageUrl: text(raw.imageUrl),
+    phaseLabel: text(raw.phaseLabel),
+    courtName: text(raw.courtName),
+    detail: text(raw.detail),
+    startsAt,
+    endsAt: text(raw.endsAt),
+  };
 }

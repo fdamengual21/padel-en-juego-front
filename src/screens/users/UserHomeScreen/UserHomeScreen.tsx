@@ -1,17 +1,17 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Calendar, CircleAlert } from "lucide-react";
+import { CircleAlert } from "lucide-react";
 import Api from "@/api/Api";
 import { useMockSession } from "@/app/MockSessionProvider";
 import { EmptyState } from "@/components/EmptyState";
-import TournamentCard from "@/components/tournaments/TournamentCard";
 import { buttonVariants } from "@/components/ui/button";
 import { ROUTES } from "@/router/routes";
 import { cn } from "@/lib/utils";
 import type { PlayerReservation } from "@/modules/reservations";
-import PlayerReservationCard from "./components/PlayerReservationCard";
+import HomeTournamentCard from "./components/HomeTournamentCard";
 import PlayerReservationDetailModal from "./components/PlayerReservationDetailModal";
+import PlayerWeekBoard from "./components/PlayerWeekBoard";
 
 export default function UserHomeScreen() {
   const { clubId, playerId, isAuthenticated } = useMockSession();
@@ -21,9 +21,9 @@ export default function UserHomeScreen() {
     queryKey: ["player-feed", clubId, playerId],
     queryFn: () => Api.TournamentOpsService().getPlayerFeed(clubId, playerId),
   });
-  const reservationsQuery = useQuery({
-    queryKey: ["player-reservations", playerId],
-    queryFn: () => Api.ReservationService().listMine(),
+  const weekQuery = useQuery({
+    queryKey: ["player-week", playerId],
+    queryFn: () => Api.TournamentOpsService().getMyWeek(),
     enabled: isAuthenticated,
     staleTime: 0,
     refetchOnWindowFocus: true,
@@ -53,11 +53,11 @@ export default function UserHomeScreen() {
         {isLoading || !data ? (
           <p className="text-sm text-muted-foreground">Cargando torneos…</p>
         ) : data.upcomingTournaments.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No tenés torneos próximos.</p>
+          <p className="text-sm text-muted-foreground">No hay torneos próximos.</p>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {data.upcomingTournaments.map((tournament) => (
-              <TournamentCard
+              <HomeTournamentCard
                 key={tournament.id}
                 tournament={tournament}
                 to={ROUTES.player.tournamentDetail(tournament.id)}
@@ -69,34 +69,23 @@ export default function UserHomeScreen() {
 
       {isAuthenticated ? (
         <section data-testid="player-upcoming-reservations">
-          {reservationsQuery.isError ? (
+          {weekQuery.isError ? (
             <EmptyState
               tone="error"
               icon={CircleAlert}
               title={
-                reservationsQuery.error instanceof Error
-                  ? reservationsQuery.error.message
-                  : "No se pudieron cargar tus turnos."
+                weekQuery.error instanceof Error
+                  ? weekQuery.error.message
+                  : "No se pudo cargar la semana."
               }
             />
           ) : (
-            <div className="space-y-3">
-              <UpcomingTurnsSummary
-                count={(reservationsQuery.data ?? []).length}
-                loading={reservationsQuery.isLoading}
-              />
-              {(reservationsQuery.data ?? []).length > 0 ? (
-                <div className="flex items-stretch gap-3 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  {(reservationsQuery.data ?? []).map((reservation) => (
-                    <PlayerReservationCard
-                      key={reservation.id}
-                      reservation={reservation}
-                      onOpen={setSelected}
-                    />
-                  ))}
-                </div>
-              ) : null}
-            </div>
+            <PlayerWeekBoard
+              reservations={weekQuery.data?.reservations ?? []}
+              events={weekQuery.data?.events ?? []}
+              loading={weekQuery.isLoading}
+              onOpenReservation={setSelected}
+            />
           )}
           <PlayerReservationDetailModal
             reservation={selected}
@@ -104,7 +93,7 @@ export default function UserHomeScreen() {
               if (!open) setSelected(null);
             }}
             onCancelled={() => {
-              void queryClient.invalidateQueries({ queryKey: ["player-reservations"] });
+              void queryClient.invalidateQueries({ queryKey: ["player-week"] });
             }}
           />
         </section>
@@ -127,22 +116,6 @@ export default function UserHomeScreen() {
           </div>
         </section>
       )}
-    </div>
-  );
-}
-
-function UpcomingTurnsSummary({ count, loading }: { count: number; loading: boolean }) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-        <Calendar className="size-4" aria-hidden />
-      </span>
-      <h3 className="text-lg font-semibold tracking-tight text-foreground">Próximos 7 días</h3>
-      {!loading ? (
-        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-success px-1.5 text-[11px] font-semibold leading-none text-white tabular-nums">
-          {count}
-        </span>
-      ) : null}
     </div>
   );
 }
