@@ -64,6 +64,17 @@ export function displayZoneName(name: string): string {
   return name.replace(/^Grupo\b/i, "Zona");
 }
 
+function zoneWithoutMatchesLabel(
+  group: TournamentGroup,
+  pairLabels: Record<string, string>,
+): string {
+  if (group.pairIds.length === 1) {
+    const name = pairLabels[group.pairIds[0]] ?? "La pareja";
+    return `${name} pasa de fase.`;
+  }
+  return "Sin partidos en esta zona.";
+}
+
 function pairIndexInGroup(group: TournamentGroup, pairId: string | null): number | null {
   if (!pairId) return null;
   const idx = group.pairIds.indexOf(pairId);
@@ -78,7 +89,7 @@ function MatchesTableNode({ data }: NodeProps) {
   const d = data as MatchesTableNodeData;
   return (
     <div
-      className="box-border w-full rounded-md border-2 border-foreground/80 bg-card text-left shadow-sm"
+      className="nopan nodrag nowheel box-border w-full rounded-md border-2 border-foreground/80 bg-card text-left shadow-sm"
       data-testid={d.testId}
     >
       {d.showTargetHandle ? (
@@ -130,6 +141,8 @@ function resolvePairLabel(
     const zone = groupNames[slot.groupId] ?? "Zona";
     return `${slot.groupPosition}° ${zone}`;
   }
+  if (slot.sourceType === "MATCH_WINNER") return "Ganador";
+  if (slot.sourceType === "MATCH_LOSER") return "Perdedor";
   return "Por definir";
 }
 
@@ -221,21 +234,27 @@ export default function BracketView({
       for (const group of sortedGroups) {
         const zoneMatches = groupMatches
           .filter((m) => m.groupId === group.id && m.phase === "GROUP")
-          .sort(
-            (a, b) =>
-              (a.scheduledAt ?? "").localeCompare(b.scheduledAt ?? "") ||
-              a.id.localeCompare(b.id),
-          );
+          .sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
         const rows: MatchTableRow[] = zoneMatches.map((match, index) => {
           const seedA = pairIndexInGroup(group, match.pairAId);
           const seedB = pairIndexInGroup(group, match.pairBId);
+          const labelA = resolvePairLabel(match, "A", slots, pairLabels, groupNames);
+          const labelB = resolvePairLabel(match, "B", slots, pairLabels, groupNames);
+          const vs =
+            seedA && seedB
+              ? `${seedA} vs ${seedB}`
+              : labelA === "Ganador" && labelB === "Ganador"
+                ? "G vs G"
+                : labelA === "Perdedor" && labelB === "Perdedor"
+                  ? "P vs P"
+                  : "—";
           return {
             n: index + 1,
-            vs: seedA && seedB ? `${seedA} vs ${seedB}` : "—",
+            vs,
             schedule: formatScheduleShortEs(match.scheduledAt),
             matchId: match.id,
-            pairALabel: pairLabels[match.pairAId ?? ""] ?? "Por definir",
-            pairBLabel: pairLabels[match.pairBId ?? ""] ?? "Por definir",
+            pairALabel: labelA,
+            pairBLabel: labelB,
             sets: match.sets,
             playStatus: resolveMatchPlayStatus(match, matchRules),
             canEdit: Boolean(match.pairAId && match.pairBId && onMatchClick),
@@ -246,8 +265,8 @@ export default function BracketView({
           id: `zone-${group.id}`,
           type: "matchesTable",
           position: { x: 0, y: zoneY },
-          className: "!overflow-visible",
-          style: { width: ZONE_W, height: h },
+          className: "nopan nodrag nowheel !overflow-visible",
+          style: { width: ZONE_W, height: h, pointerEvents: "all", zIndex: 10 },
           data: {
             title: displayZoneName(group.name),
             rows,
@@ -255,7 +274,7 @@ export default function BracketView({
             decidingSlotIndex,
             showIndexColumn: true,
             showTargetHandle: false,
-            emptyLabel: "Sin partidos en esta zona.",
+            emptyLabel: zoneWithoutMatchesLabel(group, pairLabels),
             testId: `zone-table-node-${displayZoneName(group.name)}`,
             onOpenMatch: openMatchHandler(zoneMatches, onMatchClick),
           } satisfies MatchesTableNodeData,
@@ -319,8 +338,8 @@ export default function BracketView({
         id: `round-${round.id}`,
         type: "matchesTable",
         position: { x: elimX, y },
-        className: "!overflow-visible",
-        style: { width: ROUND_W, height: h },
+        className: "nopan nodrag nowheel !overflow-visible",
+        style: { width: ROUND_W, height: h, pointerEvents: "all", zIndex: 10 },
         data: {
           title: roundLabel,
           rows,

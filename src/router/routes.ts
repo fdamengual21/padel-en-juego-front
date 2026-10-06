@@ -7,6 +7,7 @@ export const ROUTES = {
     register: "/registro",
     checkEmail: "/revisar-correo",
     verifyEmail: "/verificar-email",
+    setPassword: "/definir-clave",
   },
   legal: {
     privacy: "/privacidad",
@@ -33,6 +34,7 @@ export const ROUTES = {
     tournamentDetail: (id: string) => `/club/torneos/${id}`,
     players: "/club/jugadores",
     clients: "/club/clientes",
+    staff: "/club/usuarios",
     clientDetail: (id: string) => `/club/clientes/${id}`,
     courts: "/club/canchas",
     fixedReservations: "/club/turnos-fijos",

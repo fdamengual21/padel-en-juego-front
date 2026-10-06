@@ -24,6 +24,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { findUserClub } from "@/modules/auth/clubContext";
+import { clubHomeFor } from "@/router/clubHome";
 import { ROUTES } from "@/router/routes";
 import { cn } from "@/lib/utils";
 
@@ -100,7 +102,7 @@ export default function UserShell() {
   const goToClub = () => {
     if (clubs.length === 1 && clubs[0]) {
       enterClub(clubs[0].id);
-      navigate(ROUTES.club.dashboard);
+      navigate(clubHomeFor(findUserClub(clubs, clubs[0].id)?.permissions));
       return;
     }
     navigate(ROUTES.chooseMode);

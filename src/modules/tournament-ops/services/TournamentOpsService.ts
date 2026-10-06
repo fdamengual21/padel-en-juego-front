@@ -194,8 +194,11 @@ export class TournamentOpsService {
     return this.repository.getPlayerHome(playerId);
   }
 
-  getPlayerFeed(clubId: string, playerId: string | null) {
-    return this.repository.getPlayerFeed(clubId, playerId);
+  getPlayerFeed(location?: {
+    provinceId?: number | null;
+    municipalityId?: number | null;
+  }) {
+    return this.repository.getPlayerFeed(location);
   }
 
   getMyWeek() {
@@ -263,6 +266,10 @@ export class TournamentOpsService {
 
   registerPairByPlayer(input: import("@/domain").RegisterPairInput) {
     return this.repository.registerPairByPlayer(input);
+  }
+
+  cancelMyRegistration(categoryId: string) {
+    return this.repository.cancelMyRegistration(categoryId);
   }
 
   listPublicCategories(tournamentId: string) {

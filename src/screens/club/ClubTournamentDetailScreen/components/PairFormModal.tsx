@@ -10,7 +10,6 @@ import type {
 import Api from "@/api/Api";
 import DuplicateIdentityDialog from "@/components/auth/DuplicateIdentityDialog";
 import { Button } from "@/components/ui/button";
-import { DatePicker } from "@/components/ui/date-picker";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { formatTournamentDayEs } from "@/lib/dates";
 import PlayerPickerField, {
   emptyPlayerSlot,
   isManualDraftValid,
@@ -50,10 +50,12 @@ interface PairFormModalProps {
   pair?: TournamentPair | null;
   registration?: TournamentRegistration | null;
   circuitType?: TournamentCircuitType;
-  /** Si true, pide día + franja (torneos no Quality). */
+  /** Si true, pide la franja de cada día del torneo (no Quality). */
   requireAvailability?: boolean;
   tournamentStartDate?: string;
   tournamentEndDate?: string | null;
+  dailyStartTime?: string | null;
+  dailyEndTime?: string | null;
   playersById: Record<string, Player>;
   isSaving?: boolean;
   onOpenChange: (open: boolean) => void;
@@ -67,8 +69,22 @@ interface AvailabilityDraft {
   endTime: string;
 }
 
-function emptyAvailability(date: string): AvailabilityDraft {
-  return { date, startTime: "10:00", endTime: "22:00" };
+function tournamentDays(start: string, end: string | null | undefined): string[] {
+  const days: string[] = [];
+  const cursor = new Date(`${start}T12:00:00`);
+  const last = new Date(`${end || start}T12:00:00`);
+  if (Number.isNaN(cursor.getTime()) || Number.isNaN(last.getTime())) return start ? [start] : [];
+  while (cursor <= last) {
+    const month = String(cursor.getMonth() + 1).padStart(2, "0");
+    const day = String(cursor.getDate()).padStart(2, "0");
+    days.push(`${cursor.getFullYear()}-${month}-${day}`);
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return days;
+}
+
+function emptyAvailability(date: string, startTime: string, endTime: string): AvailabilityDraft {
+  return { date, startTime, endTime };
 }
 
 /** Mapea la preferencia del jugador a la de pareja (inscripción solo). */
@@ -144,6 +160,8 @@ export default function PairFormModal({
   requireAvailability = false,
   tournamentStartDate,
   tournamentEndDate,
+  dailyStartTime,
+  dailyEndTime,
   playersById,
   isSaving = false,
   onOpenChange,
@@ -165,7 +183,11 @@ export default function PairFormModal({
   }>({});
 
   const showRankingSnapshot = circuitType !== "NONE";
-  const defaultDate = tournamentStartDate ?? "";
+  const dayStart = dailyStartTime || "10:00";
+  const dayEnd = dailyEndTime || "22:00";
+  const days = tournamentStartDate
+    ? tournamentDays(tournamentStartDate, tournamentEndDate)
+    : [];
 
   useEffect(() => {
     if (!open) return;
@@ -200,8 +222,8 @@ export default function PairFormModal({
     setPoints1("");
     setPoints2("");
     setAvailability(
-      requireAvailability && defaultDate
-        ? [emptyAvailability(defaultDate)]
+      requireAvailability
+        ? days.map((date) => emptyAvailability(date, dayStart, dayEnd))
         : [],
     );
   }, [
@@ -211,7 +233,10 @@ export default function PairFormModal({
     registration,
     playersById,
     requireAvailability,
-    defaultDate,
+    tournamentStartDate,
+    tournamentEndDate,
+    dayStart,
+    dayEnd,
   ]);
 
   const slot1Ready = isPlayerSlotReady(slot1);
@@ -225,7 +250,10 @@ export default function PairFormModal({
   const availabilityOk =
     !requireAvailability ||
     mode === "edit" ||
-    availability.some((a) => a.date && a.startTime && a.endTime);
+    (availability.length > 0 &&
+      availability.every(
+        (slot) => slot.date && slot.startTime && slot.endTime && slot.startTime < slot.endTime,
+      ));
   const canSubmit =
     slot1Ready && (slot2Empty || slot2Ready) && availabilityOk && !isSaving;
 
@@ -303,53 +331,27 @@ export default function PairFormModal({
 
           {requireAvailability && mode === "create" ? (
             <div className="space-y-3 rounded-lg border border-border p-3">
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <p className="text-sm font-medium">Disponibilidad</p>
-                  <p className="text-xs text-muted-foreground">
-                    Días y franjas en los que pueden jugar.
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() =>
-                    setAvailability((prev) => [
-                      ...prev,
-                      emptyAvailability(defaultDate || prev[0]?.date || ""),
-                    ])
-                  }
-                >
-                  Agregar día
-                </Button>
+              <div>
+                <p className="text-sm font-medium">Disponibilidad</p>
+                <p className="text-xs text-muted-foreground">
+                  Una franja por cada día del torneo. Solo se ajusta el horario.
+                </p>
               </div>
               {availability.length === 0 ? (
                 <p className="text-sm text-destructive">
-                  Agregá al menos un día y horario.
+                  Este torneo no tiene días cargados.
                 </p>
               ) : (
                 <ul className="space-y-2">
                   {availability.map((slot, index) => (
                     <li
-                      key={`av-${index}`}
-                      className="grid gap-2 sm:grid-cols-[1fr_auto_auto_auto]"
+                      key={slot.date}
+                      className="grid grid-cols-[1fr_auto_auto] items-center gap-2"
                     >
-                      <DatePicker
-                        value={slot.date}
-                        minDate={tournamentStartDate}
-                        maxDate={tournamentEndDate ?? undefined}
-                        onChange={(next) => {
-                          if (!next) return;
-                          setAvailability((prev) =>
-                            prev.map((item, i) =>
-                              i === index ? { ...item, date: next } : item,
-                            ),
-                          );
-                        }}
-                      />
+                      <span className="text-sm">{formatTournamentDayEs(slot.date)}</span>
                       <Input
                         type="time"
+                        aria-label={`Desde ${slot.date}`}
                         value={slot.startTime}
                         onChange={(e) =>
                           setAvailability((prev) =>
@@ -363,6 +365,7 @@ export default function PairFormModal({
                       />
                       <Input
                         type="time"
+                        aria-label={`Hasta ${slot.date}`}
                         value={slot.endTime}
                         onChange={(e) =>
                           setAvailability((prev) =>
@@ -374,19 +377,6 @@ export default function PairFormModal({
                           )
                         }
                       />
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        className="text-destructive"
-                        onClick={() =>
-                          setAvailability((prev) =>
-                            prev.filter((_, i) => i !== index),
-                          )
-                        }
-                      >
-                        Quitar
-                      </Button>
                     </li>
                   ))}
                 </ul>

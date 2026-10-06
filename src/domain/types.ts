@@ -228,6 +228,12 @@ export interface Tournament {
   /** Ventana horaria diaria del torneo (HH:mm). */
   dailyStartTime: string;
   dailyEndTime: string;
+  /** Inicio del bloqueo de canchas de un Quality, HH:mm. */
+  courtHoldStartTime?: string;
+  /** Fin del bloqueo de canchas de un Quality, HH:mm. */
+  courtHoldEndTime?: string;
+  /** Canchas que ocupa el bloqueo de un Quality. */
+  courtHoldCourtIds?: string[];
   status: TournamentStatus;
   format: TournamentFormat;
   /**
@@ -247,6 +253,8 @@ export interface Tournament {
   myRegistrationStatus?: "PENDING" | "ACCEPTED" | "WAITLIST" | null;
   /** Categorias, cuando el listado publico las trae. */
   categories?: Array<{ id: string; name: string }>;
+  /** Dias (desde 1) en los que se juega cada fase. */
+  phaseDays?: Array<{ phase: string; dayNumber: number }>;
 }
 
 /** Partido o torneo Quality dentro de la semana del jugador. */
@@ -279,6 +287,8 @@ export interface TournamentCategory {
   /** Objetivo de suma (12, 15, …) si kind=suma. */
   sumaTarget: number | null;
   maxPairs: number;
+  /** Cupo tomado: pendientes, aceptadas y lista de espera. Null si el listado no lo trae. */
+  occupiedPairs?: number | null;
   /** Circuito de ranking (NONE = sin ranking externo). */
   circuitType: TournamentCircuitType;
   status: EntityStatus;
@@ -397,6 +407,13 @@ export interface TournamentRegistration {
   /** Motivo de desclasificación / baja (asociado a la inscripción). */
   statusNote: string | null;
   statusChangedAt: string | null;
+  /** player si canceló un jugador de la pareja; club si la baja la hizo el club. */
+  cancelledBy?: "player" | "club" | null;
+  /**
+   * Quién canceló. Si cancelledBy es player, es el id del jugador.
+   * Si es club, es el id del usuario del club.
+   */
+  cancelledById?: string | null;
   /**
    * Puntos de ranking informados al momento de la inscripción (jugador 1).
    * No es el ranking oficial del circuito; es un snapshot manual.
@@ -431,10 +448,7 @@ export interface TournamentRuleset {
   preset: RulesetPreset;
   matchRules: MatchRules;
   tieBreakers: TieBreaker[];
-  qualifyPerGroup: number;
-  /** Tamaño objetivo por zona; la cantidad de zonas se deriva de las parejas. */
-  pairsPerGroup: number | null;
-  /** Derivado al sincronizar (ceil(parejas / pairsPerGroup)); no se configura a mano. */
+  /** Derivado al sincronizar. No se configura a mano. */
   groupCount: number | null;
 }
 
@@ -444,6 +458,8 @@ export interface TournamentGroup {
   name: string;
   order: number;
   pairIds: string[];
+  /** Parejas de esta zona que entran al cuadro. Cero si el formato no tiene llave. */
+  qualifies: number;
 }
 
 export interface GroupStanding {
@@ -491,6 +507,8 @@ export interface Match {
   sets: SetScore[];
   /** Si true, AutoMatch no sobrescribe horario/cancha. */
   scheduleManual: boolean;
+  /** Orden dentro de la zona o de la ronda. */
+  sortOrder: number;
 }
 
 export interface MatchSlot {
@@ -597,6 +615,8 @@ export interface CourtReservation {
   isClubPlayer?: boolean;
   /** True si el bloque sale de un turno fijo y no de una reserva persistida. */
   isFixed?: boolean;
+  /** True si el bloque es un rango de torneo y no una reserva de jugador. */
+  isTournamentBlock?: boolean;
   courtName?: string;
   /** URL pública de la foto de la cancha. */
   courtImageUrl?: string | null;
@@ -744,8 +764,6 @@ export type CollectionName = keyof CoreApiSnapshot;
 
 export interface GenerateGroupsConfig {
   groupCount: number;
-  pairsPerGroup: number;
-  qualifyPerGroup: number;
 }
 
 /** Vista procesada del cuadro (zonas + eliminación) para UI / futuro realtime. */
@@ -781,12 +799,29 @@ export interface ZonesBoardView {
   matchRules: MatchRules;
   courts: Court[];
   allMatches: Match[];
-  qualifyPerGroup: number;
-  pairsPerGroup: number;
+  slots: MatchSlot[];
   /** Zonas con todos los partidos finalizados (pueden mostrar clasificados). */
   finishedGroupIds: string[];
   unassignedPairs: CuadroBoardView["unassignedPairs"];
   notice: string | null;
+  autoAssign: AutoAssignPreview;
+}
+
+/** Jugador de una inscripción, para el detalle de la tarjeta. */
+export interface RegistrationPlayerDetail {
+  id: string;
+  displayName: string;
+  phone: string | null;
+  categoryLevel: import("./categories").CategoryLevel | null;
+  /** `left` | `right` | `both`. Null si no cargó lado. */
+  sidePreference: import("./playerSidePreference").PlayerSidePreference | null;
+}
+
+/** Franja que la pareja declaró al inscribirse. */
+export interface RegistrationAvailability {
+  date: string;
+  startTime: string;
+  endTime: string;
 }
 
 /** Tab Participantes. */
@@ -802,6 +837,10 @@ export interface ParticipantsBoardView {
     playerAvatars: [string | null, string | null];
     /** Id de cliente del club por jugador; null si no hay ficha. */
     playerClientIds: [string | null, string | null];
+    /** Ficha de cada jugador. El segundo es null si la pareja está incompleta. */
+    players?: [RegistrationPlayerDetail | null, RegistrationPlayerDetail | null];
+    /** Horarios declarados. Solo los trae el tablero del club; el publico no. */
+    availability?: RegistrationAvailability[];
     incomplete: boolean;
     disqualified: boolean;
   }>;
@@ -871,8 +910,6 @@ export interface ConfigBoardView {
   category: TournamentCategory;
   ruleset: TournamentRuleset | null;
   structureLocked: boolean;
-  pairsPerGroup: number;
-  qualifyPerGroup: number;
   notice: string | null;
 }
 
@@ -892,6 +929,19 @@ export interface ScheduleResult {
   scheduledCount: number;
   suboptimalCount: number;
   pendingCount: number;
+  phase?: string | null;
+  phaseLabel?: string;
+  manualSkipped?: number;
+  message?: string | null;
+}
+
+export interface AutoAssignPreview {
+  phase: string | null;
+  phaseLabel: string;
+  eligibleCount: number;
+  manualCount: number;
+  alreadyUsed: boolean;
+  blockedReason: string | null;
 }
 
 export type CourtAgendaEventKind = "reservation" | "tournament_match";

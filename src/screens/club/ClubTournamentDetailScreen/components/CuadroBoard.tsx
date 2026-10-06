@@ -1,14 +1,11 @@
 import type { CuadroBoardView, Match } from "@/domain";
 import BracketView from "@/components/tournaments/BracketView";
-import { Button } from "@/components/ui/button";
 import { roundSectionLabel } from "@/lib/tournamentLabels";
 
 interface CuadroBoardProps {
   board: CuadroBoardView;
   isLoading?: boolean;
   onOpenResult: (match: Match) => void;
-  onSyncStructure?: () => void;
-  syncPending?: boolean;
   /** Vista jugador/guest: copy sin “cargar resultado”. */
   readOnly?: boolean;
 }
@@ -17,8 +14,6 @@ export default function CuadroBoard({
   board,
   isLoading = false,
   onOpenResult,
-  onSyncStructure,
-  syncPending = false,
   readOnly = false,
 }: CuadroBoardProps) {
   const sortedRounds = [...board.rounds].sort((a, b) => a.order - b.order);
@@ -48,17 +43,6 @@ export default function CuadroBoard({
             {isLoading ? " · actualizando…" : ""}
           </p>
         </div>
-        {onSyncStructure ? (
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={syncPending}
-            onClick={onSyncStructure}
-          >
-            {syncPending ? "Sincronizando…" : "Sincronizar estructura"}
-          </Button>
-        ) : null}
       </div>
 
       {board.notice ? (

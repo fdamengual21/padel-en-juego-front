@@ -3,6 +3,8 @@ import { readData } from "@/config/axiosInstance";
 import type { ApiEnvelope } from "@/lib/apiClient";
 import type {
   ConfirmEmailInput,
+  AcceptInviteInput,
+  AcceptInviteResponse,
   LoginInput,
   LoginResponse,
   RegisterInput,
@@ -13,6 +15,7 @@ export interface IAuthRepository {
   register(input: RegisterInput): Promise<RegisterResponse>;
   login(input: LoginInput): Promise<LoginResponse>;
   confirmEmail(input: ConfirmEmailInput): Promise<LoginResponse>;
+  acceptInvite(input: AcceptInviteInput): Promise<AcceptInviteResponse>;
   resendConfirmation(email: string): Promise<string>;
 }
 
@@ -60,6 +63,14 @@ export class AuthRepository implements IAuthRepository {
   async confirmEmail(input: ConfirmEmailInput) {
     const response = await this.axiosInstance.post<ApiEnvelope<LoginResponse>>(
       "/auth/confirm-email",
+      input,
+    );
+    return readData(response);
+  }
+
+  async acceptInvite(input: AcceptInviteInput) {
+    const response = await this.axiosInstance.post<ApiEnvelope<AcceptInviteResponse>>(
+      "/auth/accept-invite",
       input,
     );
     return readData(response);

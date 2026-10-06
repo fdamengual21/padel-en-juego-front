@@ -1,6 +1,7 @@
 import type { IAuthRepository } from "../repositories/AuthRepository";
 import type {
   ConfirmEmailInput,
+  AcceptInviteInput,
   LoginInput,
   LoginResponse,
   RegisterInput,
@@ -41,6 +42,10 @@ export class AuthService {
   async confirmEmail(input: ConfirmEmailInput) {
     const data = await this.repository.confirmEmail(input);
     return requireLoginTokens(data);
+  }
+
+  acceptInvite(input: AcceptInviteInput) {
+    return this.repository.acceptInvite(input);
   }
 
   resendConfirmation(email: string) {

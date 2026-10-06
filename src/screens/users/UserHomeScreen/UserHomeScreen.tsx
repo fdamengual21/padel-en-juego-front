@@ -4,22 +4,36 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleAlert } from "lucide-react";
 import Api from "@/api/Api";
 import { useMockSession } from "@/app/MockSessionProvider";
+import { useUser } from "@/app/UserProvider";
+import { useAuthStore } from "@/stores/authStore";
 import { EmptyState } from "@/components/EmptyState";
 import { buttonVariants } from "@/components/ui/button";
 import { ROUTES } from "@/router/routes";
 import { cn } from "@/lib/utils";
 import type { PlayerReservation } from "@/modules/reservations";
-import HomeTournamentCard from "./components/HomeTournamentCard";
+import HomeTournamentCard from "../components/HomeTournamentCard";
 import PlayerReservationDetailModal from "./components/PlayerReservationDetailModal";
 import PlayerWeekBoard from "./components/PlayerWeekBoard";
 
 export default function UserHomeScreen() {
-  const { clubId, playerId, isAuthenticated } = useMockSession();
+  const { playerId, isAuthenticated } = useMockSession();
+  const { isResolvingUser } = useUser();
+  const token = useAuthStore((state) => state.token);
+  const user = useAuthStore((state) => state.user);
+  const profilePending = Boolean(token?.trim()) && !user;
+  const locationReady = !isResolvingUser && !profilePending;
+  const provinceId = locationReady ? (user?.provinceId ?? null) : null;
+  const municipalityId = locationReady ? (user?.municipalityId ?? null) : null;
   const queryClient = useQueryClient();
   const [selected, setSelected] = useState<PlayerReservation | null>(null);
   const { data, isLoading } = useQuery({
-    queryKey: ["player-feed", clubId, playerId],
-    queryFn: () => Api.TournamentOpsService().getPlayerFeed(clubId, playerId),
+    queryKey: ["player-feed", provinceId, municipalityId],
+    queryFn: () =>
+      Api.TournamentOpsService().getPlayerFeed({
+        provinceId,
+        municipalityId,
+      }),
+    enabled: locationReady,
   });
   const weekQuery = useQuery({
     queryKey: ["player-week", playerId],

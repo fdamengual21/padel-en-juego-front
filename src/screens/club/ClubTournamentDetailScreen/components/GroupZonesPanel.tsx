@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Court, GroupStanding, Match, MatchRules, TournamentGroup } from "@/domain";
+import type { Court, GroupStanding, Match, MatchRules, MatchSlot, TournamentGroup } from "@/domain";
 import { scoreboardSlotCount } from "@/domain";
 import MatchCourtSelect, {
   MatchHorarioButton,
@@ -26,7 +26,6 @@ import {
 import { resolveMatchPlayStatus } from "@/lib/matchPlayStatus";
 import { formatScheduleShortEs } from "@/lib/dates";
 import { cn } from "@/lib/utils";
-import { groupQualificationTargetLabel } from "@/domain";
 
 interface StandingColumnHeadProps {
   label: string;
@@ -60,13 +59,12 @@ interface GroupZonesPanelProps {
   matchRules: MatchRules;
   courts?: Court[];
   allMatches?: Match[];
+  slots?: MatchSlot[];
   reservations?: import("@/domain").CourtReservation[];
   matchDurationMinutes?: number;
   scheduleSavingMatchId?: string | null;
   /** Torneo finalizado/cancelado: sin editar agenda, cancha ni resultado. */
   tournamentLocked?: boolean;
-  /** Cuántos clasifican por zona (para marcar avance). */
-  qualifyPerGroup?: number;
   /** Zonas con todos los partidos terminados. */
   finishedGroupIds?: string[];
   onSaveSchedule?: (input: {
@@ -91,6 +89,23 @@ function pairIndexInGroup(group: TournamentGroup, pairId: string | null): number
   return idx >= 0 ? idx + 1 : null;
 }
 
+function pendingSide(source: string | undefined): string | null {
+  if (source === "MATCH_WINNER") return "Ganador";
+  if (source === "MATCH_LOSER") return "Perdedor";
+  return null;
+}
+
+function slotSource(slots: MatchSlot[], matchId: string, side: "A" | "B") {
+  return slots.find((slot) => slot.matchId === matchId && slot.side === side)?.sourceType;
+}
+
+function qualifyHeadline(count: number): string | null {
+  if (count === 1) return "Pasa el primero";
+  if (count === 2) return "Pasan los dos primeros";
+  if (count === 3) return "Pasan los tres primeros";
+  return null;
+}
+
 export default function GroupZonesPanel({
   groups,
   matches,
@@ -99,11 +114,11 @@ export default function GroupZonesPanel({
   matchRules,
   courts = [],
   allMatches,
+  slots = [],
   reservations = [],
   matchDurationMinutes,
   scheduleSavingMatchId = null,
   tournamentLocked = false,
-  qualifyPerGroup = 2,
   finishedGroupIds = [],
   onSaveSchedule,
   onOpenResult,
@@ -144,11 +159,8 @@ export default function GroupZonesPanel({
       {groups.map((group) => {
         const groupMatches = matches
           .filter((m) => m.groupId === group.id && m.phase === "GROUP")
-          .sort(
-            (a, b) =>
-              (a.scheduledAt ?? "").localeCompare(b.scheduledAt ?? "") ||
-              a.id.localeCompare(b.id),
-          );
+          .sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
+        const passedLabel = qualifyHeadline(group.qualifies ?? 0);
         const zoneFinished = finishedGroupSet.has(group.id);
         const groupStandings = standings
           .filter((s) => s.groupId === group.id)
@@ -193,6 +205,16 @@ export default function GroupZonesPanel({
                   {groupMatches.map((match, index) => {
                     const seedA = pairIndexInGroup(group, match.pairAId);
                     const seedB = pairIndexInGroup(group, match.pairBId);
+                    const pendingA = pendingSide(slotSource(slots, match.id, "A"));
+                    const pendingB = pendingSide(slotSource(slots, match.id, "B"));
+                    const cruce =
+                      seedA && seedB
+                        ? `${seedA} vs ${seedB}`
+                        : pendingA && pendingB
+                          ? pendingA === "Ganador"
+                            ? "G vs G"
+                            : "P vs P"
+                          : "—";
                     const playStatus = resolveMatchPlayStatus(match, matchRules);
                     const hasPairs = Boolean(match.pairAId && match.pairBId);
                     const matchCancelled = match.status === "cancelled";
@@ -216,7 +238,7 @@ export default function GroupZonesPanel({
                           N°{index + 1}
                         </TableCell>
                         <TableCell className="w-0 px-2 py-1.5 text-sm font-medium whitespace-nowrap">
-                          {seedA && seedB ? `${seedA} vs ${seedB}` : "—"}
+                          {cruce}
                         </TableCell>
                         <TableCell className="w-[7.25rem] px-2 py-1.5">
                           {showAgenda && onSaveSchedule ? (
@@ -256,8 +278,12 @@ export default function GroupZonesPanel({
                         <TableCell className="w-[17rem] px-2 py-1.5 whitespace-normal">
                           <PairVsBlock
                             className="text-sm"
-                            pairALabel={pairLabels[match.pairAId ?? ""] ?? "Por definir"}
-                            pairBLabel={pairLabels[match.pairBId ?? ""] ?? "Por definir"}
+                            pairALabel={
+                              pairLabels[match.pairAId ?? ""] ?? pendingA ?? "Por definir"
+                            }
+                            pairBLabel={
+                              pairLabels[match.pairBId ?? ""] ?? pendingB ?? "Por definir"
+                            }
                           />
                         </TableCell>
                         <TableCell className="w-[11rem] px-2 py-1.5 text-left whitespace-normal">
@@ -308,7 +334,9 @@ export default function GroupZonesPanel({
                         colSpan={showAgenda ? 7 : 6}
                         className="text-sm text-muted-foreground"
                       >
-                        Sin partidos en esta zona.
+                        {group.pairIds.length === 1
+                          ? `${pairLabels[group.pairIds[0]] ?? "La pareja"} pasa de fase.`
+                          : "Sin partidos en esta zona."}
                       </TableCell>
                     </TableRow>
                   ) : null}
@@ -322,9 +350,9 @@ export default function GroupZonesPanel({
                   <p className="text-xs font-medium text-muted-foreground">
                     Posiciones (sets ganados − perdidos)
                   </p>
-                  {zoneFinished ? (
+                  {zoneFinished && passedLabel ? (
                     <span className="rounded-md bg-primary/20 px-2 py-0.5 text-xs font-medium text-foreground">
-                      Zona finalizada · top {qualifyPerGroup} al cuadro
+                      Zona finalizada · {passedLabel}
                     </span>
                   ) : null}
                 </div>
@@ -361,7 +389,7 @@ export default function GroupZonesPanel({
                         const qualifies =
                           zoneFinished &&
                           row.position > 0 &&
-                          row.position <= qualifyPerGroup;
+                          row.position <= (group.qualifies ?? 0);
                         return (
                           <TableRow
                             key={row.id}
@@ -391,7 +419,7 @@ export default function GroupZonesPanel({
                               <TableCell>
                                 {qualifies ? (
                                   <span className="inline-flex rounded-md bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">
-                                    {groupQualificationTargetLabel(row.position)}
+                                    Clasifica
                                   </span>
                                 ) : (
                                   <span className="text-xs text-muted-foreground">

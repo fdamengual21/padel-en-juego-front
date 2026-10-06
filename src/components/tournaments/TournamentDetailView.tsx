@@ -2,7 +2,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Trash2 } from "lucide-react";
-import type { Match, MatchResultInput, MatchRules, TournamentPair } from "@/domain";
+import type {
+  Match,
+  MatchResultInput,
+  MatchRules,
+  ParticipantsBoardView,
+  TournamentPair,
+} from "@/domain";
 import {
   createId,
   isMatchResultComplete,
@@ -12,6 +18,7 @@ import {
 import Api from "@/api/Api";
 import MatchCard from "@/components/tournaments/MatchCard";
 import PlayerRegistrationPanel from "@/components/tournaments/PlayerRegistrationPanel";
+import RegistrationDetailModal from "@/components/tournaments/RegistrationDetailModal";
 import StatusBadge from "@/components/tournaments/StatusBadge";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,6 +29,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import WarningDialog from "@/components/ui/warning-dialog";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -36,6 +49,9 @@ import TournamentForm, {
 } from "@/screens/club/components/TournamentForm";
 import {
   buildMatchRulesFromForm,
+  countTournamentDays,
+  phaseDayListFromMap,
+  phaseDayMapFromList,
   type TournamentFormValues,
 } from "@/modules/tournaments/types";
 import { ROUTES } from "@/router/routes";
@@ -66,13 +82,31 @@ const FALLBACK_MATCH_RULES: MatchRules = {
   superTiebreakWinByTwo: true,
 };
 
-function structureChanged(
-  prev: Pick<TournamentFormValues, "pairsPerGroup" | "qualifyPerGroup">,
-  next: TournamentFormValues,
-): boolean {
+function AutoAssignButton({
+  blockedReason,
+  pending,
+  onOpen,
+}: {
+  blockedReason: string | null;
+  pending: boolean;
+  onOpen: () => void;
+}) {
+  const disabled = pending || Boolean(blockedReason);
+  const button = (
+    <Button type="button" size="sm" disabled={disabled} onClick={onOpen}>
+      {pending ? "Asignando…" : "Autoasignar horarios y canchas"}
+    </Button>
+  );
+  if (!blockedReason) return button;
   return (
-    prev.pairsPerGroup !== next.pairsPerGroup ||
-    prev.qualifyPerGroup !== next.qualifyPerGroup
+    <TooltipProvider delay={200}>
+      <Tooltip>
+        <TooltipTrigger render={<span className="inline-flex" />}>
+          {button}
+        </TooltipTrigger>
+        <TooltipContent>{blockedReason}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
@@ -84,7 +118,7 @@ export default function TournamentDetailView({
   const readOnly = !isClub;
   const qc = useQueryClient();
   const [resultMatchId, setResultMatchId] = useState<string | null>(null);
-  const [pendingStructureValues, setPendingStructureValues] =
+  const [pendingDateValues, setPendingDateValues] =
     useState<TournamentFormValues | null>(null);
   const [dqRegistrationId, setDqRegistrationId] = useState<string | null>(null);
   const [dqNote, setDqNote] = useState("");
@@ -95,9 +129,13 @@ export default function TournamentDetailView({
   const [pairModalOpen, setPairModalOpen] = useState(false);
   const [editingPair, setEditingPair] = useState<TournamentPair | null>(null);
   const [confirmAddStartedOpen, setConfirmAddStartedOpen] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("grupos");
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [clientDetailId, setClientDetailId] = useState<string | null>(null);
+  const [detailRow, setDetailRow] = useState<
+    ParticipantsBoardView["rows"][number] | null
+  >(null);
 
   const { data: tournament } = useQuery({
     queryKey: ["tournament", tournamentId, isClub],
@@ -105,6 +143,11 @@ export default function TournamentDetailView({
       isClub
         ? Api.TournamentService().getById(tournamentId)
         : Api.TournamentService().getPublic(tournamentId),
+  });
+  const { data: clubCourts = [] } = useQuery({
+    queryKey: ["courts", "tournament-form", isClub],
+    queryFn: () => Api.CourtService().list(),
+    enabled: isClub,
   });
   const { data: categories = [] } = useQuery({
     queryKey: ["categories", tournamentId, isClub],
@@ -181,7 +224,7 @@ export default function TournamentDetailView({
       isClub
         ? Api.TournamentOpsService().getZonesBoard(categoryId)
         : Api.TournamentOpsService().getPublicZonesBoard(categoryId),
-    enabled: Boolean(categoryId) && activeTab === "grupos",
+    enabled: Boolean(categoryId),
     refetchOnMount: "always",
   });
   const {
@@ -331,19 +374,10 @@ export default function TournamentDetailView({
           `${data.autoMatch.player1Name} y ${data.autoMatch.player2Name} se unieron por preferencia de lado`,
         );
       } else {
-        toastSuccess(
-          vars.mode === "edit"
-            ? "Pareja actualizada"
-            : "Inscripción cargada",
-          vars.mode === "edit"
-            ? undefined
-            : "Queda pendiente hasta que la aceptes",
-        );
+        toastSuccess(vars.mode === "edit" ? "Pareja actualizada" : "Inscripción aceptada");
       }
       await invalidateOps();
-      const shouldSyncStructure =
-        (vars.mode === "edit" && Boolean(vars.player2Id)) ||
-        Boolean(data.autoMatch);
+      const shouldSyncStructure = Boolean(vars.player2Id) || Boolean(data.autoMatch);
       if (shouldSyncStructure) {
         const result =
           await Api.TournamentOpsService().syncCategoryStructure(categoryId);
@@ -472,11 +506,13 @@ export default function TournamentDetailView({
     mutationFn: () => Api.TournamentOpsService().scheduleCategory(categoryId),
     onSuccess: async (result) => {
       toastSuccess(
-        "Horarios generados",
-        result.pendingCount > 0
-          ? `${result.scheduledCount} partidos ubicados. ${result.pendingCount} quedaron sin cancha libre.`
-          : `${result.scheduledCount} partidos ubicados.`,
+        "Horarios asignados",
+        result.message ??
+          (result.pendingCount > 0
+            ? `No hay canchas libres dentro de los días del torneo para ${result.pendingCount} partidos.`
+            : `Se asignaron ${result.scheduledCount} partidos de ${result.phaseLabel ?? "la fase"}.`),
       );
+      setAssignOpen(false);
       await invalidateOps();
     },
     onError: (err: Error) => {
@@ -502,9 +538,19 @@ export default function TournamentDetailView({
         endDate: values.endDate,
         dailyStartTime: values.dailyStartTime,
         dailyEndTime: values.dailyEndTime,
+        courtHoldStartTime:
+          values.format === "QUALITY" && values.courtHoldCourtIds.length > 0
+            ? values.courtHoldStartTime
+            : "",
+        courtHoldEndTime:
+          values.format === "QUALITY" && values.courtHoldCourtIds.length > 0
+            ? values.courtHoldEndTime
+            : "",
+        courtHoldCourtIds: values.format === "QUALITY" ? values.courtHoldCourtIds : [],
         format: values.format,
         registrationFee: values.registrationFee,
         status: cfgTournament.status,
+        phaseDays: phaseDayListFromMap(values.phaseDays),
         updatedAt: new Date().toISOString(),
       });
       await Api.TournamentOpsService().updateCategory(cfgCategory.id, {
@@ -528,8 +574,6 @@ export default function TournamentDetailView({
           "HEAD_TO_HEAD",
           "GAME_DIFFERENCE",
         ],
-        qualifyPerGroup: values.qualifyPerGroup,
-        pairsPerGroup: values.pairsPerGroup,
         groupCount: null,
       });
       return Api.TournamentOpsService().syncCategoryStructure(cfgCategory.id, {
@@ -539,7 +583,7 @@ export default function TournamentDetailView({
     },
     onSuccess: async (result) => {
       toastSuccess("Configuración guardada", result.message);
-      setPendingStructureValues(null);
+      setPendingDateValues(null);
       await invalidateOps();
     },
     onError: (err: Error) => {
@@ -711,15 +755,11 @@ export default function TournamentDetailView({
         tournament: configBoard.tournament,
         category: configBoard.category,
         ruleset: configBoard.ruleset,
-        pairsPerGroup: configBoard.pairsPerGroup,
-        qualifyPerGroup: configBoard.qualifyPerGroup,
       }
     : {
         tournament,
         category,
         ruleset,
-        pairsPerGroup: ruleset?.pairsPerGroup ?? 4,
-        qualifyPerGroup: ruleset?.qualifyPerGroup ?? 2,
       };
 
   const formInitial = defaultTournamentFormValues({
@@ -729,11 +769,11 @@ export default function TournamentDetailView({
     endDate: formSource.tournament.endDate ?? formSource.tournament.startDate,
     dailyStartTime: formSource.tournament.dailyStartTime ?? "10:00",
     dailyEndTime: formSource.tournament.dailyEndTime ?? "22:00",
+    courtHoldStartTime: formSource.tournament.courtHoldStartTime || "18:00",
+    courtHoldEndTime: formSource.tournament.courtHoldEndTime || "22:00",
+    courtHoldCourtIds: formSource.tournament.courtHoldCourtIds ?? [],
     registrationFee: formSource.tournament.registrationFee ?? 0,
-    format:
-      formSource.tournament.format === "QUALITY"
-        ? "GROUPS_ELIMINATION"
-        : formSource.tournament.format,
+    format: formSource.tournament.format,
     matchPlayType:
       formSource.ruleset?.preset === "QUALITY" ||
       formSource.ruleset?.preset === "CUSTOM" ||
@@ -752,13 +792,21 @@ export default function TournamentDetailView({
     categoryName: formSource.category?.name ?? "",
     maxPairs: formSource.category?.maxPairs ?? 16,
     circuitType: formSource.category?.circuitType ?? "NONE",
-    pairsPerGroup: formSource.pairsPerGroup,
-    qualifyPerGroup: formSource.qualifyPerGroup,
+    phaseDays: phaseDayMapFromList(
+      formSource.tournament.phaseDays,
+      formSource.tournament.format,
+      countTournamentDays(
+        formSource.tournament.startDate,
+        formSource.tournament.endDate ?? formSource.tournament.startDate,
+      ),
+    ),
   });
 
   const summaryGroups = zonesBoard?.groups ?? groups;
-  const summaryQualify =
-    zonesBoard?.qualifyPerGroup ?? ruleset?.qualifyPerGroup ?? 2;
+  const summaryQualify = summaryGroups.reduce(
+    (total, group) => total + (group.qualifies ?? 0),
+    0,
+  );
 
   return (
     <div
@@ -772,21 +820,49 @@ export default function TournamentDetailView({
         >
           ← Volver a torneos
         </Link>
-        <div className="mt-1 flex flex-wrap items-center gap-2">
-          <h2 className="text-2xl font-semibold tracking-tight">{tournament.name}</h2>
-          <StatusBadge status={tournament.status} />
-          <span className="text-sm text-muted-foreground">{category?.name}</span>
+        <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <h2 className="text-2xl font-semibold tracking-tight">{tournament.name}</h2>
+            <StatusBadge status={tournament.status} />
+            {readOnly && categories.length > 1 ? (
+              <select
+                aria-label="Categoría"
+                className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                value={categoryId}
+                onChange={(event) => setSelectedCategoryId(event.target.value)}
+              >
+                {categories.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="text-sm text-muted-foreground">{category?.name}</span>
+            )}
+          </div>
+          {readOnly ? (
+            <div className="ml-auto flex w-full max-w-xl items-center sm:w-auto">
+              <PlayerRegistrationPanel
+                tournament={tournament}
+                categories={categories}
+                categoryId={categoryId}
+                onCategoryChange={setSelectedCategoryId}
+              />
+            </div>
+          ) : (
+            <AutoAssignButton
+              blockedReason={
+                zonesBoard
+                  ? zonesBoard.autoAssign.blockedReason
+                  : "Cargando la fase…"
+              }
+              pending={scheduleMutation.isPending}
+              onOpen={() => setAssignOpen(true)}
+            />
+          )}
         </div>
       </div>
-
-      {readOnly ? (
-        <PlayerRegistrationPanel
-          tournament={tournament}
-          categories={categories}
-          categoryId={categoryId}
-          onCategoryChange={setSelectedCategoryId}
-        />
-      ) : null}
 
       <section
         className="rounded-xl border border-border bg-card p-4"
@@ -820,7 +896,9 @@ export default function TournamentDetailView({
             label="Zonas"
             value={
               summaryGroups.length
-                ? `${summaryGroups.length} · clasifican ${summaryQualify * summaryGroups.length}`
+                ? summaryQualify > 0
+                  ? `${summaryGroups.length} · clasifican ${summaryQualify}`
+                  : `${summaryGroups.length}`
                 : "Pendiente de cupo"
             }
           />
@@ -901,7 +979,9 @@ export default function TournamentDetailView({
               return (
                 <li
                   key={pair.id}
-                  className="px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between text-sm"
+                  data-testid="participant-card"
+                  className="flex cursor-pointer flex-col gap-2 px-4 py-3 text-sm transition-colors hover:bg-muted/40 sm:flex-row sm:items-center sm:justify-between"
+                  onClick={() => setDetailRow(row)}
                 >
                   <div className="min-w-0 space-y-2">
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -925,7 +1005,10 @@ export default function TournamentDetailView({
                             key={`${pair.id}-p${index}`}
                             type="button"
                             className="flex min-w-0 items-center gap-2 rounded-md text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-                            onClick={() => setClientDetailId(player.clientId)}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setClientDetailId(player.clientId);
+                            }}
                           >
                             {inner}
                           </button>
@@ -960,7 +1043,10 @@ export default function TournamentDetailView({
                       </p>
                     ) : null}
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div
+                    className="flex flex-wrap gap-2"
+                    onClick={(event) => event.stopPropagation()}
+                  >
                     {isClub &&
                     (reg?.status === "PENDING" || reg?.status === "WAITLIST") ? (
                       <>
@@ -1040,19 +1126,9 @@ export default function TournamentDetailView({
           {isClub ? (
             <>
               <p className="text-xs text-muted-foreground">
-                Las inscripciones quedan pendientes hasta que las aceptes. Solo las
-                parejas aceptadas y completas entran al armado de zonas y partidos.
-                La desclasificación queda en la inscripción (con nota).
+                Las parejas que carga el club quedan aceptadas. Solo las
+                completas entran al armado de zonas y partidos.
               </p>
-              <Button
-                className="mt-1"
-                variant="outline"
-                size="sm"
-                disabled={syncMutation.isPending}
-                onClick={() => syncMutation.mutate()}
-              >
-                Sincronizar estructura
-              </Button>
             </>
           ) : null}
         </TabsContent>
@@ -1071,9 +1147,9 @@ export default function TournamentDetailView({
               matchRules={zonesBoard.matchRules}
               courts={zonesBoard.courts}
               allMatches={zonesBoard.allMatches}
+              slots={zonesBoard.slots}
               reservations={courtReservations}
               matchDurationMinutes={matchDurationMinutes}
-              qualifyPerGroup={zonesBoard.qualifyPerGroup}
               finishedGroupIds={zonesBoard.finishedGroupIds}
               tournamentLocked={tournamentLocked || readOnly}
               scheduleSavingMatchId={
@@ -1113,10 +1189,6 @@ export default function TournamentDetailView({
               board={cuadroBoard}
               isLoading={cuadroFetching}
               onOpenResult={openResult}
-              onSyncStructure={
-                isClub ? () => syncMutation.mutate() : undefined
-              }
-              syncPending={syncMutation.isPending}
               readOnly={readOnly}
             />
           ) : (
@@ -1127,21 +1199,6 @@ export default function TournamentDetailView({
         </TabsContent>
 
         <TabsContent value="partidos" className="space-y-3 pt-4">
-          {isClub && !readOnly ? (
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm text-muted-foreground">
-                El generador usa canchas libres, los días de cada fase y la disponibilidad de las parejas.
-              </p>
-              <Button
-                type="button"
-                size="sm"
-                disabled={scheduleMutation.isPending || !categoryId}
-                onClick={() => scheduleMutation.mutate()}
-              >
-                {scheduleMutation.isPending ? "Programando…" : "Programar horarios"}
-              </Button>
-            </div>
-          ) : null}
           {matchesBoard?.notice ? (
             <p className="text-sm text-muted-foreground">{matchesBoard.notice}</p>
           ) : null}
@@ -1238,13 +1295,31 @@ export default function TournamentDetailView({
           {configBoard ? (
             <TournamentForm
               key={`${configBoard.generatedAt}-${configBoard.ruleset?.id ?? "rules"}`}
+              courts={clubCourts
+                .filter((court) => court.status === "active")
+                .map((court) => ({ id: court.id, name: court.name }))}
               initialValues={formInitial}
               submitLabel="Guardar configuración"
               isSubmitting={saveConfig.isPending}
               onSubmit={async (values) => {
-                const structureTouched = structureChanged(formInitial, values);
-                if (structureTouched && (configBoard.structureLocked || structureLocked)) {
-                  setPendingStructureValues(values);
+                const datesTouched =
+                  formInitial.startDate !== values.startDate ||
+                  formInitial.endDate !== values.endDate;
+                const played = matches.some(
+                  (match) =>
+                    match.status === "finished" ||
+                    match.status === "walkover" ||
+                    match.status === "inProgress",
+                );
+                if (datesTouched && tournamentLocked) {
+                  toastError(
+                    "No se puede cambiar la fecha",
+                    "El torneo ya está cerrado.",
+                  );
+                  return;
+                }
+                if (datesTouched && played) {
+                  setPendingDateValues(values);
                   return;
                 }
                 await saveConfig.mutateAsync({
@@ -1261,18 +1336,19 @@ export default function TournamentDetailView({
       </Tabs>
 
       <Dialog
-        open={isClub && Boolean(pendingStructureValues)}
+        open={isClub && Boolean(pendingDateValues)}
         onOpenChange={(open) => {
-          if (!open) setPendingStructureValues(null);
+          if (!open) setPendingDateValues(null);
         }}
       >
-        <DialogContent data-testid="structure-change-dialog">
+        <DialogContent data-testid="date-change-dialog">
           <DialogHeader>
-            <DialogTitle>Cambió el cupo de zonas</DialogTitle>
+            <DialogTitle>Cambiar la fecha del torneo</DialogTitle>
             <DialogDescription>
-              Al aplicar, se reordenan las zonas según el nuevo cupo de parejas por
-              zona, pero se conservan los VS ya jugados y sus resultados. Solo se
-              redistribuyen los cruces que todavía no se disputaron.
+              Las parejas inscriptas se mantienen y los resultados ya cargados también.
+              El calendario pasa a las fechas nuevas. Los partidos que todavía no se
+              jugaron quedan sin cancha ni horario, y hay que volver a programarlos.
+              La disponibilidad marcada para los días anteriores se borra.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:justify-end">
@@ -1280,22 +1356,22 @@ export default function TournamentDetailView({
               type="button"
               variant="outline"
               disabled={saveConfig.isPending}
-              onClick={() => setPendingStructureValues(null)}
+              onClick={() => setPendingDateValues(null)}
             >
               Cancelar
             </Button>
             <Button
               type="button"
-              disabled={saveConfig.isPending || !pendingStructureValues}
+              disabled={saveConfig.isPending || !pendingDateValues}
               onClick={() => {
-                if (!pendingStructureValues) return;
+                if (!pendingDateValues) return;
                 void saveConfig.mutateAsync({
-                  values: pendingStructureValues,
+                  values: pendingDateValues,
                   preserveResults: true,
                 });
               }}
             >
-              Aplicar cupo (conservar VS)
+              Cambiar fecha
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1434,6 +1510,43 @@ export default function TournamentDetailView({
         }}
       />
 
+      <Dialog
+        open={isClub && assignOpen}
+        onOpenChange={setAssignOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Autoasignar horarios y canchas</DialogTitle>
+            <DialogDescription>
+              Se van a asignar cancha y horario a{" "}
+              {zonesBoard?.autoAssign.eligibleCount ?? 0} partidos de{" "}
+              {zonesBoard?.autoAssign.phaseLabel || "esta fase"}. Esta asignación
+              automática se hace una sola vez en esta fase.
+              {(zonesBoard?.autoAssign.manualCount ?? 0) > 0
+                ? ` ${zonesBoard?.autoAssign.manualCount} partidos ya tienen horario o cancha cargados a mano y no se van a modificar.`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={scheduleMutation.isPending}
+              onClick={() => setAssignOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              disabled={scheduleMutation.isPending || !categoryId}
+              onClick={() => scheduleMutation.mutate()}
+            >
+              {scheduleMutation.isPending ? "Asignando…" : "Confirmar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <PairFormModal
         open={isClub && pairModalOpen}
         mode={editingPair ? "edit" : "create"}
@@ -1448,6 +1561,8 @@ export default function TournamentDetailView({
         requireAvailability={requirePairAvailability}
         tournamentStartDate={tournament?.startDate}
         tournamentEndDate={tournament?.endDate}
+        dailyStartTime={tournament?.dailyStartTime}
+        dailyEndTime={tournament?.dailyEndTime}
         playersById={playersById}
         isSaving={savePairMutation.isPending}
         onOpenChange={(open) => {
@@ -1499,6 +1614,16 @@ export default function TournamentDetailView({
         onSubmit={async (result) => {
           if (!resultMatch) return;
           await submitResult.mutateAsync({ matchId: resultMatch.id, result });
+        }}
+      />
+
+      <RegistrationDetailModal
+        open={detailRow !== null}
+        row={detailRow}
+        categoryName={category?.name ?? null}
+        showAvailability={isClub && requirePairAvailability}
+        onOpenChange={(open) => {
+          if (!open) setDetailRow(null);
         }}
       />
 

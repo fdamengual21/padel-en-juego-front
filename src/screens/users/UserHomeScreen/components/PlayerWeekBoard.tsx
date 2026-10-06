@@ -37,7 +37,7 @@ export default function PlayerWeekBoard({
         <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
           <Calendar className="size-4" aria-hidden />
         </span>
-        <h3 className="text-lg font-semibold tracking-tight text-foreground">Próximos 7 días</h3>
+        <h3 className="text-lg font-semibold tracking-tight text-foreground">Partidos/reservas en los próximos 7 días</h3>
         {!loading ? (
           <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-success px-1.5 text-[11px] font-semibold leading-none text-white tabular-nums">
             {count}
@@ -83,9 +83,8 @@ function DayColumn({
   return (
     <article
       data-open={pinned ? "true" : undefined}
-      className={`group/day relative flex w-72 shrink-0 flex-col gap-2 rounded-xl border p-3 transition-shadow duration-500 ease-out hover:z-20 focus-within:z-20 data-[open=true]:z-20 hover:shadow-sm focus-within:shadow-sm data-[open=true]:shadow-sm ${
-        isToday ? "border-success/40 bg-success/5" : "border-border bg-card"
-      }`}
+      className={`group/day relative flex w-72 shrink-0 flex-col gap-2 rounded-xl border p-3 transition-shadow duration-500 ease-out hover:z-20 focus-within:z-20 data-[open=true]:z-20 hover:shadow-sm focus-within:shadow-sm data-[open=true]:shadow-sm ${isToday ? "border-success/40 bg-success/5" : "border-border bg-card"
+        }`}
       data-testid={`player-week-day-${day.key}`}
     >
       <header>

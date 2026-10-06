@@ -10,6 +10,7 @@ import {
   Settings,
   Trophy,
   User,
+  UserCog,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -17,9 +18,12 @@ import { useMockSession } from "@/app/MockSessionProvider";
 import { usePermissions } from "@/authorization";
 import {
   PERMISSION_CLUB_COURTS_READ,
+  PERMISSION_CLUB_CLIENTS_READ,
   PERMISSION_CLUB_RESERVATIONS_READ,
+  PERMISSION_CLUB_SCHEDULE_READ,
   PERMISSION_CLUB_SETTINGS_READ,
   PERMISSION_CLUB_TOURNAMENTS_READ,
+  PERMISSION_CLUB_USERS_READ,
 } from "@/authorization/permissionCodes";
 import AccountDrawerMenu, {
   AccountActionSections,
@@ -45,6 +49,8 @@ interface NavItem {
   end?: boolean;
   feature?: FeatureKey;
   permission?: string;
+  permissions?: readonly string[];
+  permissionMode?: "all" | "any";
 }
 
 const items: NavItem[] = [
@@ -54,6 +60,8 @@ const items: NavItem[] = [
     icon: LayoutDashboard,
     end: true,
     feature: "clubDashboard",
+    permissions: [PERMISSION_CLUB_RESERVATIONS_READ, PERMISSION_CLUB_TOURNAMENTS_READ],
+    permissionMode: "any",
   },
   {
     to: ROUTES.club.tournaments,
@@ -62,13 +70,20 @@ const items: NavItem[] = [
     feature: "tournaments",
     permission: PERMISSION_CLUB_TOURNAMENTS_READ,
   },
-  { to: ROUTES.club.clients, label: "Clientes", icon: Users, feature: "clients" },
+  { to: ROUTES.club.clients, label: "Clientes", icon: Users, feature: "clients", permission: PERMISSION_CLUB_CLIENTS_READ },
+  {
+    to: ROUTES.club.staff,
+    label: "Usuarios",
+    icon: UserCog,
+    permission: PERMISSION_CLUB_USERS_READ,
+  },
   {
     to: ROUTES.club.courts,
     label: "Canchas",
     icon: MapPin,
     feature: "courts",
-    permission: PERMISSION_CLUB_COURTS_READ,
+    permissions: [PERMISSION_CLUB_COURTS_READ, PERMISSION_CLUB_SCHEDULE_READ],
+    permissionMode: "any",
   },
   {
     to: ROUTES.club.fixedReservations,
@@ -93,6 +108,7 @@ const gridColsClass: Record<number, string> = {
   4: "grid-cols-4",
   5: "grid-cols-5",
   6: "grid-cols-6",
+  7: "grid-cols-7",
 };
 
 export default function ClubShell() {
@@ -103,9 +119,12 @@ export default function ClubShell() {
     useMockSession();
   const { can } = usePermissions();
   const { session, error } = useLoadClubSession();
-  const visibleItems = filterByFeature(items).filter(
-    (item) => !item.permission || can(item.permission),
-  );
+  const visibleItems = filterByFeature(items).filter((item) => {
+    if (item.permissions && item.permissions.length > 0) {
+      return can(item.permissions, { mode: item.permissionMode ?? "all" });
+    }
+    return !item.permission || can(item.permission);
+  });
   const bottomItems = visibleItems.filter(
     (item) => item.to !== ROUTES.club.settings,
   );

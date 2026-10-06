@@ -4,7 +4,8 @@ import { useMockSession } from "@/app/MockSessionProvider";
 import { useUser } from "@/app/UserProvider";
 import Avatar from "@/components/Avatar";
 import { buttonVariants } from "@/components/ui/button";
-import { clubRoleLabel } from "@/modules/auth/clubContext";
+import { clubRoleLabel, findUserClub } from "@/modules/auth/clubContext";
+import { clubHomeFor } from "@/router/clubHome";
 import { ROUTES } from "@/router/routes";
 import { cn } from "@/lib/utils";
 
@@ -43,7 +44,7 @@ export default function EntryScreen() {
 
   const enterAsClub = (clubId: string) => {
     enterClub(clubId);
-    navigate(ROUTES.club.dashboard);
+    navigate(clubHomeFor(findUserClub(clubs, clubId)?.permissions));
   };
 
   return (

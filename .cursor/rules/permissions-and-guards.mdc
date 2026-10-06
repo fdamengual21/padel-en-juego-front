@@ -10,7 +10,7 @@ Estilo concesionarias. La API es la fuente de verdad: `PermissionCode` + `RolePe
 
 ## Catalogo club
 
-Codigos en `src/authorization/permissionCodes.ts` (strings iguales a `PermissionCode` del backend). Matriz por rol: `docs/identity-er.md`.
+Codigos en `src/authorization/permissionCodes.ts` (strings iguales a `PermissionCode` del backend). La matriz por rol esta en el backend (`RolePermissions`). No abrir `docs/` para consultarla.
 
 - `ClubOwner` / `ClubAdmin` → `PermissionCode.ClubAll` (todo `club.*`).
 - `Organizer` / `Coach` → subconjunto (ver matriz).

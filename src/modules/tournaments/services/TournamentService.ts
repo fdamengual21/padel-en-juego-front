@@ -1,4 +1,8 @@
-import type { ITournamentRepository } from "../repositories/TournamentRepository";
+import type {
+  ClubTournamentListQuery,
+  ITournamentRepository,
+  PublicTournamentListQuery,
+} from "../repositories/TournamentRepository";
 import type { CreateTournamentRequest, Tournament } from "../types";
 
 export class TournamentService {
@@ -8,12 +12,12 @@ export class TournamentService {
     this.repository = repository;
   }
 
-  list(clubId?: string) {
-    return this.repository.list(clubId);
+  list(query?: ClubTournamentListQuery) {
+    return this.repository.list(query);
   }
 
-  listPublic() {
-    return this.repository.listPublic();
+  listPublic(query?: PublicTournamentListQuery) {
+    return this.repository.listPublic(query);
   }
 
   getById(id: string) {

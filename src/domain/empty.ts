@@ -132,11 +132,18 @@ export function emptyZonesBoard(categoryId: string): ZonesBoardView {
     matchRules: DEFAULT_MATCH_RULES,
     courts: [],
     allMatches: [],
-    qualifyPerGroup: 2,
-    pairsPerGroup: 4,
+    slots: [],
     finishedGroupIds: [],
     unassignedPairs: [],
     notice: null,
+    autoAssign: {
+      phase: null,
+      phaseLabel: "",
+      eligibleCount: 0,
+      manualCount: 0,
+      alreadyUsed: false,
+      blockedReason: "No hay una fase pendiente para asignar.",
+    },
   };
 }
 
@@ -205,8 +212,6 @@ export function emptyConfigBoard(
     category,
     ruleset: null,
     structureLocked: false,
-    pairsPerGroup: 4,
-    qualifyPerGroup: 2,
     notice: null,
   };
 }

@@ -16,7 +16,7 @@ interface CourtSummaryCardProps {
   club: Club;
   court: Court;
   daySummary: CourtDaySummary;
-  onConfigure: () => void;
+  onConfigure?: () => void;
   onSelectSlot?: (slot: CourtAvailableSlot) => void;
 }
 
@@ -218,12 +218,14 @@ export default function CourtSummaryCard({
             )}
           </div>
 
-          <div>
-            <Button type="button" className="gap-2" onClick={onConfigure}>
-              <CalendarPlus className="size-4" />
-              Configurar cancha
-            </Button>
-          </div>
+          {onConfigure ? (
+            <div>
+              <Button type="button" className="gap-2" onClick={onConfigure}>
+                <CalendarPlus className="size-4" />
+                Configurar cancha
+              </Button>
+            </div>
+          ) : null}
         </div>
       </div>
     </article>

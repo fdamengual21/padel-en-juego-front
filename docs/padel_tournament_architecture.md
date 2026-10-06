@@ -280,22 +280,21 @@ Grupos, partidos de grupos y bracket **no se arman a mano** en la UI.
 Se recalculan al confirmar inscripciones (`syncCategoryStructure`) según el ruleset:
 
 ```text
-Inscripciones confirmadas
+Inscripciones aceptadas y completas, en orden de cabeza
     ↓
-Config (pairsPerGroup / qualifyPerGroup)
+Zonas de 3. Si sobra 1, la zona A es de 4. Si sobran 2, A y B son de 4.
+Cinco parejas: zona A de 2 y zona B de 3.
     ↓
-groupCount = ceil(parejas / pairsPerGroup)  # se llena en orden: 4+4+1, no 3+3+3
+Zona de 3: todos contra todos, pasan 2.
+Zona de 4 en zonas + eliminación: 1 vs 4, 2 vs 3, ganadores y perdedores, pasan 3.
+Quality y todos contra todos: todos contra todos, sin llave.
     ↓
-Grupos + round-robin
-    ↓
-Bracket provisional (slots)
-    ↓
-Auto-schedule (respeta scheduleManual)
+Llave a la potencia de 2 de los clasificados
 ```
 
-No se configura a mano la cantidad de zonas: se deriva de las parejas confirmadas. Cada zona se llena hasta `pairsPerGroup`; el remanente queda en la última (aunque sea una sola pareja).
+No se elige el tamaño de zona ni cuántos clasifican.
 
-Si el torneo ya tiene partidos de zona jugados, al regenerar **no se recrean esos VS**: se conservan marcador y emparejamiento; solo se agregan los enfrentamientos que falten y se pueden mover parejas que aún no jugaron.
+Si el torneo ya tiene partidos de zona jugados, el sync no rearma el cuadro.
 ---
 
 # 8. TournamentPair
@@ -1152,7 +1151,7 @@ CuadroBoardView
 ```
 
 La pestaña **Cuadro** del club consume ese recurso y al entrar sincroniza la estructura (incorpora parejas nuevas si faltan) y refetch.
-Si una pareja completa quedó fuera, el sync la mete respetando el cupo (`pairsPerGroup`) conservando VS ya jugados.
+Si una pareja completa quedó fuera y la zona todavía no tiene resultados, el sync rearma las zonas y conserva el horario de un cruce que siga siendo entre las mismas dos parejas.
 
 Cada tab del detalle de torneo tiene su board DTO en core-api y se refresca al hacer foco:
 
@@ -1164,7 +1163,7 @@ Cada tab del detalle de torneo tiene su board DTO en core-api y se refresca al h
 | Partidos | `getMatchesBoard` |
 | Config | `getConfigBoard` |
 
-Al cambiar cupo (`pairsPerGroup`) con partidos jugados, aplicar conserva los VS ya jugados y rearma zonas al nuevo cupo.
+Con partidos ya jugados, el cuadro no se rearma.
 
 ## Scheduling
 

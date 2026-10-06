@@ -158,10 +158,10 @@ export interface ITournamentOpsRepository {
   getDashboard(clubId: string): Promise<ClubDashboardView>;
   getRanking(categoryId?: string): Promise<GroupStanding[]>;
   getPlayerHome(playerId: string): Promise<PlayerDashboard>;
-  getPlayerFeed(
-    clubId: string,
-    playerId: string | null,
-  ): Promise<PlayerFeed>;
+  getPlayerFeed(location?: {
+    provinceId?: number | null;
+    municipalityId?: number | null;
+  }): Promise<PlayerFeed>;
   getMyWeek(): Promise<{ reservations: PlayerReservation[]; events: PlayerWeekEvent[] }>;
   listProvinces(): Promise<Array<{ id: string; name: string }>>;
   listCities(
@@ -191,6 +191,7 @@ export interface ITournamentOpsRepository {
   registerPair(input: RegisterPairInput): Promise<RegisterPairResult>;
   registerPairByAdmin(input: RegisterPairInput): Promise<RegisterPairResult>;
   registerPairByPlayer(input: RegisterPairInput): Promise<RegisterPairResult>;
+  cancelMyRegistration(categoryId: string): Promise<TournamentRegistration>;
   updatePairPlayers(
     pairId: string,
     input: UpdatePairPlayersInput,
@@ -248,7 +249,7 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
     this.http = http;
   }
 
-  private async read<T>(path: string, method: "get" | "post" | "patch" | "put" = "get", body?: unknown): Promise<T> {
+  private async read<T>(path: string, method: "get" | "post" | "patch" | "put" | "delete" = "get", body?: unknown): Promise<T> {
     const response = await this.http.request<ApiEnvelope<T>>({ url: path, method, data: body });
     return readData(response);
   }
@@ -467,17 +468,31 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
     return this.read<PlayerDashboard>("/users/me/tournaments/home");
   }
 
-  async getPlayerFeed(_clubId: string, _playerId: string | null) {
-    const response = await this.http.get<ApiEnvelope<import("@/domain").Tournament[]>>(
-      "/public/tournaments",
-    );
-    const today = new Date().toISOString().slice(0, 10);
-    const upcoming = (readData(response) ?? []).filter(
-      (tournament) =>
-        tournament.status === "registrationOpen" ||
+  async getPlayerFeed(location?: {
+    provinceId?: number | null;
+    municipalityId?: number | null;
+  }) {
+    const response = await this.http.get<
+      ApiEnvelope<{ items?: import("@/domain").Tournament[] } | import("@/domain").Tournament[]>
+    >("/public/tournaments", {
+      params: {
+        page: 1,
+        pageSize: 6,
+        provinceId: location?.provinceId ?? undefined,
+        municipalityId: location?.municipalityId ?? undefined,
+      },
+    });
+    const payload = readData(response);
+    const rows = Array.isArray(payload) ? payload : (payload?.items ?? []);
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const upcoming = rows.filter((tournament) => {
+      const end = tournament.endDate ?? tournament.startDate;
+      return (
         tournament.status === "inProgress" ||
-        (tournament.status !== "finished" && tournament.startDate >= today),
-    );
+        (tournament.status === "registrationOpen" && end >= today)
+      );
+    });
     return { upcomingTournaments: upcoming.slice(0, 6), upcomingReservations: [] };
   }
 
@@ -570,6 +585,13 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
         player2Id: input.player2Id ?? null,
         availability: input.availability ?? [],
       },
+    );
+  }
+
+  async cancelMyRegistration(categoryId: string) {
+    return this.read<TournamentRegistration>(
+      `/users/me/tournaments/categories/${categoryId}`,
+      "delete",
     );
   }
 

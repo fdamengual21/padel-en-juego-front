@@ -1,3 +1,4 @@
+export { default as ScoringTournamentInfoDialog } from "./ScoringTournamentInfoDialog";
 export { default as TournamentCard } from "./TournamentCard";
 export { default as BracketView } from "./BracketView";
 export { default as RoundMatchesTable } from "./RoundMatchesTable";

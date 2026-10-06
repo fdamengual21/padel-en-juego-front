@@ -189,6 +189,7 @@ export function normalizeReservation(raw: Record<string, unknown>): CourtReserva
     playerHasAccount: raw.playerHasAccount === true,
     isClubPlayer: raw.isClubPlayer === true,
     isFixed: raw.isFixed === true,
+    isTournamentBlock: raw.isTournamentBlock === true,
     courtName: asString(raw.courtName),
     courtImageUrl: asString(raw.courtImageUrl) || null,
     startsAt: asString(raw.startsAt),

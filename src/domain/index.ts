@@ -1,4 +1,9 @@
 export * from "./types";
+export {
+  SCORING_MIN_PAIRS,
+  SCORING_MAX_PAIRS,
+  clampScoringMaxPairs,
+} from "./scoringTournament";
 export type { PageQuery, PaginatedResult } from "./pagination";
 export { paginateItems, normalizePageQuery } from "./pagination";
 export { createId, groupQualificationTargetLabel } from "./ids";

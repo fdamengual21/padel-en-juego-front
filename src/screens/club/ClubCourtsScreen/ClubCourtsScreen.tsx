@@ -51,7 +51,9 @@ import { useClubSession } from "@/hooks/useClubSession";
 import { ROUTES } from "@/router/routes";
 import { usePermissions } from "@/authorization";
 import {
+  PERMISSION_CLUB_COURTS_READ,
   PERMISSION_CLUB_COURTS_WRITE,
+  PERMISSION_CLUB_RESERVATIONS_READ,
   PERMISSION_CLUB_RESERVATIONS_WRITE,
 } from "@/authorization/permissionCodes";
 import { PermissionsGuard } from "@/components/guards";
@@ -194,12 +196,20 @@ interface ReservationModalState {
   courtId: string | null;
 }
 
-function reservationToGridEvent(item: CourtReservation): CalendarEventGridItemDto {
+function reservationToGridEvent(
+  item: CourtReservation,
+  hidePlayers: boolean,
+): CalendarEventGridItemDto {
   const player = [item.playerFirstName, item.playerLastName].filter(Boolean).join(" ");
+  const title = item.isTournamentBlock
+    ? player || "Torneo"
+    : hidePlayers
+      ? "Ocupado"
+      : player || "Turno";
   return {
     id: item.id,
     type: "reservation",
-    title: player || "Turno",
+    title,
     subtitle: item.isFixed
       ? `Fijo · ${item.courtName ?? ""}`.replace(/\s·\s$/, "")
       : (item.courtName ?? null),
@@ -225,6 +235,8 @@ export default function ClubCourtsScreen() {
   const { can } = usePermissions();
   const navigate = useNavigate();
   const canWriteReservations = can(PERMISSION_CLUB_RESERVATIONS_WRITE);
+  const canSeeReservationDetail = can(PERMISSION_CLUB_RESERVATIONS_READ);
+  const canOpenCourtConfig = can(PERMISSION_CLUB_COURTS_READ);
   const queryClient = useQueryClient();
   const [selectedCourtId, setSelectedCourtId] = useState<string | null>(null);
   const [headerView, setHeaderView] = useState<CourtsHeaderView>("overview");
@@ -470,7 +482,7 @@ export default function ClubCourtsScreen() {
   const pendingReservationsQuery = useQuery({
     queryKey: ["court-reservations-pending", clubId],
     queryFn: () => Api.ReservationService().listPending(),
-    enabled: Boolean(clubId),
+    enabled: Boolean(clubId) && canSeeReservationDetail,
   });
 
   const calendarCourtId = headerView === "detail" ? activeCourtId : null;
@@ -487,8 +499,11 @@ export default function ClubCourtsScreen() {
   });
 
   const reservationGridEvents = useMemo(
-    () => (calendarReservationsQuery.data ?? []).map(reservationToGridEvent),
-    [calendarReservationsQuery.data],
+    () =>
+      (calendarReservationsQuery.data ?? []).map((item) =>
+        reservationToGridEvent(item, !canSeeReservationDetail),
+      ),
+    [calendarReservationsQuery.data, canSeeReservationDetail],
   );
 
   const openReservation = (reservation: CourtReservation) => {
@@ -532,6 +547,8 @@ export default function ClubCourtsScreen() {
     const reservation = (calendarReservationsQuery.data ?? []).find(
       (item) => item.id === eventId,
     );
+    if (reservation?.isTournamentBlock) return;
+    if (!canSeeReservationDetail) return;
     if (reservation?.isFixed) {
       navigate(ROUTES.club.fixedReservations);
       return;
@@ -571,7 +588,9 @@ export default function ClubCourtsScreen() {
         <div>
           <h2 className="text-3xl font-semibold tracking-tight">Canchas</h2>
           <p className="text-base text-muted-foreground">
-            Agenda, reservas y configuración por cancha.
+            {canWriteReservations || canOpenCourtConfig
+              ? "Agenda, reservas y configuración por cancha."
+              : "Agenda del club para ver disponibilidad."}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -688,7 +707,11 @@ export default function ClubCourtsScreen() {
               nextFreeAt: availableSlots[0]?.startsAt ?? null,
             };
           })()}
-          onConfigure={() => navigate(ROUTES.club.courtConfig(court.id))}
+          onConfigure={
+            canOpenCourtConfig
+              ? () => navigate(ROUTES.club.courtConfig(court.id))
+              : undefined
+          }
           onSelectSlot={
             canWriteReservations
               ? (slot) => openChip(court.id, slot)
@@ -699,13 +722,15 @@ export default function ClubCourtsScreen() {
         <p className="text-base text-muted-foreground">Cargando canchas…</p>
       ) : null}
 
-      <DashboardPendingTray
-        reservations={pendingReservationsQuery.data ?? []}
-        isLoading={pendingReservationsQuery.isLoading}
-        isError={pendingReservationsQuery.isError}
-        canMutate={canWriteReservations}
-        onChanged={invalidateBoard}
-      />
+      {canSeeReservationDetail ? (
+        <DashboardPendingTray
+          reservations={pendingReservationsQuery.data ?? []}
+          isLoading={pendingReservationsQuery.isLoading}
+          isError={pendingReservationsQuery.isError}
+          canMutate={canWriteReservations}
+          onChanged={invalidateBoard}
+        />
+      ) : null}
 
       {courts.length > 0 ? (
         <>

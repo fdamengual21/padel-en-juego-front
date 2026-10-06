@@ -131,6 +131,7 @@ export function MatchScheduleTimeModal({
 }: MatchScheduleTimeModalProps) {
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
+  const [courtId, setCourtId] = useState("");
   const { confirmConflicts, dialog: conflictDialog } =
     useScheduleConflictConfirm(pairLabels);
 
@@ -138,10 +139,16 @@ export function MatchScheduleTimeModal({
     if (!open || !match) return;
     setDate(toScheduleDateValue(match.scheduledAt));
     setTime(toScheduleTimeValue(match.scheduledAt));
+    setCourtId(match.courtId ?? "");
   }, [open, match]);
 
   const scheduleComplete = Boolean(date) === Boolean(time);
-  const canSave = Boolean(match) && scheduleComplete && !isSaving;
+  const clearing = !date && !time;
+  const canSave =
+    Boolean(match) &&
+    scheduleComplete &&
+    !isSaving &&
+    (clearing || Boolean(courtId));
 
   return (
     <>
@@ -180,9 +187,31 @@ export function MatchScheduleTimeModal({
               />
             </div>
           </div>
+          <div className="space-y-2">
+            <Label htmlFor="match-schedule-court">Cancha</Label>
+            <select
+              id="match-schedule-court"
+              className="h-8 w-full rounded-md border border-border bg-background px-2 text-sm"
+              disabled={isSaving || !match}
+              value={courtId}
+              onChange={(e) => setCourtId(e.target.value)}
+            >
+              <option value="">Sin cancha</option>
+              {courts.map((court) => (
+                <option key={court.id} value={court.id}>
+                  {court.name}
+                </option>
+              ))}
+            </select>
+          </div>
           {!scheduleComplete ? (
             <p className="text-xs text-muted-foreground">
               Completá fecha y hora, o dejá ambos vacíos para quitar el horario.
+            </p>
+          ) : null}
+          {!clearing && !courtId ? (
+            <p className="text-xs text-muted-foreground">
+              Elegí una cancha para guardar el horario.
             </p>
           ) : null}
           <DialogFooter>
@@ -203,7 +232,7 @@ export function MatchScheduleTimeModal({
                   const saved = await saveWithConflictCheck({
                     matchId: match.id,
                     scheduledAt: fromScheduleDateAndTime(date, time),
-                    courtId: match.courtId,
+                    courtId: clearing ? null : courtId || null,
                     allMatches,
                     courts,
                     reservations,

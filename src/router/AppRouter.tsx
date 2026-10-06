@@ -13,13 +13,15 @@ import LoginScreen from "@/screens/entry/LoginScreen";
 import RegisterScreen from "@/screens/entry/RegisterScreen";
 import CheckEmailScreen from "@/screens/entry/CheckEmailScreen";
 import VerifyEmailScreen from "@/screens/entry/VerifyEmailScreen";
+import SetPasswordScreen from "@/screens/entry/SetPasswordScreen";
 import PrivacyPolicyScreen from "@/screens/entry/PrivacyPolicyScreen";
 import TermsOfServiceScreen from "@/screens/entry/TermsOfServiceScreen";
-import ClubDashboardScreen from "@/screens/club/ClubDashboardScreen";
+import ClubHomeGate from "@/router/guards/ClubHomeGate";
 import ClubTournamentsScreen from "@/screens/club/ClubTournamentsScreen";
 import ClubTournamentCreateScreen from "@/screens/club/ClubTournamentCreateScreen";
 import ClubTournamentDetailScreen from "@/screens/club/ClubTournamentDetailScreen";
 import ClubClientsScreen from "@/screens/club/ClubClientsScreen";
+import ClubStaffScreen from "@/screens/club/ClubStaffScreen";
 import ClubClientDetailScreen from "@/screens/club/ClubClientDetailScreen";
 import ClubCourtsScreen from "@/screens/club/ClubCourtsScreen";
 import ClubFixedReservationsScreen from "@/screens/club/ClubFixedReservationsScreen";
@@ -43,9 +45,11 @@ import {
   PERMISSION_CLUB_CLIENTS_READ,
   PERMISSION_CLUB_COURTS_READ,
   PERMISSION_CLUB_RESERVATIONS_READ,
+  PERMISSION_CLUB_SCHEDULE_READ,
   PERMISSION_CLUB_SETTINGS_READ,
   PERMISSION_CLUB_TOURNAMENTS_READ,
   PERMISSION_CLUB_TOURNAMENTS_WRITE,
+  PERMISSION_CLUB_USERS_READ,
 } from "@/authorization/permissionCodes";
 import { ROUTES } from "@/router/routes";
 
@@ -60,6 +64,7 @@ const router = createBrowserRouter(
       <Route path={ROUTES.auth.register} element={<RegisterScreen />} />
       <Route path={ROUTES.auth.checkEmail} element={<CheckEmailScreen />} />
       <Route path={ROUTES.auth.verifyEmail} element={<VerifyEmailScreen />} />
+      <Route path={ROUTES.auth.setPassword} element={<SetPasswordScreen />} />
       <Route path={ROUTES.legal.privacy} element={<PrivacyPolicyScreen />} />
       <Route path={ROUTES.legal.terms} element={<TermsOfServiceScreen />} />
       <Route path={ROUTES.chooseMode} element={<EntryScreen />} />
@@ -128,7 +133,7 @@ const router = createBrowserRouter(
             <RequireFeature feature="clubDashboard" redirectTo={ROUTES.home} />
           }
         >
-          <Route index element={<ClubDashboardScreen />} />
+          <Route index element={<ClubHomeGate />} />
         </Route>
         <Route
           element={
@@ -174,6 +179,13 @@ const router = createBrowserRouter(
             />
           </Route>
         </Route>
+        <Route
+          element={
+            <RequirePermission permission={PERMISSION_CLUB_USERS_READ} />
+          }
+        >
+          <Route path="usuarios" element={<ClubStaffScreen />} />
+        </Route>
         <Route path="jugadores" element={<Navigate to={ROUTES.club.clients} replace />} />
         <Route
           element={
@@ -182,10 +194,19 @@ const router = createBrowserRouter(
         >
           <Route
             element={
-              <RequirePermission permission={PERMISSION_CLUB_COURTS_READ} />
+              <RequirePermission
+                permission={[PERMISSION_CLUB_COURTS_READ, PERMISSION_CLUB_SCHEDULE_READ]}
+                mode="any"
+              />
             }
           >
             <Route path="canchas" element={<ClubCourtsScreen />} />
+          </Route>
+          <Route
+            element={
+              <RequirePermission permission={PERMISSION_CLUB_COURTS_READ} />
+            }
+          >
             <Route path="canchas/:courtId" element={<ClubCourtConfigScreen />} />
           </Route>
           <Route

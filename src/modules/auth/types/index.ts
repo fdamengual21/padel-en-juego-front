@@ -42,3 +42,13 @@ export interface ConfirmEmailInput {
   userId: string;
   token: string;
 }
+
+export interface AcceptInviteInput {
+  userId: string;
+  token: string;
+  password: string;
+}
+
+export interface AcceptInviteResponse {
+  email: string;
+}

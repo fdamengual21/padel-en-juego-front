@@ -1,12 +1,18 @@
 import { useMemo, useState, type ReactNode } from "react";
+import { Info } from "lucide-react";
 import {
   buildMatchRulesFromForm,
+  defaultPhaseDays,
+  enumerateTournamentDays,
   equalsResolutionLabel,
   matchPlayTypeLabel,
+  phasesForFormat,
+  reconcilePhaseDays,
+  countTournamentDays,
   tournamentFormatLabel,
   type TournamentFormValues,
 } from "@/modules/tournaments/types";
-import { formatLongDateEs } from "@/lib/dates";
+import { formatLongDateEs, parseIsoDateOnly } from "@/lib/dates";
 import {
   CATEGORY_LEVELS,
   formatCategoryLevel,
@@ -17,7 +23,12 @@ import {
   type RulesetPreset,
   type TournamentCircuitType,
   type TournamentFormat,
+  SCORING_MAX_PAIRS,
+  SCORING_MIN_PAIRS,
+  clampScoringMaxPairs,
 } from "@/domain";
+import ScoringTournamentInfoDialog from "@/components/tournaments/ScoringTournamentInfoDialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
@@ -25,19 +36,30 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { circuitTypeLabel } from "@/modules/tournaments/types";
 
+function isScoringFormat(format: TournamentFormat): boolean {
+  return format === "GROUPS_ELIMINATION" || format === "DIRECT_ELIMINATION";
+}
+
 export function defaultTournamentFormValues(
   partial?: Partial<TournamentFormValues>,
 ): TournamentFormValues {
-  return {
+  const startDate = partial?.startDate ?? "2026-10-01";
+  const endDate = partial?.endDate ?? "2026-10-03";
+  const requestedFormat = partial?.format ?? "GROUPS_ELIMINATION";
+  const { phaseDays, ...rest } = partial ?? {};
+  const matchPlayType = rest.matchPlayType ?? "STANDARD";
+  const scoring = matchPlayType === "STANDARD";
+  const format =
+    scoring && !isScoringFormat(requestedFormat) ? "GROUPS_ELIMINATION" : requestedFormat;
+  const values: TournamentFormValues = {
     name: "Open Padel Club",
     description: "",
-    startDate: "2026-10-01",
-    endDate: "2026-10-03",
     dailyStartTime: "10:00",
     dailyEndTime: "22:00",
+    courtHoldStartTime: "18:00",
+    courtHoldEndTime: "22:00",
+    courtHoldCourtIds: [],
     registrationFee: 0,
-    format: "GROUPS_ELIMINATION",
-    matchPlayType: "STANDARD",
     equalsResolution: "goldenPoint",
     setsToWin: 2,
     tiebreakPoints: 7,
@@ -46,11 +68,26 @@ export function defaultTournamentFormValues(
     categoryGender: "male",
     sumaTarget: null,
     categoryName: `${formatCategoryLevel(6)} Masculino`,
-    maxPairs: 16,
+    maxPairs: scoring ? SCORING_MAX_PAIRS : 16,
     circuitType: "NONE",
-    pairsPerGroup: 4,
-    qualifyPerGroup: 2,
-    ...partial,
+    ...rest,
+    matchPlayType,
+    startDate,
+    endDate,
+    format,
+    phaseDays:
+      phaseDays == null || format !== requestedFormat
+        ? defaultPhaseDays(format, countTournamentDays(startDate, endDate))
+        : phaseDays,
+  };
+  if (!scoring) return values;
+  return {
+    ...values,
+    equalsResolution: "advantage",
+    setsToWin: 2,
+    tiebreakPoints: 7,
+    maxPairs:
+      rest.maxPairs == null ? SCORING_MAX_PAIRS : clampScoringMaxPairs(rest.maxPairs),
   };
 }
 
@@ -69,6 +106,7 @@ export function buildCategoryDisplayName(values: TournamentFormValues): string {
 
 interface TournamentFormProps {
   initialValues?: Partial<TournamentFormValues>;
+  courts?: Array<{ id: string; name: string }>;
   submitLabel: string;
   onSubmit: (values: TournamentFormValues) => Promise<void> | void;
   isSubmitting?: boolean;
@@ -76,10 +114,12 @@ interface TournamentFormProps {
 
 export default function TournamentForm({
   initialValues,
+  courts = [],
   submitLabel,
   onSubmit,
   isSubmitting = false,
 }: TournamentFormProps) {
+  const [rulesOpen, setRulesOpen] = useState(false);
   const [values, setValues] = useState<TournamentFormValues>(() =>
     defaultTournamentFormValues(initialValues),
   );
@@ -100,7 +140,40 @@ export default function TournamentForm({
       }
       if (key === "matchPlayType") {
         if (value === "QUALITY") next.setsToWin = 1;
-        if (value === "STANDARD") next.setsToWin = 2;
+        if (value === "STANDARD") {
+          next.setsToWin = 2;
+          next.tiebreakPoints = 7;
+          next.equalsResolution = "advantage";
+          next.maxPairs = SCORING_MAX_PAIRS;
+          if (!isScoringFormat(next.format)) next.format = "GROUPS_ELIMINATION";
+        }
+      }
+      if (
+        key === "format" &&
+        next.matchPlayType === "STANDARD" &&
+        !isScoringFormat(next.format)
+      ) {
+        next.format = "GROUPS_ELIMINATION";
+      }
+      if (key === "maxPairs" && next.matchPlayType === "STANDARD" && typeof value === "number") {
+        next.maxPairs = clampScoringMaxPairs(value);
+      }
+      if (key === "format" && next.format === "QUALITY") {
+        next.endDate = next.startDate;
+      }
+      if (key === "startDate" && typeof value === "string" && next.format === "QUALITY") {
+        next.endDate = value;
+      }
+      if (key === "startDate" && typeof value === "string" && next.endDate < value) {
+        next.endDate = value;
+      }
+      if (
+        key === "startDate" ||
+        key === "endDate" ||
+        key === "format" ||
+        next.format !== prev.format
+      ) {
+        next.phaseDays = reconcilePhaseDays(next);
       }
       return next;
     });
@@ -163,8 +236,9 @@ export default function TournamentForm({
               <Field label="Fin" htmlFor="end">
                 <DatePicker
                   id="end"
-                  value={values.endDate}
+                  value={values.format === "QUALITY" ? values.startDate : values.endDate}
                   minDate={values.startDate}
+                  disabled={values.format === "QUALITY"}
                   onChange={(next) => {
                     if (next) patch("endDate", next);
                   }}
@@ -282,14 +356,6 @@ export default function TournamentForm({
                 onChange={(e) => patch("categoryName", e.target.value)}
               />
             </Field>
-            <Field label="Máximo de parejas" htmlFor="maxPairs">
-              <Input
-                id="maxPairs"
-                type="number"
-                value={values.maxPairs}
-                onChange={(e) => patch("maxPairs", Number(e.target.value))}
-              />
-            </Field>
 
             <div className="space-y-2">
               <p className="text-sm font-medium">Circuito de ranking</p>
@@ -330,21 +396,59 @@ export default function TournamentForm({
               {(
                 [
                   ["QUALITY", "Quality — 1 set"],
-                  ["STANDARD", "Estándar — al mejor de 3 sets"],
+                  ["STANDARD", "Torneo puntuable"],
                   ["CUSTOM", "Personalizado"],
                 ] as const
               ).map(([value, label]) => (
-                <label key={value} className="flex items-center gap-2 text-sm">
-                  <input
-                    type="radio"
-                    name="matchPlayType"
-                    checked={values.matchPlayType === value}
-                    onChange={() => patch("matchPlayType", value as RulesetPreset)}
-                  />
-                  {label}
-                </label>
+                <div key={value} className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      name="matchPlayType"
+                      checked={values.matchPlayType === value}
+                      onChange={() => patch("matchPlayType", value as RulesetPreset)}
+                    />
+                    {label}
+                  </label>
+                  {value === "STANDARD" && values.matchPlayType === "STANDARD" ? (
+                    <Alert variant="info">
+                      <Info />
+                      <AlertDescription>
+                        Este torneo suma al ranking. El mínimo y el máximo de
+                        parejas se controlan al inscribir.
+                      </AlertDescription>
+                      <div className="col-start-2">
+                        <Button
+                          type="button"
+                          variant="link"
+                          className="h-auto px-0 text-primary-strong"
+                          onClick={() => setRulesOpen(true)}
+                        >
+                          Ver reglas
+                        </Button>
+                      </div>
+                    </Alert>
+                  ) : null}
+                </div>
               ))}
             </div>
+
+            <Field label="Máximo de parejas" htmlFor="maxPairs">
+              <Input
+                id="maxPairs"
+                type="number"
+                min={values.matchPlayType === "STANDARD" ? SCORING_MIN_PAIRS : 2}
+                max={values.matchPlayType === "STANDARD" ? SCORING_MAX_PAIRS : undefined}
+                value={values.maxPairs}
+                onChange={(e) => patch("maxPairs", Number(e.target.value))}
+              />
+              {values.matchPlayType === "STANDARD" ? (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Mínimo {SCORING_MIN_PAIRS} parejas. El mínimo y este máximo se
+                  controlan al inscribir.
+                </p>
+              ) : null}
+            </Field>
 
             <div className="space-y-2">
               <p className="text-sm font-medium">En iguales (40-40)</p>
@@ -359,6 +463,7 @@ export default function TournamentForm({
                     type="radio"
                     name="equalsResolution"
                     checked={values.equalsResolution === value}
+                    disabled={values.matchPlayType === "STANDARD"}
                     onChange={() =>
                       patch("equalsResolution", value as EqualsResolution)
                     }
@@ -398,13 +503,11 @@ export default function TournamentForm({
                   </p>
                 </Field>
               </div>
-            ) : (
+            ) : values.matchPlayType === "QUALITY" ? (
               <p className="text-xs text-muted-foreground">
-                {values.matchPlayType === "QUALITY"
-                  ? "Quality: 1 set a 6 juegos; a 6-6 se juega tie-break a 7."
-                  : "Estándar: al mejor de 3 sets a 6 juegos; a 6-6 tie-break a 7."}
+                Quality: 1 set a 6 juegos; a 6-6 se juega tie-break a 7.
               </p>
-            )}
+            ) : null}
 
             <div className="border-t border-border pt-4 space-y-3">
               <p className="text-sm font-medium">Estructura del torneo</p>
@@ -414,44 +517,103 @@ export default function TournamentForm({
                     ["GROUPS_ELIMINATION", "Zonas + eliminación"],
                     ["DIRECT_ELIMINATION", "Eliminación directa"],
                     ["ROUND_ROBIN", "Todos contra todos"],
+                    ["QUALITY", "Quality — un solo día"],
                   ] as const
-                ).map(([value, label]) => (
-                  <label key={value} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="radio"
-                      name="format"
-                      checked={values.format === value}
-                      onChange={() => patch("format", value as TournamentFormat)}
-                    />
-                    {label}
-                  </label>
-                ))}
+                ).map(([value, label]) => {
+                  const locked =
+                    values.matchPlayType === "STANDARD" && !isScoringFormat(value);
+                  return (
+                    <label
+                      key={value}
+                      className={cn(
+                        "flex items-center gap-2 text-sm",
+                        locked && "cursor-not-allowed text-muted-foreground",
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="format"
+                        checked={values.format === value}
+                        disabled={locked}
+                        onChange={() => patch("format", value as TournamentFormat)}
+                      />
+                      {label}
+                    </label>
+                  );
+                })}
               </div>
-              {values.format === "GROUPS_ELIMINATION" ? (
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Parejas/zona" htmlFor="ppg">
-                    <Input
-                      id="ppg"
-                      type="number"
-                      min={2}
-                      value={values.pairsPerGroup}
-                      onChange={(e) => patch("pairsPerGroup", Number(e.target.value))}
-                    />
-                  </Field>
-                  <Field label="Clasifican" htmlFor="qpg">
-                    <Input
-                      id="qpg"
-                      type="number"
-                      min={1}
-                      value={values.qualifyPerGroup}
-                      onChange={(e) =>
-                        patch("qualifyPerGroup", Number(e.target.value))
-                      }
-                    />
-                  </Field>
+              {values.format === "QUALITY" ? (
+                <div className="space-y-3 rounded-xl border border-border p-3">
+                  <p className="text-sm font-medium">Bloqueo de canchas</p>
+                  <p className="text-xs text-muted-foreground">
+                    Ese rango queda ocupado en la agenda, en las reservas y en los turnos libres.
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Desde" htmlFor="hold-start">
+                      <Input
+                        id="hold-start"
+                        type="time"
+                        value={values.courtHoldStartTime}
+                        onChange={(e) => patch("courtHoldStartTime", e.target.value)}
+                      />
+                    </Field>
+                    <Field label="Hasta" htmlFor="hold-end">
+                      <Input
+                        id="hold-end"
+                        type="time"
+                        value={values.courtHoldEndTime}
+                        onChange={(e) => patch("courtHoldEndTime", e.target.value)}
+                      />
+                    </Field>
+                  </div>
+                  {courts.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No hay canchas activas.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {courts.map((court) => {
+                        const checked = values.courtHoldCourtIds.includes(court.id);
+                        return (
+                          <label key={court.id} className="flex items-center gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => {
+                                const nextIds = checked
+                                  ? values.courtHoldCourtIds.filter((id) => id !== court.id)
+                                  : [...values.courtHoldCourtIds, court.id];
+                                patch("courtHoldCourtIds", nextIds);
+                              }}
+                            />
+                            {court.name}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               ) : null}
+              {values.format === "GROUPS_ELIMINATION" ? (
+                <p className="text-sm text-muted-foreground">
+                  Zonas de 3. Si sobra una pareja, la zona A queda de 4. Si sobran
+                  dos, A y B quedan de 4. De una zona de 3 pasan 2 y de una de 4
+                  pasan 3.
+                </p>
+              ) : null}
             </div>
+            {values.matchPlayType !== "QUALITY" && values.format !== "QUALITY" ? (
+              <PhaseDayPicker
+                values={values}
+                onChange={(phase, dayNumber) => {
+                  const selected = values.phaseDays[phase] ?? [];
+                  const has = selected.includes(dayNumber);
+                  if (has && selected.length === 1) return;
+                  const nextDays = has
+                    ? selected.filter((day) => day !== dayNumber)
+                    : [...selected, dayNumber].sort((left, right) => left - right);
+                  patch("phaseDays", { ...values.phaseDays, [phase]: nextDays });
+                }}
+              />
+            ) : null}
           </div>
         </Section>
 
@@ -469,7 +631,7 @@ export default function TournamentForm({
             <p className="text-muted-foreground">
               {tournamentFormatLabel(values.format)}
               {values.format === "GROUPS_ELIMINATION"
-                ? ` · ${Math.max(1, Math.ceil(Math.max(2, values.maxPairs) / Math.max(2, values.pairsPerGroup)))} zonas (según cupo) · ${values.pairsPerGroup}/zona · clasifican ${values.qualifyPerGroup}`
+                ? " · zonas de 3, o de 4 si sobran parejas · pasan 2 o 3"
                 : ""}
             </p>
             <p className="text-muted-foreground">
@@ -485,7 +647,71 @@ export default function TournamentForm({
           {submitLabel}
         </Button>
       </div>
+      <ScoringTournamentInfoDialog open={rulesOpen} onOpenChange={setRulesOpen} />
     </form>
+  );
+}
+
+function PhaseDayPicker({
+  values,
+  onChange,
+}: {
+  values: TournamentFormValues;
+  onChange: (phase: string, dayNumber: number) => void;
+}) {
+  const days = enumerateTournamentDays(values.startDate, values.endDate);
+  const phases = phasesForFormat(values.format);
+  if (phases.length === 0 || days.length === 0) return null;
+
+  return (
+    <div className="space-y-4 border-t border-border pt-4">
+      <div className="space-y-1">
+        <p className="text-sm font-medium">Días de cada fase</p>
+        <p className="text-xs text-muted-foreground">
+          El autoasignado de canchas y horarios usa estos días. Una fase puede jugarse en más de uno.
+        </p>
+      </div>
+      {phases.map((phase) => (
+        <div key={phase.code} className="space-y-2">
+          <p className="text-sm">{phase.label}</p>
+          <div className="flex flex-wrap gap-2">
+            {days.map((day) => {
+              const selected = (values.phaseDays[phase.code] ?? []).includes(day.dayNumber);
+              const date = parseIsoDateOnly(day.iso);
+              const caption = date
+                ? date.toLocaleDateString("es-AR", { day: "numeric", month: "short" })
+                : "";
+              return (
+                <button
+                  key={day.dayNumber}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => onChange(phase.code, day.dayNumber)}
+                  className={cn(
+                    "rounded-full border px-3 py-1.5 text-sm",
+                    selected
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-background text-foreground",
+                  )}
+                >
+                  Día {day.dayNumber}
+                  {caption ? (
+                    <span
+                      className={cn(
+                        "ml-1.5 text-xs",
+                        selected ? "text-primary-foreground/80" : "text-muted-foreground",
+                      )}
+                    >
+                      {caption}
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
