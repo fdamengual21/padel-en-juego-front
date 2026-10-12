@@ -1,3 +1,5 @@
+import { useQuery } from "@tanstack/react-query";
+import { LoaderCircle } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import StatusBadge from "@/components/tournaments/StatusBadge";
 import {
@@ -7,13 +9,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import Api from "@/api/Api";
 import {
   formatCategoryLevel,
   isCategoryLevel,
   playerSidePreferenceLabel,
+  type ParticipantRegistrationView,
   type ParticipantsBoardView,
+  type RegistrationPlayerDetail,
 } from "@/domain";
-import { formatTournamentDayEs } from "@/lib/dates";
+import { formatRegisteredAtEs, formatTournamentDayEs } from "@/lib/dates";
 import { sidePreferenceLabel } from "@/lib/tournamentLabels";
 
 type ParticipantRow = ParticipantsBoardView["rows"][number];
@@ -21,7 +26,10 @@ type ParticipantRow = ParticipantsBoardView["rows"][number];
 interface RegistrationDetailModalProps {
   open: boolean;
   row: ParticipantRow | null;
+  registration: ParticipantRegistrationView | null;
+  categoryId: string;
   categoryName: string | null;
+  isClub: boolean;
   showAvailability: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -29,12 +37,27 @@ interface RegistrationDetailModalProps {
 export default function RegistrationDetailModal({
   open,
   row,
+  registration,
+  categoryId,
   categoryName,
+  isClub,
   showAvailability,
   onOpenChange,
 }: RegistrationDetailModalProps) {
-  const players = row ? columnsOf(row) : [];
+  const playerIds = row
+    ? [row.pair.player1Id, row.pair.player2Id].filter((id): id is string => Boolean(id))
+    : [];
+  const playersQuery = useQuery({
+    queryKey: ["participant-players", categoryId, playerIds.join(",")],
+    queryFn: () =>
+      isClub
+        ? Api.TournamentOpsService().getParticipantPlayers(categoryId, playerIds)
+        : Api.TournamentOpsService().getPublicParticipantPlayers(categoryId, playerIds),
+    enabled: open && Boolean(categoryId) && playerIds.length > 0,
+  });
+
   const availability = row?.availability ?? [];
+  const loadedPlayers = playersQuery.data ?? [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -45,79 +68,95 @@ export default function RegistrationDetailModal({
         <DialogHeader className="shrink-0 border-b border-border px-4 py-4">
           <DialogTitle className="flex flex-wrap items-center gap-2">
             Inscripción
-            {row?.registration ? <StatusBadge status={row.registration.status} /> : null}
+            {registration ? <StatusBadge status={registration.status} /> : null}
           </DialogTitle>
           <DialogDescription>
             {categoryName ?? "Categoría del torneo"}
-            {row?.pair.seed != null ? ` · Orden ${row.pair.seed}` : ""}
+            {registration?.registeredAt
+              ? ` · ${formatRegisteredAtEs(registration.registeredAt)}`
+              : ""}
           </DialogDescription>
         </DialogHeader>
 
         {row ? (
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-            <div className="grid gap-3 sm:grid-cols-2">
-              {players.map((player) => (
-                <section
-                  key={player.key}
-                  className="rounded-xl border border-border bg-card p-3"
-                >
-                  <div className="flex items-center gap-2">
-                    <Avatar
-                      name={player.name}
-                      imageUrl={player.imageUrl}
-                      size="sm"
-                      alt={player.name}
-                    />
-                    <p className="min-w-0 truncate text-sm font-medium">{player.name}</p>
-                  </div>
-                  <dl className="mt-3 space-y-1.5 text-sm">
-                    <Detail label="Categoría" value={player.category} />
-                    <Detail label="Lado" value={player.side} />
-                    {player.phone ? <Detail label="Teléfono" value={player.phone} /> : null}
-                    {player.ranking != null ? (
-                      <Detail label="Ranking" value={String(player.ranking)} />
-                    ) : null}
-                  </dl>
-                </section>
-              ))}
-            </div>
-
-            {row.registration?.statusNote ? (
-              <p className="mt-3 text-sm text-destructive/90">
-                Nota: {row.registration.statusNote}
+            {playersQuery.isLoading ? (
+              <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                <LoaderCircle className="size-4 animate-spin" />
+                Cargando inscripción…
               </p>
-            ) : null}
+            ) : playersQuery.isError ? (
+              <p className="text-sm text-destructive">
+                {playersQuery.error instanceof Error
+                  ? playersQuery.error.message
+                  : "No se pudo cargar la inscripción."}
+              </p>
+            ) : (
+              <>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {columnsOf(row, loadedPlayers).map((player) => (
+                    <section
+                      key={player.key}
+                      className="rounded-xl border border-border bg-card p-3"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Avatar
+                          name={player.name}
+                          imageUrl={player.imageUrl}
+                          size="sm"
+                          alt={player.name}
+                        />
+                        <p className="min-w-0 truncate text-sm font-medium">{player.name}</p>
+                      </div>
+                      <dl className="mt-3 space-y-1.5 text-sm">
+                        <Detail label="Categoría" value={player.category} />
+                        <Detail label="Lado" value={player.side} />
+                        {player.phone ? <Detail label="Teléfono" value={player.phone} /> : null}
+                      </dl>
+                    </section>
+                  ))}
+                </div>
 
-            {row.registration?.status === "CANCELLED" && row.registration.cancelledBy ? (
-              <p className="mt-3 text-sm text-muted-foreground">{cancelledByLabel(row)}</p>
-            ) : null}
-
-            {showAvailability ? (
-              <section className="mt-4 border-t border-border pt-4">
-                <h3 className="text-sm font-medium">Disponibilidad</h3>
-                {availability.length === 0 ? (
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    No declararon horarios.
+                {registration?.statusNote ? (
+                  <p className="mt-3 text-sm text-destructive/90">
+                    Nota: {registration.statusNote}
                   </p>
-                ) : (
-                  <ul className="mt-2 flex flex-wrap gap-2">
-                    {availability.map((slot) => (
-                      <li
-                        key={`${slot.date}-${slot.startTime}`}
-                        className="rounded-lg border border-border px-3 py-2"
-                      >
-                        <p className="text-sm font-medium">
-                          {formatTournamentDayEs(slot.date)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {slot.startTime} – {slot.endTime}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
-            ) : null}
+                ) : null}
+
+                {registration?.status === "CANCELLED" && registration.cancelledBy ? (
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    {cancelledByLabel(registration, loadedPlayers)}
+                  </p>
+                ) : null}
+
+                {showAvailability ? (
+                  <section className="mt-4 border-t border-border pt-4">
+                    <h3 className="text-sm font-medium">Disponibilidad</h3>
+                    {availability.length === 0 ? (
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        No declararon horarios.
+                      </p>
+                    ) : (
+                      <ul className="mt-2 flex flex-wrap gap-2">
+                        {availability.map((slot) => (
+                          <li
+                            key={`${slot.date}-${slot.startTime}`}
+                            className="rounded-lg border border-border px-3 py-2"
+                          >
+                            <p className="text-sm font-medium">
+                              {formatTournamentDayEs(slot.date)}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {slot.startTime} – {slot.endTime}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </section>
+                ) : null}
+              </>
+            )}
           </div>
         ) : null}
       </DialogContent>
@@ -125,10 +164,12 @@ export default function RegistrationDetailModal({
   );
 }
 
-function cancelledByLabel(row: ParticipantRow): string {
-  if (row.registration?.cancelledBy === "club") return "La canceló el club.";
-  const name = row.players?.find((player) => player?.id === row.registration?.cancelledById)
-    ?.displayName;
+function cancelledByLabel(
+  registration: ParticipantRegistrationView,
+  players: RegistrationPlayerDetail[],
+): string {
+  if (registration.cancelledBy === "club") return "La canceló el club.";
+  const name = players.find((player) => player.id === registration.cancelledById)?.displayName;
   return name ? `La canceló ${name}.` : "La canceló un jugador de la pareja.";
 }
 
@@ -148,12 +189,13 @@ interface Column {
   category: string;
   side: string;
   phone: string | null;
-  ranking: number | null;
 }
 
-function columnsOf(row: ParticipantRow): Column[] {
-  const first = row.players?.[0];
-  const second = row.players?.[1];
+function columnsOf(row: ParticipantRow, players: RegistrationPlayerDetail[]): Column[] {
+  const first = players.find((player) => player.id === row.pair.player1Id) ?? players[0];
+  const second = row.pair.player2Id
+    ? players.find((player) => player.id === row.pair.player2Id)
+    : undefined;
   const columns: Column[] = [
     {
       key: first?.id ?? `${row.pair.id}-1`,
@@ -162,7 +204,6 @@ function columnsOf(row: ParticipantRow): Column[] {
       category: categoryLabel(first?.categoryLevel),
       side: playerSidePreferenceLabel(first?.sidePreference) ?? "Sin preferencia",
       phone: first?.phone ?? null,
-      ranking: row.registration?.rankingPointsPlayer1 ?? null,
     },
   ];
 
@@ -174,7 +215,6 @@ function columnsOf(row: ParticipantRow): Column[] {
       category: "—",
       side: sidePreferenceLabel(row.pair.sidePreference),
       phone: null,
-      ranking: null,
     });
     return columns;
   }
@@ -186,7 +226,6 @@ function columnsOf(row: ParticipantRow): Column[] {
     category: categoryLabel(second?.categoryLevel),
     side: playerSidePreferenceLabel(second?.sidePreference) ?? "Sin preferencia",
     phone: second?.phone ?? null,
-    ranking: row.registration?.rankingPointsPlayer2 ?? null,
   });
   return columns;
 }

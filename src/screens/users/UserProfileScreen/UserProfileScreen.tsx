@@ -21,13 +21,18 @@ export default function UserProfileScreen() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = parseTab(searchParams.get("tab"));
   const { playerId, player, hasApiSession } = useMockSession();
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ["player-home", playerId],
     queryFn: () => Api.TournamentOpsService().getPlayerHome(playerId!),
-    enabled: Boolean(playerId) && !hasApiSession,
+    enabled: Boolean(playerId) && hasApiSession,
   });
-  const dashboard =
-    hasApiSession && player ? emptyPlayerDashboard(player) : data;
+  const dashboard = hasApiSession
+    ? data && player
+      ? { ...data, player }
+      : null
+    : player
+      ? emptyPlayerDashboard(player)
+      : null;
 
   const setTab = (tab: string | number | null) => {
     const next = parseTab(tab == null ? null : String(tab));
@@ -46,7 +51,13 @@ export default function UserProfileScreen() {
         nextPath={ROUTES.player.profile}
         actionLabel="Ver tu perfil"
       >
-        {isLoading || !dashboard ? (
+        {hasApiSession && isLoading ? (
+          <p className="text-sm text-muted-foreground">Cargando perfil…</p>
+        ) : hasApiSession && (isError || !dashboard) ? (
+          <p className="text-sm text-muted-foreground">
+            No se pudo cargar tu perfil.
+          </p>
+        ) : !dashboard ? (
           <p className="text-sm text-muted-foreground">Cargando perfil…</p>
         ) : (
           <>
@@ -71,6 +82,7 @@ export default function UserProfileScreen() {
                   tournamentsWon={dashboard.tournamentsWon}
                   matchesWon={dashboard.matchesWon}
                   matchesLost={dashboard.matchesLost}
+                  reservationsCount={dashboard.reservationsCount}
                 />
 
                 <section className="space-y-2">

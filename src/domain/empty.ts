@@ -76,10 +76,9 @@ export function emptyPlayerDashboard(player: Player): PlayerDashboard {
     matchesLost: 0,
     tournamentsCount: 0,
     tournamentsWon: 0,
-    tournamentsLost: 0,
+    reservationsCount: 0,
     nextMatch: null,
     recentMatches: [],
-    tournaments: [],
   };
 }
 
@@ -147,11 +146,8 @@ export function emptyZonesBoard(categoryId: string): ZonesBoardView {
   };
 }
 
-export function emptyParticipantsBoard(
-  categoryId: string,
-): ParticipantsBoardView {
+export function emptyParticipantsBoard(): ParticipantsBoardView {
   return {
-    categoryId,
     generatedAt: new Date().toISOString(),
     rows: [],
     tournamentStarted: false,

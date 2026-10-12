@@ -23,8 +23,10 @@ export function messageFromEnvelope(
   const { errors } = body;
   if (typeof errors === "string" && errors.trim()) return errors;
   if (errors && typeof errors === "object") {
-    const first = Object.values(errors).flat()[0];
-    if (typeof first === "string" && first.trim()) return first;
+    const lines = Object.values(errors)
+      .flat()
+      .filter((line): line is string => typeof line === "string" && line.trim().length > 0);
+    if (lines.length > 0) return lines.join("\n");
   }
   return fallback;
 }

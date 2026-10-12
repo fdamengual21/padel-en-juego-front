@@ -437,6 +437,7 @@ export default function TournamentForm({
               <Input
                 id="maxPairs"
                 type="number"
+                disabled={values.matchPlayType === "STANDARD"}
                 min={values.matchPlayType === "STANDARD" ? SCORING_MIN_PAIRS : 2}
                 max={values.matchPlayType === "STANDARD" ? SCORING_MAX_PAIRS : undefined}
                 value={values.maxPairs}

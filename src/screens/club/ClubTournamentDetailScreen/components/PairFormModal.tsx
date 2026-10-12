@@ -1,12 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import type {
   IdentityMatch,
   PairSidePreference,
   Player,
   TournamentCircuitType,
-  TournamentPair,
   TournamentRegistration,
 } from "@/domain";
+import { isCategoryLevel } from "@/domain";
 import Api from "@/api/Api";
 import DuplicateIdentityDialog from "@/components/auth/DuplicateIdentityDialog";
 import { Button } from "@/components/ui/button";
@@ -47,7 +48,7 @@ interface PairFormModalProps {
   mode: "create" | "edit";
   /** Club actual (para detectar clientes/usuarios duplicados). */
   clubId: string;
-  pair?: TournamentPair | null;
+  pair?: { player1Id: string; player2Id: string | null } | null;
   registration?: TournamentRegistration | null;
   circuitType?: TournamentCircuitType;
   /** Si true, pide la franja de cada día del torneo (no Quality). */
@@ -56,7 +57,9 @@ interface PairFormModalProps {
   tournamentEndDate?: string | null;
   dailyStartTime?: string | null;
   dailyEndTime?: string | null;
-  playersById: Record<string, Player>;
+  categoryId: string;
+  /** Jugadores que ya ocupan un lugar en la categoría. */
+  enrolledPlayerIds?: string[];
   isSaving?: boolean;
   onOpenChange: (open: boolean) => void;
   onCreatePlayer: (draft: ManualPlayerDraft) => Promise<Player>;
@@ -142,6 +145,46 @@ async function playerIdFromIdentityMatch(
   return player.id;
 }
 
+function playerFromNames(
+  id: string,
+  displayName: string,
+  phone: string | null,
+  email: string | null,
+  categoryLevel: number | null,
+  sidePreference: Player["sidePreference"],
+): Player {
+  const parts = displayName.trim().split(/\s+/).filter(Boolean);
+  return {
+    id,
+    userId: null,
+    displayName,
+    firstName: parts[0] ?? displayName,
+    lastName: parts.slice(1).join(" "),
+    phone,
+    email,
+    age: null,
+    categoryLevel: isCategoryLevel(categoryLevel) ? categoryLevel : 6,
+    categoryHistory: [],
+    sidePreferencePrimary: null,
+    sidePreferenceSecondary: null,
+    sidePreference: sidePreference ?? null,
+    avatarUrl: null,
+    coverUrl: null,
+    createdAt: "",
+  };
+}
+
+function playerFromMatch(match: IdentityMatch, playerId: string): Player {
+  return playerFromNames(
+    playerId,
+    match.displayName || `${match.firstName} ${match.lastName}`.trim(),
+    match.phone,
+    match.email,
+    match.categoryLevel,
+    null,
+  );
+}
+
 function parsePointsInput(raw: string): number | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
@@ -162,7 +205,8 @@ export default function PairFormModal({
   tournamentEndDate,
   dailyStartTime,
   dailyEndTime,
-  playersById,
+  categoryId,
+  enrolledPlayerIds = [],
   isSaving = false,
   onOpenChange,
   onCreatePlayer,
@@ -188,6 +232,14 @@ export default function PairFormModal({
   const days = tournamentStartDate
     ? tournamentDays(tournamentStartDate, tournamentEndDate)
     : [];
+  const editPlayerIds = pair
+    ? [pair.player1Id, pair.player2Id].filter((id): id is string => Boolean(id))
+    : [];
+  const editPlayers = useQuery({
+    queryKey: ["participant-players", categoryId, editPlayerIds.join(",")],
+    queryFn: () => Api.TournamentOpsService().getParticipantPlayers(categoryId, editPlayerIds),
+    enabled: open && mode === "edit" && editPlayerIds.length > 0,
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -196,13 +248,35 @@ export default function PairFormModal({
     setDupMatches([]);
     setSkipDupForSlot({});
     if (mode === "edit" && pair) {
+      if (editPlayers.isLoading) return;
+      if (editPlayers.isError) {
+        setError(
+          editPlayers.error instanceof Error
+            ? editPlayers.error.message
+            : "No se pudieron cargar los jugadores de la pareja",
+        );
+        return;
+      }
+      const byId = new Map(
+        (editPlayers.data ?? []).map((detail) => [
+          detail.id,
+          playerFromNames(
+            detail.id,
+            detail.displayName,
+            detail.phone,
+            null,
+            detail.categoryLevel,
+            detail.sidePreference,
+          ),
+        ]),
+      );
       setSlot1({
         mode: "search",
-        player: playersById[pair.player1Id] ?? null,
+        player: byId.get(pair.player1Id) ?? null,
       });
       setSlot2({
         mode: "search",
-        player: pair.player2Id ? (playersById[pair.player2Id] ?? null) : null,
+        player: pair.player2Id ? (byId.get(pair.player2Id) ?? null) : null,
       });
       setPoints1(
         registration?.rankingPointsPlayer1 != null
@@ -231,7 +305,10 @@ export default function PairFormModal({
     mode,
     pair,
     registration,
-    playersById,
+    editPlayers.data,
+    editPlayers.isLoading,
+    editPlayers.isError,
+    editPlayers.error,
     requireAvailability,
     tournamentStartDate,
     tournamentEndDate,
@@ -255,12 +332,29 @@ export default function PairFormModal({
         (slot) => slot.date && slot.startTime && slot.endTime && slot.startTime < slot.endTime,
       ));
   const canSubmit =
-    slot1Ready && (slot2Empty || slot2Ready) && availabilityOk && !isSaving;
+    slot1Ready &&
+    (slot2Empty || slot2Ready) &&
+    availabilityOk &&
+    !isSaving &&
+    !(mode === "edit" && editPlayers.isLoading);
 
-  const exclude1 =
-    slot2.mode === "search" && slot2.player ? [slot2.player.id] : [];
-  const exclude2 =
-    slot1.mode === "search" && slot1.player ? [slot1.player.id] : [];
+  const blockedPlayerIds = useMemo(() => {
+    const currentPairIds = new Set<string>();
+    if (mode === "edit" && pair) {
+      currentPairIds.add(pair.player1Id);
+      if (pair.player2Id) currentPairIds.add(pair.player2Id);
+    }
+    return enrolledPlayerIds.filter((id) => !currentPairIds.has(id));
+  }, [enrolledPlayerIds, mode, pair]);
+
+  const slot1PlayerId = slot1.mode === "search" ? slot1.player?.id : undefined;
+  const slot2PlayerId = slot2.mode === "search" ? slot2.player?.id : undefined;
+  const exclude1 = slot2PlayerId
+    ? [...blockedPlayerIds, slot2PlayerId]
+    : blockedPlayerIds;
+  const exclude2 = slot1PlayerId
+    ? [...blockedPlayerIds, slot1PlayerId]
+    : blockedPlayerIds;
 
   return (
     <>
@@ -277,6 +371,9 @@ export default function PairFormModal({
         </DialogHeader>
 
         <div className="space-y-4">
+          {mode === "edit" && editPlayers.isLoading ? (
+            <p className="text-sm text-muted-foreground">Cargando jugadores…</p>
+          ) : null}
           <PlayerPickerField
             label="Jugador 1"
             value={slot1}
@@ -494,16 +591,7 @@ export default function PairFormModal({
               slot.draft,
               onCreatePlayer,
             );
-            const player =
-              playersById[playerId] ??
-              (await Api.TournamentOpsService().listPlayers()).find(
-                (p) => p.id === playerId,
-              ) ??
-              null;
-            if (!player) {
-              setError("No se pudo cargar el jugador existente");
-              return;
-            }
+            const player = playerFromMatch(match, playerId);
             if (dupSlot === 1) setSlot1({ mode: "search", player });
             else setSlot2({ mode: "search", player });
             setDupOpen(false);

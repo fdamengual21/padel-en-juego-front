@@ -56,6 +56,10 @@ export class TournamentOpsService {
     return this.repository.getParticipantsBoard(categoryId);
   }
 
+  getParticipantPlayers(categoryId: string, ids: string[]) {
+    return this.repository.getParticipantPlayers(categoryId, ids);
+  }
+
   getMatchesBoard(categoryId: string) {
     return this.repository.getMatchesBoard(categoryId);
   }
@@ -82,6 +86,10 @@ export class TournamentOpsService {
 
   scheduleCategory(categoryId: string) {
     return this.repository.scheduleCategory(categoryId);
+  }
+
+  finishTournament(tournamentId: string) {
+    return this.repository.finishTournament(tournamentId);
   }
 
   listCourts(clubId: string) {
@@ -192,6 +200,14 @@ export class TournamentOpsService {
 
   getPlayerHome(playerId: string) {
     return this.repository.getPlayerHome(playerId);
+  }
+
+  getPlayerHistory(...args: Parameters<ITournamentOpsRepository["getPlayerHistory"]>) {
+    return this.repository.getPlayerHistory(...args);
+  }
+
+  getPlayerPairMatches(...args: Parameters<ITournamentOpsRepository["getPlayerPairMatches"]>) {
+    return this.repository.getPlayerPairMatches(...args);
   }
 
   getPlayerFeed(location?: {
@@ -306,6 +322,10 @@ export class TournamentOpsService {
 
   getPublicParticipantsBoard(categoryId: string) {
     return this.repository.getPublicParticipantsBoard(categoryId);
+  }
+
+  getPublicParticipantPlayers(categoryId: string, ids: string[]) {
+    return this.repository.getPublicParticipantPlayers(categoryId, ids);
   }
 
   getPublicMatchesBoard(categoryId: string) {

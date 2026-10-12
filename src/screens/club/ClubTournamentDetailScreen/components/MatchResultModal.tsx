@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Match, MatchResultInput, MatchRules, SetScore } from "@/domain";
 import {
+  decidingScoreSlotIndex,
   deriveWinnerPairIdFromSets,
+  enteredMatchSets,
+  isScoreSlotPlayable,
   scoreboardSlotCount,
-  setWinnerSide,
   validateMatchResultSets,
 } from "@/domain";
 import MatchScoreboard from "./MatchScoreboard";
@@ -37,6 +39,14 @@ function emptySets(count: number, existing: SetScore[]): SetScore[] {
   }));
 }
 
+function clearUnplayable(sets: SetScore[], rules: MatchRules): SetScore[] {
+  return sets.map((set, index) =>
+    isScoreSlotPlayable(sets, index, rules)
+      ? set
+      : { gamesA: 0, gamesB: 0 },
+  );
+}
+
 export default function MatchResultModal({
   open,
   onOpenChange,
@@ -53,31 +63,18 @@ export default function MatchResultModal({
 
   useEffect(() => {
     if (!open || !match) return;
-    setSets(emptySets(maxSlots, match.sets));
+    setSets(clearUnplayable(emptySets(maxSlots, match.sets), matchRules));
     setError(null);
-  }, [open, match, maxSlots]);
+  }, [open, match, maxSlots, matchRules]);
 
-  const filledSets = useMemo(() => {
-    const out: SetScore[] = [];
-    let winsA = 0;
-    let winsB = 0;
-    for (const set of sets) {
-      if (winsA >= matchRules.setsToWin || winsB >= matchRules.setsToWin) break;
-      if (set.gamesA === 0 && set.gamesB === 0) break;
-      out.push(set);
-      const side = setWinnerSide(set);
-      if (side === "A") winsA += 1;
-      if (side === "B") winsB += 1;
-    }
-    return out;
-  }, [sets, matchRules]);
+  const enteredSets = useMemo(() => enteredMatchSets(sets), [sets]);
 
-  const decidingSlotIndex = useMemo(() => {
-    if (!matchRules.superTiebreakEnabled || matchRules.setsToWin < 2) return null;
-    return maxSlots - 1;
-  }, [matchRules, maxSlots]);
+  const decidingSlotIndex = useMemo(
+    () => decidingScoreSlotIndex(sets, matchRules),
+    [sets, matchRules],
+  );
 
-  const canSave = Boolean(match?.pairAId && match?.pairBId && filledSets.length > 0);
+  const canSave = Boolean(match?.pairAId && match?.pairBId && enteredSets.length > 0);
   const isEditingExisting = Boolean(
     match &&
       (match.status === "finished" ||
@@ -88,26 +85,28 @@ export default function MatchResultModal({
   const patchSet = (index: number, side: "A" | "B", value: string) => {
     const n = Number(value);
     const games = Number.isFinite(n) ? Math.max(0, Math.min(99, Math.trunc(n))) : 0;
-    setSets((prev) =>
-      prev.map((set, i) =>
+    if (!isScoreSlotPlayable(sets, index, matchRules)) return;
+    setSets((prev) => {
+      const next = prev.map((set, i) =>
         i === index
           ? side === "A"
             ? { ...set, gamesA: games }
             : { ...set, gamesB: games }
           : set,
-      ),
-    );
+      );
+      return clearUnplayable(next, matchRules);
+    });
   };
 
   const handleSave = async () => {
     if (!match?.pairAId || !match.pairBId) return;
-    const validation = validateMatchResultSets(filledSets, matchRules);
+    const validation = validateMatchResultSets(enteredSets, matchRules);
     if (!validation.ok) {
       setError(validation.message);
       return;
     }
     const winnerPairId = deriveWinnerPairIdFromSets(
-      filledSets,
+      enteredSets,
       match.pairAId,
       match.pairBId,
       matchRules,
@@ -117,7 +116,7 @@ export default function MatchResultModal({
       return;
     }
     setError(null);
-    await onSubmit({ sets: filledSets, winnerPairId });
+    await onSubmit({ sets: enteredSets, winnerPairId });
     onOpenChange(false);
   };
 
@@ -148,6 +147,7 @@ export default function MatchResultModal({
             slotCount={maxSlots}
             decidingSlotIndex={decidingSlotIndex}
             editable
+            isSlotPlayable={(index) => isScoreSlotPlayable(sets, index, matchRules)}
             size="md"
             onChange={patchSet}
           />

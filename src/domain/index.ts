@@ -15,6 +15,9 @@ export {
   isValidDecidingTiebreak,
   validateMatchResultSets,
   isMatchResultComplete,
+  isScoreSlotPlayable,
+  decidingScoreSlotIndex,
+  enteredMatchSets,
   deriveWinnerPairIdFromSets,
   setWinnerSide,
 } from "./matchResultRules";

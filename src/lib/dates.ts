@@ -39,6 +39,14 @@ export function formatScheduleShortEs(isoDate: string | null | undefined): strin
   return `${capitalizeWord(d.format("dddd"))} ${d.format("D")} ${d.format("HH:mm")}hs`;
 }
 
+/** Día y hora de una inscripción: "12 oct 2026 · 01:45" */
+export function formatRegisteredAtEs(isoDate: string | null | undefined): string {
+  if (!isoDate) return "Sin fecha";
+  const d = dayjs(isoDate);
+  if (!d.isValid()) return "Sin fecha";
+  return `${d.format("D MMM YYYY")} · ${d.format("HH:mm")}`;
+}
+
 /** Día de torneo (fecha calendario): "Sábado 20 de Septiembre" */
 export function formatTournamentDayEs(date: string | null | undefined): string {
   if (!date) return "Sin fecha";

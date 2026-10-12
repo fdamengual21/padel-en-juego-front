@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { LoaderCircle, X } from "lucide-react";
 import type { CategoryLevel, Player, SidePosition } from "@/domain";
 import Api from "@/api/Api";
 import PlayerIdentityFields, {
@@ -112,7 +113,7 @@ export default function PlayerPickerField({
     [],
   );
 
-  const { results, isSearching, canSearch } = useAbortableSearch<Player>({
+  const { results, isSearching, canSearch, debouncedQuery } = useAbortableSearch<Player>({
     query,
     minLength: 2,
     delayMs: 300,
@@ -121,6 +122,9 @@ export default function PlayerPickerField({
   });
 
   const filtered = results.filter((p) => !excludeIds.includes(p.id));
+  const pendingSearch =
+    query.trim().length >= 2 &&
+    (isSearching || query.trim() !== debouncedQuery.trim());
 
   if (selected) {
     return (
@@ -219,14 +223,28 @@ export default function PlayerPickerField({
     <div className="space-y-2">
       <Label htmlFor={`player-search-${label}`}>{label}</Label>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <Input
-          id={`player-search-${label}`}
-          className="min-w-0 flex-1"
-          value={query}
-          placeholder="Buscar por nombre (mín. 2 letras)…"
-          onChange={(e) => setQuery(e.target.value)}
-          autoComplete="off"
-        />
+        <div className="relative min-w-0 flex-1">
+          <Input
+            id={`player-search-${label}`}
+            className="pr-8"
+            value={query}
+            placeholder="Buscar por nombre (mín. 2 letras)…"
+            onChange={(e) => setQuery(e.target.value)}
+            autoComplete="off"
+          />
+          {pendingSearch ? (
+            <LoaderCircle className="pointer-events-none absolute top-1/2 right-2 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+          ) : query ? (
+            <button
+              type="button"
+              className="absolute top-1/2 right-1 inline-flex size-6 -translate-y-1/2 items-center justify-center text-muted-foreground hover:text-foreground"
+              aria-label="Limpiar búsqueda"
+              onClick={() => setQuery("")}
+            >
+              <X className="size-3.5" />
+            </button>
+          ) : null}
+        </div>
         <Button
           type="button"
           size="sm"
@@ -245,11 +263,9 @@ export default function PlayerPickerField({
         </Button>
       </div>
 
-      {canSearch ? (
+      {canSearch && !pendingSearch ? (
         <div className="rounded-lg border border-border bg-card">
-          {isSearching ? (
-            <p className="px-3 py-2 text-xs text-muted-foreground">Buscando…</p>
-          ) : filtered.length > 0 ? (
+          {filtered.length > 0 ? (
             <ul className="max-h-40 overflow-y-auto divide-y divide-border">
               {filtered.map((player) => (
                 <li key={player.id}>
@@ -277,11 +293,11 @@ export default function PlayerPickerField({
             </p>
           )}
         </div>
-      ) : (
+      ) : query.trim().length < 2 ? (
         <p className="text-xs text-muted-foreground">
           Escribí al menos 2 caracteres.
         </p>
-      )}
+      ) : null}
     </div>
   );
 }

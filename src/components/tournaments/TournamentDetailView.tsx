@@ -1,19 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { Trash2 } from "lucide-react";
-import type {
-  Match,
-  MatchResultInput,
-  MatchRules,
-  ParticipantsBoardView,
-  TournamentPair,
-} from "@/domain";
+import { LoaderCircle, Trash2 } from "lucide-react";
 import {
+  OCCUPYING_REGISTRATION_STATUSES,
   createId,
   isMatchResultComplete,
   isQualityPreset,
   resolveMatchDurationMinutes,
+  type Match,
+  type MatchResultInput,
+  type MatchRules,
+  type ParticipantsBoardView,
 } from "@/domain";
 import Api from "@/api/Api";
 import MatchCard from "@/components/tournaments/MatchCard";
@@ -39,6 +37,7 @@ import WarningDialog from "@/components/ui/warning-dialog";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Avatar from "@/components/Avatar";
+import { formatRegisteredAtEs } from "@/lib/dates";
 import ClientDetailModal from "@/screens/club/ClubClientDetailScreen/components/ClientDetailModal";
 import CuadroBoard from "@/screens/club/ClubTournamentDetailScreen/components/CuadroBoard";
 import GroupZonesPanel from "@/screens/club/ClubTournamentDetailScreen/components/GroupZonesPanel";
@@ -58,6 +57,7 @@ import { ROUTES } from "@/router/routes";
 import { formatTournamentDayEs } from "@/lib/dates";
 import { resolveMatchPlayStatus } from "@/lib/matchPlayStatus";
 import { sidePreferenceLabel } from "@/lib/tournamentLabels";
+import { ApiHttpError } from "@/lib/apiClient";
 import { toastError, toastInfo, toastSuccess } from "@/lib/toast";
 
 /** Quién mira el detalle: club (admin) o jugador/guest (solo lectura). */
@@ -127,9 +127,15 @@ export default function TournamentDetailView({
   );
   const [removeNote, setRemoveNote] = useState("");
   const [pairModalOpen, setPairModalOpen] = useState(false);
-  const [editingPair, setEditingPair] = useState<TournamentPair | null>(null);
+  const [editingPair, setEditingPair] = useState<
+    ParticipantsBoardView["rows"][number]["pair"] | null
+  >(null);
   const [confirmAddStartedOpen, setConfirmAddStartedOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
+  const [finishOpen, setFinishOpen] = useState(false);
+  const [finishPhase, setFinishPhase] = useState<"confirm" | "pending" | "done">("confirm");
+  const [finishOk, setFinishOk] = useState(false);
+  const [finishDetail, setFinishDetail] = useState("");
   const [activeTab, setActiveTab] = useState("grupos");
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [clientDetailId, setClientDetailId] = useState<string | null>(null);
@@ -166,7 +172,7 @@ export default function TournamentDetailView({
       isClub
         ? Api.TournamentOpsService().listPairs(categoryId)
         : Api.TournamentOpsService().listPublicPairs(categoryId),
-    enabled: Boolean(categoryId),
+    enabled: Boolean(categoryId) && (activeTab === "partidos" || Boolean(resultMatchId)),
   });
   const { data: registrations = [] } = useQuery({
     queryKey: ["registrations", categoryId],
@@ -195,7 +201,7 @@ export default function TournamentDetailView({
   const { data: players = [] } = useQuery({
     queryKey: ["players"],
     queryFn: () => Api.TournamentOpsService().listPlayers(),
-    enabled: isClub,
+    enabled: isClub && (activeTab === "partidos" || Boolean(resultMatchId)),
   });
   const { data: ruleset } = useQuery({
     queryKey: ["ruleset", categoryId],
@@ -209,7 +215,7 @@ export default function TournamentDetailView({
     queryKey: ["court-reservations", tournament?.clubId],
     queryFn: () =>
       Api.TournamentOpsService().listCourtReservations(tournament!.clubId),
-    enabled: isClub && Boolean(tournament?.clubId),
+    enabled: isClub && Boolean(tournament?.clubId) && (activeTab === "grupos" || assignOpen),
   });
 
   const matchDurationMinutes = resolveMatchDurationMinutes(ruleset?.preset);
@@ -217,19 +223,16 @@ export default function TournamentDetailView({
 
   const {
     data: zonesBoard,
-    refetch: refetchZonesBoard,
   } = useQuery({
     queryKey: ["zones-board", categoryId],
     queryFn: () =>
       isClub
         ? Api.TournamentOpsService().getZonesBoard(categoryId)
         : Api.TournamentOpsService().getPublicZonesBoard(categoryId),
-    enabled: Boolean(categoryId),
-    refetchOnMount: "always",
+    enabled: Boolean(categoryId) && (activeTab === "grupos" || assignOpen),
   });
   const {
     data: participantsBoard,
-    refetch: refetchParticipantsBoard,
   } = useQuery({
     queryKey: ["participants-board", categoryId],
     queryFn: () =>
@@ -237,7 +240,6 @@ export default function TournamentDetailView({
         ? Api.TournamentOpsService().getParticipantsBoard(categoryId)
         : Api.TournamentOpsService().getPublicParticipantsBoard(categoryId),
     enabled: Boolean(categoryId) && activeTab === "participantes",
-    refetchOnMount: "always",
   });
 
   const toastedAutoMatchKeys = useRef(new Set<string>());
@@ -262,7 +264,6 @@ export default function TournamentDetailView({
   const {
     data: cuadroBoard,
     isFetching: cuadroFetching,
-    refetch: refetchCuadro,
   } = useQuery({
     queryKey: ["cuadro", categoryId],
     queryFn: () =>
@@ -270,11 +271,9 @@ export default function TournamentDetailView({
         ? Api.TournamentOpsService().getCuadroBoard(categoryId)
         : Api.TournamentOpsService().getPublicCuadroBoard(categoryId),
     enabled: Boolean(categoryId) && activeTab === "cuadro",
-    refetchOnMount: "always",
   });
   const {
     data: matchesBoard,
-    refetch: refetchMatchesBoard,
   } = useQuery({
     queryKey: ["matches-board", categoryId],
     queryFn: () =>
@@ -282,16 +281,13 @@ export default function TournamentDetailView({
         ? Api.TournamentOpsService().getMatchesBoard(categoryId)
         : Api.TournamentOpsService().getPublicMatchesBoard(categoryId),
     enabled: Boolean(categoryId) && activeTab === "partidos",
-    refetchOnMount: "always",
   });
   const {
     data: configBoard,
-    refetch: refetchConfigBoard,
   } = useQuery({
     queryKey: ["config-board", categoryId],
     queryFn: () => Api.TournamentOpsService().getConfigBoard(categoryId),
     enabled: Boolean(categoryId) && isClub && activeTab === "config",
-    refetchOnMount: "always",
   });
 
   const invalidateOps = async () => {
@@ -391,7 +387,8 @@ export default function TournamentDetailView({
   });
 
   useEffect(() => {
-    if (!categoryId || !isClub) return;
+    if (!categoryId || !isClub || !tournament) return;
+    if (tournament.status === "finished" || tournament.status === "cancelled") return;
     void Api.TournamentOpsService()
       .syncCategoryStructure(categoryId)
       .then(async () => {
@@ -399,7 +396,7 @@ export default function TournamentDetailView({
       });
     // Sync once when category is ready / registrations already seeded.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categoryId, registrations.length, isClub]);
+  }, [categoryId, registrations.length, isClub, tournament?.status]);
 
   const localPairLabels = useMemo(() => {
     const map: Record<string, string> = {};
@@ -442,20 +439,48 @@ export default function TournamentDetailView({
     }, {}) ??
     localPairPlayerNames;
 
-  const playersById = useMemo(() => {
-    const map: Record<string, (typeof players)[number]> = {};
-    for (const p of players) map[p.id] = p;
-    return map;
-  }, [players]);
+  const enrolledPlayerIds = useMemo(() => {
+    const ids: string[] = [];
+    for (const row of participantsBoard?.rows ?? []) {
+      const status = row.registration?.status;
+      if (status && !OCCUPYING_REGISTRATION_STATUSES.has(status) && !row.disqualified) {
+        continue;
+      }
+      ids.push(row.pair.player1Id);
+      if (row.pair.player2Id) ids.push(row.pair.player2Id);
+    }
+    return ids;
+  }, [participantsBoard?.rows]);
+
+  const refreshAfterResult = async () => {
+    const jobs = [
+      qc.invalidateQueries({ queryKey: ["tournament", tournamentId] }),
+      qc.invalidateQueries({ queryKey: ["matches", categoryId] }),
+    ];
+    if (activeTab === "grupos") {
+      jobs.push(qc.invalidateQueries({ queryKey: ["zones-board", categoryId] }));
+    }
+    if (activeTab === "participantes") {
+      jobs.push(qc.invalidateQueries({ queryKey: ["participants-board", categoryId] }));
+    }
+    if (activeTab === "cuadro") {
+      jobs.push(qc.invalidateQueries({ queryKey: ["cuadro", categoryId] }));
+    }
+    if (activeTab === "partidos") {
+      jobs.push(qc.invalidateQueries({ queryKey: ["matches-board", categoryId] }));
+    }
+    if (activeTab === "config") {
+      jobs.push(qc.invalidateQueries({ queryKey: ["config-board", categoryId] }));
+    }
+    await Promise.all(jobs);
+  };
 
   const submitResult = useMutation({
     mutationFn: (input: { matchId: string; result: MatchResultInput }) =>
       Api.TournamentOpsService().submitMatchResult(input.matchId, input.result),
     onSuccess: async () => {
       toastSuccess("Resultado cargado");
-      await invalidateOps();
-      await Api.TournamentOpsService().syncCategoryStructure(categoryId);
-      await invalidateOps();
+      await refreshAfterResult();
     },
     onError: (err: Error) => {
       toastError("No se pudo cargar el resultado", err.message);
@@ -499,6 +524,29 @@ export default function TournamentDetailView({
     },
     onError: (err: Error) => {
       toastError("No se pudo guardar la agenda", err.message);
+    },
+  });
+
+  const finishMutation = useMutation({
+    mutationFn: () => Api.TournamentOpsService().finishTournament(tournamentId),
+    onSuccess: async (result) => {
+      setFinishOk(true);
+      setFinishDetail(result.message);
+      setFinishPhase("done");
+      toastSuccess("Torneo finalizado", result.message);
+      await invalidateOps();
+    },
+    onError: (err: Error) => {
+      const logic = err instanceof ApiHttpError && err.status === 422;
+      setFinishOk(false);
+      setFinishDetail(
+        logic ? err.message : "No se pudo finalizar el torneo. Probá de nuevo.",
+      );
+      setFinishPhase("done");
+      toastError(
+        logic ? "No se puede finalizar" : "No se pudo finalizar el torneo",
+        logic ? err.message : undefined,
+      );
     },
   });
 
@@ -674,6 +722,7 @@ export default function TournamentDetailView({
   }
 
   const accepted = registrations.filter((r) => r.status === "ACCEPTED").length;
+  const categoryFull = category != null && accepted >= category.maxPairs;
   const matchRules =
     zonesBoard?.matchRules ??
     matchesBoard?.matchRules ??
@@ -714,22 +763,6 @@ export default function TournamentDetailView({
       return;
     }
     setPairModalOpen(true);
-  };
-
-  const refreshTab = async (tab: string) => {
-    if (
-      isClub &&
-      categoryId &&
-      (tab === "grupos" || tab === "cuadro" || tab === "partidos")
-    ) {
-      await Api.TournamentOpsService().syncCategoryStructure(categoryId);
-    }
-    await invalidateOps();
-    if (tab === "grupos") await refetchZonesBoard();
-    if (tab === "participantes") await refetchParticipantsBoard();
-    if (tab === "cuadro") await refetchCuadro();
-    if (tab === "partidos") await refetchMatchesBoard();
-    if (tab === "config" && isClub) await refetchConfigBoard();
   };
 
   const openResult = (match: Match) => {
@@ -807,6 +840,21 @@ export default function TournamentDetailView({
     (total, group) => total + (group.qualifies ?? 0),
     0,
   );
+  const visibleParticipantRows = (participantsBoard?.rows ?? []).filter(
+    (row) => isClub || row.registration?.status === "ACCEPTED",
+  );
+  const participantGroups = [
+    {
+      key: "active",
+      title: null as string | null,
+      rows: visibleParticipantRows.filter((row) => row.registration?.cancelledBy !== "club"),
+    },
+    {
+      key: "removed",
+      title: "Eliminadas por el club",
+      rows: visibleParticipantRows.filter((row) => row.registration?.cancelledBy === "club"),
+    },
+  ].filter((group) => group.rows.length > 0);
 
   return (
     <div
@@ -847,19 +895,40 @@ export default function TournamentDetailView({
                 tournament={tournament}
                 categories={categories}
                 categoryId={categoryId}
+                acceptedPairs={accepted}
                 onCategoryChange={setSelectedCategoryId}
               />
             </div>
           ) : (
-            <AutoAssignButton
-              blockedReason={
-                zonesBoard
-                  ? zonesBoard.autoAssign.blockedReason
-                  : "Cargando la fase…"
-              }
-              pending={scheduleMutation.isPending}
-              onOpen={() => setAssignOpen(true)}
-            />
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <AutoAssignButton
+                blockedReason={
+                  zonesBoard
+                    ? zonesBoard.autoAssign.blockedReason
+                    : activeTab === "grupos"
+                      ? "Cargando la fase…"
+                      : null
+                }
+                pending={scheduleMutation.isPending || finishMutation.isPending}
+                onOpen={() => setAssignOpen(true)}
+              />
+              {tournament.status !== "finished" && tournament.status !== "cancelled" ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="destructive"
+                  disabled={finishMutation.isPending}
+                  onClick={() => {
+                    setFinishPhase("confirm");
+                    setFinishOk(false);
+                    setFinishDetail("");
+                    setFinishOpen(true);
+                  }}
+                >
+                  Finalizar torneo
+                </Button>
+              ) : null}
+            </div>
           )}
         </div>
       </div>
@@ -911,11 +980,7 @@ export default function TournamentDetailView({
 
       <Tabs
         value={activeTab}
-        onValueChange={(value) => {
-          const next = String(value);
-          setActiveTab(next);
-          void refreshTab(next);
-        }}
+        onValueChange={(value) => setActiveTab(String(value))}
       >
         <TabsList className="flex flex-wrap h-auto gap-1">
           <TabsTrigger value="grupos">Zonas</TabsTrigger>
@@ -935,21 +1000,34 @@ export default function TournamentDetailView({
                 : "Parejas inscriptas en la categoría."}
             </p>
             {isClub ? (
-              <Button type="button" size="sm" onClick={openAddPair}>
-                Agregar pareja
-              </Button>
+              categoryFull ? (
+                <TooltipProvider delay={200}>
+                  <Tooltip>
+                    <TooltipTrigger render={<span className="inline-flex" />}>
+                      <Button type="button" size="sm" disabled>
+                        Agregar pareja
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>El cupo de parejas aceptadas está completo.</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : (
+                <Button type="button" size="sm" onClick={openAddPair}>
+                  Agregar pareja
+                </Button>
+              )
             ) : null}
           </div>
           {participantsBoard?.notice ? (
             <p className="text-sm text-muted-foreground">{participantsBoard.notice}</p>
           ) : null}
-          <ul className="divide-y divide-border rounded-xl border border-border bg-card">
-            {(participantsBoard?.rows ?? [])
-              .filter(
-                (row) =>
-                  isClub || row.registration?.status === "ACCEPTED",
-              )
-              .map((row) => {
+          {participantGroups.map((group) => (
+            <section key={group.key} className="space-y-2">
+              {group.title ? (
+                <h3 className="text-sm font-medium">{group.title}</h3>
+              ) : null}
+              <ul className="divide-y divide-border rounded-xl border border-border bg-card">
+                {group.rows.map((row) => {
               const { pair, registration: reg } = row;
               const playerRows: Array<{
                 name: string;
@@ -1032,7 +1110,9 @@ export default function TournamentDetailView({
                       ) : null}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Orden {pair.seed ?? "—"}
+                      {reg?.registeredAt
+                        ? formatRegisteredAtEs(reg.registeredAt)
+                        : "Sin fecha de inscripción"}
                       {pair.user1Id || pair.user2Id
                         ? " · equipo vinculado a usuario(s) del torneo"
                         : " · sin usuarios vinculados"}
@@ -1122,7 +1202,9 @@ export default function TournamentDetailView({
                 </li>
               );
             })}
-          </ul>
+              </ul>
+            </section>
+          ))}
           {isClub ? (
             <>
               <p className="text-xs text-muted-foreground">
@@ -1511,6 +1593,84 @@ export default function TournamentDetailView({
       />
 
       <Dialog
+        open={isClub && finishOpen}
+        disablePointerDismissal={finishPhase === "pending"}
+        onOpenChange={(open, details) => {
+          if (!open && finishPhase === "pending") {
+            details.cancel();
+            return;
+          }
+          setFinishOpen(open);
+        }}
+      >
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>
+              {finishPhase === "pending"
+                ? "Finalizando el torneo"
+                : finishPhase === "done"
+                  ? finishOk
+                    ? "Torneo finalizado"
+                    : finishDetail.startsWith("No se pudo finalizar")
+                      ? "No se pudo finalizar"
+                      : "No se puede finalizar"
+                  : "Finalizar torneo"}
+            </DialogTitle>
+            {finishPhase === "confirm" ? (
+              <DialogDescription>
+                Al finalizar, el torneo queda cerrado. Resultados, cuadro, inscripciones
+                y horarios dejan de poder editarse.
+              </DialogDescription>
+            ) : null}
+          </DialogHeader>
+          {finishPhase === "pending" ? (
+            <div className="flex items-center gap-3 py-2 text-sm">
+              <LoaderCircle className="size-5 animate-spin" />
+              Finalizando el torneo…
+            </div>
+          ) : null}
+          {finishPhase === "done" ? (
+            finishOk ? (
+              <p>{finishDetail}</p>
+            ) : (
+              <ul className="list-disc space-y-1 pl-5">
+                {finishDetail
+                  .split("\n")
+                  .map((line) => line.trim())
+                  .filter(Boolean)
+                  .map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+              </ul>
+            )
+          ) : null}
+          {finishPhase !== "pending" ? (
+            <DialogFooter>
+              {finishPhase === "confirm" ? (
+                <Button type="button" variant="outline" onClick={() => setFinishOpen(false)}>
+                  Cancelar
+                </Button>
+              ) : null}
+              <Button
+                type="button"
+                variant={finishPhase === "confirm" ? "destructive" : "default"}
+                onClick={() => {
+                  if (finishPhase === "confirm") {
+                    setFinishPhase("pending");
+                    finishMutation.mutate();
+                    return;
+                  }
+                  setFinishOpen(false);
+                }}
+              >
+                {finishPhase === "confirm" ? "Finalizar" : "Cerrar"}
+              </Button>
+            </DialogFooter>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
         open={isClub && assignOpen}
         onOpenChange={setAssignOpen}
       >
@@ -1538,7 +1698,12 @@ export default function TournamentDetailView({
             </Button>
             <Button
               type="button"
-              disabled={scheduleMutation.isPending || !categoryId}
+              disabled={
+                scheduleMutation.isPending ||
+                !categoryId ||
+                !zonesBoard ||
+                Boolean(zonesBoard.autoAssign.blockedReason)
+              }
               onClick={() => scheduleMutation.mutate()}
             >
               {scheduleMutation.isPending ? "Asignando…" : "Confirmar"}
@@ -1563,7 +1728,8 @@ export default function TournamentDetailView({
         tournamentEndDate={tournament?.endDate}
         dailyStartTime={tournament?.dailyStartTime}
         dailyEndTime={tournament?.dailyEndTime}
-        playersById={playersById}
+        categoryId={categoryId}
+        enrolledPlayerIds={enrolledPlayerIds}
         isSaving={savePairMutation.isPending}
         onOpenChange={(open) => {
           setPairModalOpen(open);
@@ -1620,7 +1786,10 @@ export default function TournamentDetailView({
       <RegistrationDetailModal
         open={detailRow !== null}
         row={detailRow}
+        registration={detailRow?.registration ?? null}
+        categoryId={categoryId}
         categoryName={category?.name ?? null}
+        isClub={isClub}
         showAvailability={isClub && requirePairAvailability}
         onOpenChange={(open) => {
           if (!open) setDetailRow(null);

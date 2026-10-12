@@ -7,7 +7,7 @@ import { EmptyState } from "@/components/EmptyState";
 import GeographySelectFields from "@/components/GeographySelectFields";
 import { Input } from "@/components/ui/input";
 import { useDebounce } from "@/hooks/useDebounce";
-import type { Tournament } from "@/domain";
+import type { TournamentCard } from "@/domain";
 import { ROUTES } from "@/router/routes";
 import { useAuthStore } from "@/stores/authStore";
 import HomeTournamentCard from "../components/HomeTournamentCard";
@@ -31,7 +31,7 @@ export default function UserTournamentsScreen() {
   const [municipalityId, setMunicipalityId] = useState<number | null>(null);
   const [geoSeeded, setGeoSeeded] = useState(false);
   const [page, setPage] = useState(1);
-  const [items, setItems] = useState<Tournament[]>([]);
+  const [items, setItems] = useState<TournamentCard[]>([]);
   const appendRef = useRef(false);
   const debouncedSearch = useDebounce(search, 350);
 

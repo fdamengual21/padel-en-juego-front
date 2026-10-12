@@ -7,8 +7,20 @@ import { Badge } from "@/components/ui/badge";
 import type { Tournament } from "@/domain";
 import { parseIsoDateOnly } from "@/lib/dates";
 
+/** Campos que pinta la card. Un `Tournament` completo también entra. */
+export type HomeTournamentCardData = Pick<
+  Tournament,
+  "id" | "name" | "status" | "startDate" | "endDate"
+> &
+  Partial<
+    Pick<
+      Tournament,
+      "clubName" | "clubCoverUrl" | "clubAvatarUrl" | "categories" | "myRegistrationStatus"
+    >
+  >;
+
 interface HomeTournamentCardProps {
-  tournament: Tournament;
+  tournament: HomeTournamentCardData;
   to: string;
   /** En el club la foto del predio se repite en todas las filas. */
   showImage?: boolean;

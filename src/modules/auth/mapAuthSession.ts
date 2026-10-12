@@ -50,7 +50,7 @@ export function toAuthSessionFromMe(user: UserMeDto): AuthSession {
   };
 }
 
-/** Dashboard vacío para jugadores de API (torneos aún no cableados). */
+/** Resumen vacío mientras el perfil todavía no cargó. */
 export function emptyPlayerDashboard(player: Player): PlayerDashboard {
   return {
     player,
@@ -61,9 +61,8 @@ export function emptyPlayerDashboard(player: Player): PlayerDashboard {
     matchesLost: 0,
     tournamentsCount: 0,
     tournamentsWon: 0,
-    tournamentsLost: 0,
+    reservationsCount: 0,
     nextMatch: null,
     recentMatches: [],
-    tournaments: [],
   };
 }

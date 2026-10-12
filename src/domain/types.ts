@@ -13,6 +13,14 @@ export type TournamentStatus =
   | "finished"
   | "cancelled";
 
+/** Respuesta al cerrar un torneo. */
+export interface FinishTournamentResult {
+  status: string;
+  pointsAwarded: boolean;
+  reason: "scoring" | "belowMinimum" | "overMaximum" | "notScoring";
+  message: string;
+}
+
 export type TournamentFormat =
   | "GROUPS_ELIMINATION"
   | "DIRECT_ELIMINATION"
@@ -26,6 +34,14 @@ export type RegistrationStatus =
   | "WAITLIST"
   | "CANCELLED"
   | "DISQUALIFIED";
+
+/** Inscripciones que siguen ocupando un lugar en la categoría. */
+export const OCCUPYING_REGISTRATION_STATUSES = new Set<RegistrationStatus>([
+  "PENDING",
+  "ACCEPTED",
+  "WAITLIST",
+  "DISQUALIFIED",
+]);
 
 export type PairStatus = "active" | "withdrawn" | "disqualified";
 
@@ -687,26 +703,20 @@ export interface PlayerMatchView {
   courtLabel: string | null;
 }
 
-/** Participación de torneo del jugador con partidos y fase alcanzada. */
-export interface PlayerTournamentHistoryEntry {
-  tournamentId: string;
-  tournamentName: string;
-  clubId: string;
-  clubName: string;
-  tournamentStatus: TournamentStatus;
+/** Lo que pinta la card de torneo en el catálogo y en el historial. */
+export interface TournamentCard {
+  id: string;
+  name: string;
+  status: TournamentStatus;
   startDate: string;
-  endDate: string | null;
-  categoryId: string;
-  categoryName: string;
-  pairId: string;
-  partnerName: string | null;
-  matchesWon: number;
-  matchesLost: number;
-  outcome: ClientTournamentOutcome;
-  /** Fase más avanzada jugada (excluye consolación). */
-  phaseReached: MatchPhase | null;
-  phaseReachedLabel: string | null;
-  matches: PlayerMatchView[];
+  endDate: string;
+  clubName: string | null;
+  clubAvatarUrl: string | null;
+  clubCoverUrl: string | null;
+  myRegistrationStatus: "PENDING" | "ACCEPTED" | "WAITLIST" | null;
+  /** Pareja del jugador. Null en el catálogo público. */
+  pairId: string | null;
+  categories: Array<{ id: string; name: string }>;
 }
 
 export interface PlayerDashboard {
@@ -716,12 +726,13 @@ export interface PlayerDashboard {
   matchesPlayed: number;
   matchesWon: number;
   matchesLost: number;
+  /** Torneos con al menos un partido terminado. */
   tournamentsCount: number;
   tournamentsWon: number;
-  tournamentsLost: number;
+  /** Reservas confirmadas o ya jugadas. */
+  reservationsCount: number;
   nextMatch: PlayerMatchView | null;
   recentMatches: PlayerMatchView[];
-  tournaments: PlayerTournamentHistoryEntry[];
 }
 
 /** Reserva próxima enriquecida para el inicio del jugador. */
@@ -733,7 +744,7 @@ export interface PlayerUpcomingReservation {
 
 /** Feed de Inicio (torneos futuros + reservas si hay sesión). */
 export interface PlayerFeed {
-  upcomingTournaments: Tournament[];
+  upcomingTournaments: TournamentCard[];
   upcomingReservations: PlayerUpcomingReservation[];
 }
 
@@ -824,21 +835,39 @@ export interface RegistrationAvailability {
   endTime: string;
 }
 
+/** Pareja tal como la muestra el tab Participantes. */
+export interface ParticipantPairView {
+  id: string;
+  player1Id: string;
+  player2Id: string | null;
+  user1Id: string | null;
+  user2Id: string | null;
+  sidePreference: PairSidePreference | null;
+}
+
+/** Inscripción tal como la muestra el tab Participantes. */
+export interface ParticipantRegistrationView {
+  id: string;
+  status: RegistrationStatus;
+  registeredAt: string;
+  statusNote: string | null;
+  /** `player` si canceló un jugador de la pareja; `club` si la baja la hizo el club. */
+  cancelledBy?: "player" | "club" | null;
+  /** Id del jugador o del usuario del club, según `cancelledBy`. */
+  cancelledById?: string | null;
+}
+
 /** Tab Participantes. */
 export interface ParticipantsBoardView {
-  categoryId: string;
   generatedAt: string;
   rows: Array<{
-    pair: TournamentPair;
-    registration: TournamentRegistration | null;
-    label: string;
+    pair: ParticipantPairView;
+    registration: ParticipantRegistrationView | null;
     playerNames: [string, string];
     /** Avatar por jugador (cliente del club); null → iniciales. */
     playerAvatars: [string | null, string | null];
     /** Id de cliente del club por jugador; null si no hay ficha. */
     playerClientIds: [string | null, string | null];
-    /** Ficha de cada jugador. El segundo es null si la pareja está incompleta. */
-    players?: [RegistrationPlayerDetail | null, RegistrationPlayerDetail | null];
     /** Horarios declarados. Solo los trae el tablero del club; el publico no. */
     availability?: RegistrationAvailability[];
     incomplete: boolean;

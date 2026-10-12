@@ -1,7 +1,8 @@
 import type { AxiosInstance } from "axios";
 import { readData } from "@/config/axiosInstance";
-import type { PaginatedResult } from "@/domain";
+import type { PaginatedResult, TournamentCard } from "@/domain";
 import type { ApiEnvelope } from "@/lib/apiClient";
+import { normalizeTournamentCardPage } from "../mapTournamentCard";
 import type { CreateTournamentRequest, Tournament } from "../types";
 
 export interface PublicTournamentListQuery {
@@ -22,7 +23,7 @@ export interface ClubTournamentListQuery {
 
 export interface ITournamentRepository {
   list(query?: ClubTournamentListQuery): Promise<PaginatedResult<Tournament>>;
-  listPublic(query?: PublicTournamentListQuery): Promise<PaginatedResult<Tournament>>;
+  listPublic(query?: PublicTournamentListQuery): Promise<PaginatedResult<TournamentCard>>;
   getById(id: string): Promise<Tournament | null>;
   getPublic(id: string): Promise<Tournament | null>;
   create(input: CreateTournamentRequest): Promise<Tournament>;
@@ -88,7 +89,9 @@ export class TournamentRepository implements ITournamentRepository {
     return normalizePublicTournamentPage(readData(response) ?? {});
   }
 
-  async listPublic(query: PublicTournamentListQuery = {}): Promise<PaginatedResult<Tournament>> {
+  async listPublic(query: PublicTournamentListQuery = {}): Promise<PaginatedResult<TournamentCard>> {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 12;
     const response = await this.http.get<ApiEnvelope<Record<string, unknown>>>(
       "/public/tournaments",
       {
@@ -96,12 +99,12 @@ export class TournamentRepository implements ITournamentRepository {
           q: query.q?.trim() || undefined,
           provinceId: query.provinceId ?? undefined,
           municipalityId: query.municipalityId ?? undefined,
-          page: query.page ?? 1,
-          pageSize: query.pageSize ?? 12,
+          page,
+          pageSize,
         },
       },
     );
-    return normalizePublicTournamentPage(readData(response) ?? {});
+    return normalizeTournamentCardPage(readData(response), { page, pageSize });
   }
 
   async getById(id: string): Promise<Tournament | null> {

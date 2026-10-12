@@ -213,6 +213,62 @@ export function isMatchResultComplete(
   return match.winnerPairId === expected;
 }
 
+/**
+ * Una columna se puede editar solo si los sets anteriores cierran
+ * y el partido todavía no tiene ganador.
+ */
+export function isScoreSlotPlayable(
+  sets: SetScore[],
+  index: number,
+  rules: MatchRules,
+): boolean {
+  if (index < 0 || index >= scoreboardSlotCount(rules)) return false;
+
+  let winsA = 0;
+  let winsB = 0;
+  for (let i = 0; i < index; i += 1) {
+    if (winsA >= rules.setsToWin || winsB >= rules.setsToWin) return false;
+    const set = sets[i];
+    if (!set) return false;
+    const deciding = isDecidingTiebreakMoment(winsA, winsB, rules);
+    const valid = deciding
+      ? isValidDecidingTiebreak(set, rules)
+      : isValidRegularSet(set, rules);
+    if (!valid) return false;
+    const side = setWinnerSide(set);
+    if (side === "A") winsA += 1;
+    else if (side === "B") winsB += 1;
+    else return false;
+  }
+
+  return winsA < rules.setsToWin && winsB < rules.setsToWin;
+}
+
+/** Última columna, solo cuando el partido está empatado y se define por tie-break. */
+export function decidingScoreSlotIndex(
+  sets: SetScore[],
+  rules: MatchRules,
+): number | null {
+  if (!rules.superTiebreakEnabled || rules.setsToWin < 2) return null;
+  const last = scoreboardSlotCount(rules) - 1;
+  return isScoreSlotPlayable(sets, last, rules) ? last : null;
+}
+
+/** Sets con marcador, incluidos los que sobran después de que el partido ya cerró. */
+export function enteredMatchSets(sets: SetScore[]): SetScore[] {
+  let last = -1;
+  sets.forEach((set, index) => {
+    const hasScore =
+      set.gamesA !== 0 ||
+      set.gamesB !== 0 ||
+      set.tiebreakA != null ||
+      set.tiebreakB != null;
+    if (hasScore) last = index;
+  });
+  if (last < 0) return [];
+  return sets.slice(0, last + 1);
+}
+
 export function deriveWinnerPairIdFromSets(
   sets: SetScore[],
   pairAId: string,

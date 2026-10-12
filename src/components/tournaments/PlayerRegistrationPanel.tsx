@@ -5,6 +5,12 @@ import { useMockSession } from "@/app/MockSessionProvider";
 import RequirePlayerAuth from "@/components/auth/RequirePlayerAuth";
 import { Button } from "@/components/ui/button";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -23,6 +29,8 @@ interface PlayerRegistrationPanelProps {
   tournament: Tournament;
   categories: TournamentCategory[];
   categoryId: string;
+  /** Parejas aceptadas en la categoría seleccionada. */
+  acceptedPairs: number;
   onCategoryChange: (categoryId: string) => void;
 }
 
@@ -105,6 +113,7 @@ export default function PlayerRegistrationPanel({
   tournament,
   categories,
   categoryId,
+  acceptedPairs,
   onCategoryChange,
 }: PlayerRegistrationPanelProps) {
   const { isAuthenticated, player } = useMockSession();
@@ -158,6 +167,7 @@ export default function PlayerRegistrationPanel({
       await qc.invalidateQueries({ queryKey: ["my-registration", categoryId] });
       await qc.invalidateQueries({ queryKey: ["categories", tournament.id] });
       await qc.invalidateQueries({ queryKey: ["player-home"] });
+      await qc.invalidateQueries({ queryKey: ["player-history"] });
     },
     onError: (err: Error) => toastError("No se pudo inscribir", err.message),
   });
@@ -171,6 +181,7 @@ export default function PlayerRegistrationPanel({
       await qc.invalidateQueries({ queryKey: ["categories", tournament.id] });
       await qc.invalidateQueries({ queryKey: ["participants-board", categoryId] });
       await qc.invalidateQueries({ queryKey: ["player-home"] });
+      await qc.invalidateQueries({ queryKey: ["player-history"] });
     },
     onError: (err: Error) => toastError("No se pudo cancelar", err.message),
   });
@@ -183,9 +194,8 @@ export default function PlayerRegistrationPanel({
     current.status !== "CANCELLED";
   const started = tournamentHasStarted(tournament);
   const closed = tournament.status !== "registrationOpen";
-  const occupied = category?.occupiedPairs ?? 0;
-  const hasSpots = category != null && occupied < category.maxPairs;
-  const canRegister = Boolean(categoryId) && !holdsSpot && !started && !closed && hasSpots;
+  const quotaFull = category != null && acceptedPairs >= category.maxPairs;
+  const canRegister = Boolean(categoryId) && !holdsSpot && !started && !closed && !quotaFull;
   const canCancel =
     holdsSpot &&
     current != null &&
@@ -205,8 +215,6 @@ export default function PlayerRegistrationPanel({
     };
   } else if (closed) {
     blockedNotice = { type: "info", message: "Inscripciones cerradas" };
-  } else if (category != null && !hasSpots) {
-    blockedNotice = { type: "info", message: "Sin cupo" };
   }
 
   const waitingForMine = isAuthenticated && mine.isLoading && blockedNotice == null;
@@ -215,15 +223,33 @@ export default function PlayerRegistrationPanel({
     <>
       {waitingForMine ? (
         <p className="text-sm text-muted-foreground">Cargando tu inscripción…</p>
-      ) : canRegister ? (
-        <Button
-          type="button"
-          className="shrink-0"
-          data-testid="tournament-subscribe-cta"
-          onClick={() => setOpen(true)}
-        >
-          Inscribirme
-        </Button>
+      ) : canRegister || (quotaFull && !holdsSpot && !started && !closed) ? (
+        quotaFull ? (
+          <TooltipProvider delay={200}>
+            <Tooltip>
+              <TooltipTrigger render={<span className="inline-flex" />}>
+                <Button
+                  type="button"
+                  className="shrink-0"
+                  data-testid="tournament-subscribe-cta"
+                  disabled
+                >
+                  Inscribirme
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>El cupo de parejas aceptadas está completo.</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        ) : (
+          <Button
+            type="button"
+            className="shrink-0"
+            data-testid="tournament-subscribe-cta"
+            onClick={() => setOpen(true)}
+          >
+            Inscribirme
+          </Button>
+        )
       ) : blockedNotice ? (
         <div className="flex flex-wrap items-center justify-end gap-2">
           {canCancel ? (
@@ -360,7 +386,7 @@ export default function PlayerRegistrationPanel({
                   ))}
                 </div>
               ) : null}
-              <Button type="submit" disabled={register.isPending || !categoryId}>
+              <Button type="submit" disabled={register.isPending || !categoryId || quotaFull}>
                 Inscribirme
               </Button>
             </form>

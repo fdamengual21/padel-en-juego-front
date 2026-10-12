@@ -11,6 +11,8 @@ interface MatchScoreboardProps {
   /** Índice de la columna decisiva de tie-break (estilo distinto). */
   decidingSlotIndex?: number | null;
   editable?: boolean;
+  /** Si está, una columna cerrada (partido ya definido o set anterior incompleto) no se edita. */
+  isSlotPlayable?: (index: number) => boolean;
   onChange?: (index: number, side: "A" | "B", value: string) => void;
   /** `sm` = filas de zona; `md` = modal de carga. */
   size?: "sm" | "md";
@@ -34,6 +36,7 @@ export default function MatchScoreboard({
   slotCount,
   decidingSlotIndex = null,
   editable = false,
+  isSlotPlayable,
   onChange,
   size = "sm",
   className,
@@ -56,6 +59,7 @@ export default function MatchScoreboard({
         slotCount={slots}
         decidingSlotIndex={decidingSlotIndex}
         editable={editable}
+        isSlotPlayable={isSlotPlayable}
         onChange={onChange}
         isMd={isMd}
         showDivider
@@ -67,6 +71,7 @@ export default function MatchScoreboard({
         slotCount={slots}
         decidingSlotIndex={decidingSlotIndex}
         editable={editable}
+        isSlotPlayable={isSlotPlayable}
         onChange={onChange}
         isMd={isMd}
       />
@@ -81,6 +86,7 @@ function ScoreboardRow({
   slotCount,
   decidingSlotIndex,
   editable,
+  isSlotPlayable,
   onChange,
   isMd,
   showDivider = false,
@@ -91,6 +97,7 @@ function ScoreboardRow({
   slotCount: number;
   decidingSlotIndex: number | null;
   editable: boolean;
+  isSlotPlayable?: (index: number) => boolean;
   onChange?: (index: number, side: "A" | "B", value: string) => void;
   isMd: boolean;
   showDivider?: boolean;
@@ -124,6 +131,7 @@ function ScoreboardRow({
         {Array.from({ length: slotCount }, (_, index) => {
           const isDeciding =
             decidingSlotIndex != null && index === decidingSlotIndex;
+          const playable = isSlotPlayable?.(index) ?? true;
           const value = cellValue(sets, index, side);
           return (
             <label
@@ -131,21 +139,33 @@ function ScoreboardRow({
               className={cn(
                 "flex items-center justify-center border-l border-border",
                 isMd ? "w-9" : "w-7",
-                isDeciding ? "bg-background" : "bg-primary/15",
+                !playable
+                  ? "bg-muted"
+                  : isDeciding
+                    ? "bg-background"
+                    : "bg-primary/15",
               )}
-              title={isDeciding && slotCount > 1 ? "Tie-break" : `Set ${index + 1}`}
+              title={
+                !playable
+                  ? "Este set no se juega"
+                  : isDeciding && slotCount > 1
+                    ? "Tie-break"
+                    : `Set ${index + 1}`
+              }
             >
               <span className="sr-only">
                 {isDeciding ? "Tie-break" : `Set ${index + 1}`} pareja {side}
               </span>
               {editable && onChange ? (
                 <ScoreCellInput
-                  value={value}
+                  value={playable ? value : 0}
                   showZero={
-                    cellValue(sets, index, "A") > 0 ||
-                    cellValue(sets, index, "B") > 0
+                    playable &&
+                    (cellValue(sets, index, "A") > 0 ||
+                      cellValue(sets, index, "B") > 0)
                   }
                   isMd={isMd}
+                  disabled={!playable}
                   onChange={(next) => onChange(index, side, next)}
                 />
               ) : (
@@ -171,11 +191,13 @@ function ScoreCellInput({
   value,
   showZero,
   isMd,
+  disabled = false,
   onChange,
 }: {
   value: number;
   showZero: boolean;
   isMd: boolean;
+  disabled?: boolean;
   onChange: (value: string) => void;
 }) {
   // Vacío al empezar; si el set ya tiene marcador, el 0 se muestra (ej. 6-0).
@@ -186,12 +208,15 @@ function ScoreCellInput({
       type="text"
       inputMode="numeric"
       autoComplete="off"
+      disabled={disabled}
       className={cn(
-        "w-full bg-transparent text-center font-semibold tabular-nums text-foreground outline-none",
+        "w-full bg-transparent text-center font-semibold tabular-nums outline-none",
+        disabled ? "cursor-not-allowed text-muted-foreground" : "text-foreground",
         isMd ? "text-sm py-1.5" : "text-xs py-1",
       )}
       value={display}
       onChange={(e) => {
+        if (disabled) return;
         onChange(
           String(parseIntegerFromForm(e.target.value, { max: 99, maxDigits: 2 })),
         );

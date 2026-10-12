@@ -4,6 +4,7 @@ interface PlayerHomeStatsProps {
   tournamentsWon: number;
   matchesWon: number;
   matchesLost: number;
+  reservationsCount: number;
 }
 
 function StatCard({
@@ -34,10 +35,11 @@ export default function PlayerHomeStats({
   tournamentsWon,
   matchesWon,
   matchesLost,
+  reservationsCount,
 }: PlayerHomeStatsProps) {
   return (
     <div
-      className="grid grid-cols-2 gap-2 sm:grid-cols-4"
+      className="grid grid-cols-2 gap-2 sm:grid-cols-3"
       data-testid="player-home-stats"
     >
       <StatCard label="Partidos jugados" value={matchesPlayed} />
@@ -52,6 +54,7 @@ export default function PlayerHomeStats({
         value={`${matchesWon}–${matchesLost}`}
         hint="Ganados – perdidos"
       />
+      <StatCard label="Reservas" value={reservationsCount} />
     </div>
   );
 }
