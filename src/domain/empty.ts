@@ -114,7 +114,8 @@ export function emptyCuadroBoard(categoryId: string): CuadroBoardView {
     pairLabels: {},
     pairPlayerNames: {},
     matchRules: DEFAULT_MATCH_RULES,
-    unassignedPairs: [],
+    unresolvedTies: [],
+    pairingCandidates: [],
     notice: null,
   };
 }
@@ -133,7 +134,7 @@ export function emptyZonesBoard(categoryId: string): ZonesBoardView {
     allMatches: [],
     slots: [],
     finishedGroupIds: [],
-    unassignedPairs: [],
+    unresolvedTies: [],
     notice: null,
     autoAssign: {
       phase: null,
@@ -151,6 +152,15 @@ export function emptyParticipantsBoard(): ParticipantsBoardView {
     generatedAt: new Date().toISOString(),
     rows: [],
     tournamentStarted: false,
+    admission: { allowed: true, reason: null },
+    capacity: {
+      maxPairs: 0,
+      completePairs: 0,
+      soloPlayers: 0,
+      heldSpots: 0,
+      inDraw: 0,
+      full: false,
+    },
     notice: null,
     autoMatches: [],
   };

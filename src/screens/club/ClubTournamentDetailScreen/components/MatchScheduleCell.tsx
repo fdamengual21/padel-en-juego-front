@@ -297,7 +297,7 @@ export default function MatchCourtSelect({
       >
         <select
           key={`${match.id}-${match.courtId ?? "none"}-${selectEpoch}`}
-          className="h-8 w-full rounded-md border border-border bg-background px-1.5 text-sm"
+          className="h-7 w-full rounded-md border border-border bg-background px-1.5 text-xs"
           disabled={disabled || isSaving}
           value={match.courtId ?? ""}
           onChange={(e) => {
@@ -353,7 +353,7 @@ export function MatchHorarioButton({
       disabled={disabled}
       data-testid="match-horario-button"
       className={cn(
-        "rounded-md px-1 py-0.5 text-left text-sm whitespace-nowrap transition-colors",
+        "rounded-md px-1 py-0.5 text-left text-xs whitespace-nowrap transition-colors",
         disabled
           ? "cursor-not-allowed text-muted-foreground"
           : "text-sidebar underline-offset-2 hover:bg-muted hover:underline",

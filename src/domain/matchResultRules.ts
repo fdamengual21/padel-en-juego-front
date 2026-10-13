@@ -213,6 +213,47 @@ export function isMatchResultComplete(
   return match.winnerPairId === expected;
 }
 
+/** Lado ganador del partido, si ya está definido. */
+export function matchWinnerSide(match: {
+  winnerPairId: string | null;
+  pairAId: string | null;
+  pairBId: string | null;
+}): "A" | "B" | null {
+  if (match.winnerPairId && match.winnerPairId === match.pairAId) return "A";
+  if (match.winnerPairId && match.winnerPairId === match.pairBId) return "B";
+  return null;
+}
+
+/** Hay un marcador o un ganador para mostrar, aunque no se pueda editar. */
+export function matchResultIsViewable(match: {
+  status: string;
+  sets: SetScore[];
+  winnerPairId: string | null;
+}): boolean {
+  if (match.status === "finished" || match.status === "walkover") return true;
+  if (match.winnerPairId) return true;
+  return match.sets.some((set) => set.gamesA > 0 || set.gamesB > 0);
+}
+
+/**
+ * Abre el modal de resultado. Si no se puede editar, solo cuando ya hay marcador.
+ * Un partido cancelado nunca se edita.
+ */
+export function canOpenMatchResult(
+  match: {
+    status: string;
+    sets: SetScore[];
+    winnerPairId: string | null;
+    pairAId: string | null;
+    pairBId: string | null;
+  },
+  canEdit: boolean,
+): boolean {
+  if (!match.pairAId || !match.pairBId) return false;
+  if (match.status === "cancelled") return matchResultIsViewable(match);
+  return canEdit || matchResultIsViewable(match);
+}
+
 /**
  * Una columna se puede editar solo si los sets anteriores cierran
  * y el partido todavía no tiene ganador.

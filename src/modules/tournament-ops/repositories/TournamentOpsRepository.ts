@@ -56,8 +56,10 @@ import {
   type RegisterPairInput,
   type RegisterPairResult,
   type FinishTournamentResult,
+  type StartTournamentResult,
+  type ResolveTieResult,
+  type SetMatchPairingResult,
   type ScheduleResult,
-  type SyncCategoryStructureOptions,
   type AcceptRegistrationResult,
   type TournamentCategory,
   type TournamentGroup,
@@ -109,6 +111,7 @@ export interface ITournamentOpsRepository {
   }>;
   scheduleCategory(categoryId: string): Promise<ScheduleResult>;
   finishTournament(tournamentId: string): Promise<FinishTournamentResult>;
+  startTournament(tournamentId: string): Promise<StartTournamentResult>;
   listCourts(clubId: string): Promise<Court[]>;
   createCourt(input: CreateCourtInput): Promise<Court>;
   updateClub(id: string, patch: UpdateClubInput): Promise<Club>;
@@ -205,10 +208,7 @@ export interface ITournamentOpsRepository {
     pairId: string,
     input: UpdatePairPlayersInput,
   ): Promise<TournamentPair>;
-  syncCategoryStructure(
-    categoryId: string,
-    options?: SyncCategoryStructureOptions,
-  ): Promise<{
+  syncCategoryStructure(categoryId: string): Promise<{
     synced: boolean;
     message: string;
     groups: TournamentGroup[];
@@ -233,6 +233,15 @@ export interface ITournamentOpsRepository {
     options?: { force?: boolean; pairLabels?: Record<string, string> },
   ): Promise<Match>;
   setMatchStatus(matchId: string, status: MatchStatus): Promise<Match>;
+  resolveTie(
+    categoryId: string,
+    groupId: string,
+    input: { order: string[]; note: string },
+  ): Promise<ResolveTieResult>;
+  setMatchPairing(
+    matchId: string,
+    input: { pairAId: string; pairBId: string; note: string | null },
+  ): Promise<SetMatchPairingResult>;
   updateCategory(
     id: string,
     patch: Partial<Omit<TournamentCategory, "id" | "tournamentId">>,
@@ -362,6 +371,10 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
 
   async finishTournament(tournamentId: string) {
     return this.read<FinishTournamentResult>(`/club/tournaments/${tournamentId}/finish`, "post");
+  }
+
+  async startTournament(tournamentId: string) {
+    return this.read<StartTournamentResult>(`/club/tournaments/${tournamentId}/start`, "post");
   }
 
   async listCourts(_clubId: string) {
@@ -702,7 +715,7 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
     return this.read<TournamentPair>(`/club/tournaments/pairs/${pairId}`, "patch", input);
   }
 
-  async syncCategoryStructure(categoryId: string, _options?: SyncCategoryStructureOptions) {
+  async syncCategoryStructure(categoryId: string) {
     return this.read<{
       synced: boolean;
       message: string;
@@ -752,6 +765,25 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
 
   async setMatchStatus(matchId: string, status: MatchStatus) {
     return this.read<Match>(`/club/tournaments/matches/${matchId}/status`, "patch", { status });
+  }
+
+  async resolveTie(categoryId: string, groupId: string, input: { order: string[]; note: string }) {
+    return this.read<ResolveTieResult>(
+      `/club/tournaments/categories/${categoryId}/groups/${groupId}/tiebreak`,
+      "post",
+      input,
+    );
+  }
+
+  async setMatchPairing(
+    matchId: string,
+    input: { pairAId: string; pairBId: string; note: string | null },
+  ) {
+    return this.read<SetMatchPairingResult>(
+      `/club/tournaments/matches/${matchId}/pairing`,
+      "patch",
+      input,
+    );
   }
 
   async updateCategory(

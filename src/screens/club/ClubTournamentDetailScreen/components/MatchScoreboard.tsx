@@ -16,6 +16,8 @@ interface MatchScoreboardProps {
   onChange?: (index: number, side: "A" | "B", value: string) => void;
   /** `sm` = filas de zona; `md` = modal de carga. */
   size?: "sm" | "md";
+  /** En solo lectura: marca al ganador y atenúa al perdedor. */
+  winnerSide?: "A" | "B" | null;
   className?: string;
 }
 
@@ -39,6 +41,7 @@ export default function MatchScoreboard({
   isSlotPlayable,
   onChange,
   size = "sm",
+  winnerSide = null,
   className,
 }: MatchScoreboardProps) {
   const slots = Math.max(1, slotCount);
@@ -62,6 +65,7 @@ export default function MatchScoreboard({
         isSlotPlayable={isSlotPlayable}
         onChange={onChange}
         isMd={isMd}
+        rowTone={rowTone("A", winnerSide)}
         showDivider
       />
       <ScoreboardRow
@@ -74,9 +78,18 @@ export default function MatchScoreboard({
         isSlotPlayable={isSlotPlayable}
         onChange={onChange}
         isMd={isMd}
+        rowTone={rowTone("B", winnerSide)}
       />
     </div>
   );
+}
+
+function rowTone(
+  side: "A" | "B",
+  winnerSide: "A" | "B" | null,
+): "winner" | "loser" | "none" {
+  if (!winnerSide) return "none";
+  return side === winnerSide ? "winner" : "loser";
 }
 
 function ScoreboardRow({
@@ -89,6 +102,7 @@ function ScoreboardRow({
   isSlotPlayable,
   onChange,
   isMd,
+  rowTone: tone,
   showDivider = false,
 }: {
   names: [string, string];
@@ -100,6 +114,7 @@ function ScoreboardRow({
   isSlotPlayable?: (index: number) => boolean;
   onChange?: (index: number, side: "A" | "B", value: string) => void;
   isMd: boolean;
+  rowTone: "winner" | "loser" | "none";
   showDivider?: boolean;
 }) {
   return (
@@ -112,6 +127,7 @@ function ScoreboardRow({
       <div
         className={cn(
           "flex min-w-0 flex-col justify-center bg-muted/50",
+          tone === "winner" && "border-l-2 border-primary-strong",
           isMd ? "gap-0.5 px-2.5 py-1.5" : "gap-px px-2 py-1",
         )}
       >
@@ -119,7 +135,8 @@ function ScoreboardRow({
           <p
             key={`${side}-${i}-${name}`}
             className={cn(
-              "truncate font-medium leading-tight text-foreground",
+              "truncate leading-tight",
+              tone === "loser" ? "font-normal text-muted-foreground" : "font-medium text-foreground",
               isMd ? "text-xs" : "text-[11px]",
             )}
           >
@@ -171,7 +188,10 @@ function ScoreboardRow({
               ) : (
                 <span
                   className={cn(
-                    "font-semibold tabular-nums text-foreground",
+                    "tabular-nums",
+                    tone === "winner" && "font-bold text-primary-strong",
+                    tone === "loser" && "font-medium text-muted-foreground",
+                    tone === "none" && "font-semibold text-foreground",
                     isMd ? "text-sm py-1.5" : "text-xs py-1",
                   )}
                 >

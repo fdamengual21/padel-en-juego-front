@@ -20,10 +20,13 @@ export {
   enteredMatchSets,
   deriveWinnerPairIdFromSets,
   setWinnerSide,
+  matchWinnerSide,
+  matchResultIsViewable,
+  canOpenMatchResult,
 } from "./matchResultRules";
 export {
-  hasMatchStartedBySchedule,
   resolveMatchPlayStatus,
+  matchPlayStatusHint,
   matchPlayStatusLabel,
   validateMatchStatusTransition,
   validateMatchMutation,
@@ -31,6 +34,14 @@ export {
   type MatchMutationKind,
   type MatchMutationValidationResult,
 } from "./matchPlayStatus";
+export {
+  matchPairingBlockedReason,
+  tieBreakLabel,
+  tieBreakHint,
+  tournamentFormatLabel,
+  tournamentRulesSections,
+  type RulesSection,
+} from "./tournamentRules";
 export {
   findScheduleConflicts,
   listAvailableCourtsAt,

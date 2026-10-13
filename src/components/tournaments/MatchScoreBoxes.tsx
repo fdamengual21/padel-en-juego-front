@@ -6,8 +6,16 @@ interface MatchScoreBoxesProps {
   /** Columnas visibles (sets + tie-break decisivo si aplica). */
   slotCount: number;
   decidingSlotIndex?: number | null;
+  /** Fila del ganador del partido, en verde de texto; la otra queda atenuada. */
+  winnerSide?: "A" | "B" | null;
   size?: "sm" | "md";
   className?: string;
+}
+
+function scoreTone(side: "A" | "B", winnerSide?: "A" | "B" | null): string {
+  if (!winnerSide) return "font-semibold text-foreground";
+  if (side === winnerSide) return "font-bold text-primary-strong";
+  return "font-medium text-muted-foreground";
 }
 
 function cellValue(sets: SetScore[], index: number, side: "A" | "B"): number {
@@ -21,6 +29,7 @@ export default function MatchScoreBoxes({
   sets,
   slotCount,
   decidingSlotIndex = null,
+  winnerSide = null,
   size = "sm",
   className,
 }: MatchScoreBoxesProps) {
@@ -47,7 +56,8 @@ export default function MatchScoreBoxes({
               <span
                 key={index}
                 className={cn(
-                  "flex items-center justify-center font-semibold tabular-nums",
+                  "flex items-center justify-center tabular-nums",
+                  scoreTone(side, winnerSide),
                   large ? "h-8 w-8 text-sm" : "h-5 w-5 text-[11px]",
                   index > 0 && "border-l border-border",
                   isDeciding ? "bg-background" : "bg-primary/15",

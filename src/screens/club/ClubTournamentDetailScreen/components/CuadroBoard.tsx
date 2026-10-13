@@ -1,26 +1,59 @@
+import { useState } from "react";
 import type { CuadroBoardView, Match } from "@/domain";
-import BracketView from "@/components/tournaments/BracketView";
+import { matchPairingBlockedReason } from "@/domain";
+import BracketView, { displayZoneName } from "@/components/tournaments/BracketView";
 import { roundSectionLabel } from "@/lib/tournamentLabels";
+import MatchPairingModal from "./MatchPairingModal";
 
 interface CuadroBoardProps {
   board: CuadroBoardView;
   isLoading?: boolean;
   onOpenResult: (match: Match) => void;
+  onOpenPair?: (pairId: string) => void;
   /** Vista jugador/guest: copy sin “cargar resultado”. */
   readOnly?: boolean;
+  /** Cuadro armado (torneo comenzado): habilita cruces manuales. */
+  tournamentStarted?: boolean;
+  /** Torneo finalizado/cancelado. */
+  tournamentLocked?: boolean;
+  onSetPairing?: (input: {
+    matchId: string;
+    pairAId: string;
+    pairBId: string;
+    note: string | null;
+  }) => Promise<void> | void;
+  pairingSavingMatchId?: string | null;
 }
 
 export default function CuadroBoard({
   board,
   isLoading = false,
   onOpenResult,
+  onOpenPair,
   readOnly = false,
+  tournamentStarted = false,
+  tournamentLocked = false,
+  onSetPairing,
+  pairingSavingMatchId = null,
 }: CuadroBoardProps) {
+  const [pairingMatchId, setPairingMatchId] = useState<string | null>(null);
   const sortedRounds = [...board.rounds].sort((a, b) => a.order - b.order);
   const sectionTrail = [
-    "Zonas",
+    ...(board.groups.length ? ["Zonas"] : []),
     ...sortedRounds.map((r) => roundSectionLabel(r.type, r.name)),
   ].join(" → ");
+  const canEditPairing = Boolean(onSetPairing) && !readOnly && !tournamentLocked;
+  const pairingMatch =
+    pairingMatchId != null
+      ? (board.elimMatches.find((m) => m.id === pairingMatchId) ?? null)
+      : null;
+  const pairingRound = pairingMatch
+    ? (board.rounds.find((r) => r.id === pairingMatch.roundId) ?? null)
+    : null;
+  const unresolvedZones = board.unresolvedTies
+    .map((tie) => board.groups.find((g) => g.id === tie.groupId))
+    .filter((group): group is NonNullable<typeof group> => group != null)
+    .map((group) => displayZoneName(group.name));
 
   return (
     <div className="space-y-3" data-testid="cuadro-board">
@@ -29,9 +62,12 @@ export default function CuadroBoard({
           <p className="text-sm font-medium">Cuadro del torneo</p>
           <p className="text-sm text-muted-foreground">
             {sectionTrail}
-            {readOnly
-              ? ". Consultá horarios, estado y resultados."
+            {readOnly || tournamentLocked
+              ? ". Consultá horarios, estado y resultados. Tocá un marcador cargado para verlo."
               : ". Tocá una fila para cargar el resultado. Los primeros de zona entran cruzados al cuadro."}
+            {canEditPairing
+              ? " Con el lápiz podés fijar a mano un cruce todavía no jugado, solo entre parejas aceptadas dentro del cuadro."
+              : ""}
           </p>
           <p className="mt-1 text-[11px] text-muted-foreground">
             Actualizado{" "}
@@ -54,18 +90,14 @@ export default function CuadroBoard({
         </div>
       ) : null}
 
-      {board.unassignedPairs.length > 0 ? (
-        <div className="rounded-xl border border-border bg-card px-3 py-2">
-          <p className="text-xs font-medium text-foreground">
-            Parejas fuera del cuadro
-          </p>
-          <ul className="mt-1 space-y-1">
-            {board.unassignedPairs.map((p) => (
-              <li key={p.pairId} className="text-sm text-muted-foreground">
-                {p.label}
-              </li>
-            ))}
-          </ul>
+      {unresolvedZones.length ? (
+        <div
+          className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950"
+          data-testid="cuadro-unresolved-ties"
+        >
+          {unresolvedZones.length === 1
+            ? `${unresolvedZones[0]} tiene un empate que el reglamento no resuelve. Hasta que el club lo sortee desde la pestaña Zonas, esos lugares del cuadro quedan por definir.`
+            : `${unresolvedZones.join(", ")} tienen empates que el reglamento no resuelve. Hasta que el club los sortee desde la pestaña Zonas, esos lugares del cuadro quedan por definir.`}
         </div>
       ) : null}
 
@@ -78,9 +110,41 @@ export default function CuadroBoard({
         pairLabels={board.pairLabels}
         pairPlayerNames={board.pairPlayerNames}
         matchRules={board.matchRules}
-        onMatchClick={readOnly ? undefined : onOpenResult}
+        onMatchClick={onOpenResult}
+        canEditResult={!readOnly && !tournamentLocked}
+        onOpenPair={onOpenPair}
+        onEditPairing={canEditPairing ? (match) => setPairingMatchId(match.id) : undefined}
+        pairingBlockedReason={(match) =>
+          matchPairingBlockedReason(match, board.slots, tournamentStarted)
+        }
         heightClassName="h-[720px]"
       />
+
+      {onSetPairing ? (
+        <MatchPairingModal
+          open={Boolean(pairingMatch)}
+          match={pairingMatch}
+          roundLabel={
+            pairingRound ? roundSectionLabel(pairingRound.type, pairingRound.name) : "Ronda"
+          }
+          roundMatches={
+            pairingMatch
+              ? board.elimMatches.filter((m) => m.roundId === pairingMatch.roundId)
+              : []
+          }
+          candidateIds={board.pairingCandidates}
+          pairLabels={board.pairLabels}
+          isSubmitting={pairingMatch != null && pairingSavingMatchId === pairingMatch.id}
+          onOpenChange={(open) => {
+            if (!open) setPairingMatchId(null);
+          }}
+          onSubmit={async ({ pairAId, pairBId, note }) => {
+            if (!pairingMatch) return;
+            await onSetPairing({ matchId: pairingMatch.id, pairAId, pairBId, note });
+            setPairingMatchId(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

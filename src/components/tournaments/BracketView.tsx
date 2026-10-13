@@ -16,13 +16,13 @@ import type {
   TournamentGroup,
   TournamentRound,
 } from "@/domain";
-import { scoreboardSlotCount } from "@/domain";
+import { canOpenMatchResult, matchWinnerSide, scoreboardSlotCount } from "@/domain";
 import "@xyflow/react/dist/style.css";
 import RoundMatchesTable, {
   type MatchTableRow,
 } from "@/components/tournaments/RoundMatchesTable";
 import { formatScheduleShortEs } from "@/lib/dates";
-import { resolveMatchPlayStatus } from "@/lib/matchPlayStatus";
+import { matchPlayStatusHint, resolveMatchPlayStatus } from "@/lib/matchPlayStatus";
 import { roundSectionLabel } from "@/lib/tournamentLabels";
 import { cn } from "@/lib/utils";
 
@@ -45,6 +45,13 @@ interface BracketViewProps {
   groups?: TournamentGroup[];
   groupMatches?: Match[];
   onMatchClick?: (match: Match) => void;
+  /** Si es false, la fila solo abre cuando el partido ya tiene resultado. */
+  canEditResult?: boolean;
+  onOpenPair?: (pairId: string) => void;
+  /** Cruce manual en partidos de eliminación. Si falta, no se muestra la opción. */
+  onEditPairing?: (match: Match) => void;
+  /** Motivo por el que un cruce no se puede modificar; null si se puede. */
+  pairingBlockedReason?: (match: Match) => string | null;
   heightClassName?: string;
 }
 
@@ -58,6 +65,8 @@ type MatchesTableNodeData = {
   emptyLabel: string;
   testId: string;
   onOpenMatch?: (matchId: string) => void;
+  onOpenPair?: (pairId: string) => void;
+  onEditPairing?: (matchId: string) => void;
 };
 
 export function displayZoneName(name: string): string {
@@ -104,6 +113,8 @@ function MatchesTableNode({ data }: NodeProps) {
         showIndexColumn={d.showIndexColumn}
         emptyLabel={d.emptyLabel}
         onOpenMatch={d.onOpenMatch}
+        onOpenPair={d.onOpenPair}
+        onEditPairing={d.onEditPairing}
       />
     </div>
   );
@@ -184,6 +195,10 @@ export default function BracketView({
   groups = [],
   groupMatches = [],
   onMatchClick,
+  canEditResult = true,
+  onOpenPair,
+  onEditPairing,
+  pairingBlockedReason,
   heightClassName = "h-[560px]",
 }: BracketViewProps) {
   const groupNames = useMemo(() => {
@@ -253,11 +268,15 @@ export default function BracketView({
             vs,
             schedule: formatScheduleShortEs(match.scheduledAt),
             matchId: match.id,
+            pairAId: match.pairAId,
+            pairBId: match.pairBId,
             pairALabel: labelA,
             pairBLabel: labelB,
             sets: match.sets,
+            winnerSide: matchWinnerSide(match),
             playStatus: resolveMatchPlayStatus(match, matchRules),
-            canEdit: Boolean(match.pairAId && match.pairBId && onMatchClick),
+            statusHint: matchPlayStatusHint(match, slots, pairLabels),
+            canOpen: Boolean(onMatchClick && canOpenMatchResult(match, canEditResult)),
           };
         });
         const h = tableNodeHeight(rows.length);
@@ -277,6 +296,7 @@ export default function BracketView({
             emptyLabel: zoneWithoutMatchesLabel(group, pairLabels),
             testId: `zone-table-node-${displayZoneName(group.name)}`,
             onOpenMatch: openMatchHandler(zoneMatches, onMatchClick),
+            onOpenPair,
           } satisfies MatchesTableNodeData,
           sourcePosition: Position.Right,
           draggable: false,
@@ -316,11 +336,20 @@ export default function BracketView({
         vs: "—",
         schedule: formatScheduleShortEs(match.scheduledAt),
         matchId: match.id,
+        pairAId: match.pairAId,
+        pairBId: match.pairBId,
         pairALabel: resolvePairLabel(match, "A", slots, pairLabels, groupNames),
         pairBLabel: resolvePairLabel(match, "B", slots, pairLabels, groupNames),
         sets: match.sets,
+        winnerSide: matchWinnerSide(match),
         playStatus: resolveMatchPlayStatus(match, matchRules),
-        canEdit: Boolean(match.pairAId && match.pairBId && onMatchClick),
+        statusHint: matchPlayStatusHint(match, slots, pairLabels),
+        canOpen: Boolean(onMatchClick && canOpenMatchResult(match, canEditResult)),
+        pairingManual: match.pairingManual,
+        pairingNote: match.pairingNote,
+        pairingBlockedReason: onEditPairing
+          ? (pairingBlockedReason?.(match) ?? null)
+          : undefined,
       }));
       const h = tableNodeHeight(rows.length);
       const y = HEADER_H + Math.max(0, (referenceHeight - h) / 2);
@@ -350,6 +379,8 @@ export default function BracketView({
           emptyLabel: "Sin partidos en esta ronda.",
           testId: `round-table-node-${round.type}`,
           onOpenMatch: openMatchHandler(roundMatches, onMatchClick),
+          onOpenPair,
+          onEditPairing: openMatchHandler(roundMatches, onEditPairing),
         } satisfies MatchesTableNodeData,
         sourcePosition: Position.Right,
         targetPosition: Position.Left,
@@ -392,6 +423,10 @@ export default function BracketView({
     groups,
     groupMatches,
     onMatchClick,
+    canEditResult,
+    onOpenPair,
+    onEditPairing,
+    pairingBlockedReason,
     groupNames,
   ]);
 

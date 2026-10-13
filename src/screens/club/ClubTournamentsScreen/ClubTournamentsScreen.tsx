@@ -122,14 +122,12 @@ export default function ClubTournamentsScreen() {
         <p className="text-sm text-muted-foreground">No hay torneos con ese filtro.</p>
       ) : null}
 
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {items.map((tournament) => (
           <HomeTournamentCard
             key={tournament.id}
             tournament={tournament}
             to={ROUTES.club.tournamentDetail(tournament.id)}
-            showImage={false}
-            showClubName={false}
           />
         ))}
       </div>

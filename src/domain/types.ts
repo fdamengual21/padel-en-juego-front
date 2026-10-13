@@ -21,6 +21,16 @@ export interface FinishTournamentResult {
   message: string;
 }
 
+/** Respuesta de «Comenzar torneo». */
+export interface StartTournamentResult {
+  status: string;
+  message: string;
+  /** Solos que se unieron entre sí al comenzar. */
+  autoMatches: SoloPairAutoMatchResult[];
+  /** Nombres de los solos que quedaron sin pareja y se dieron de baja. */
+  leftOut: string[];
+}
+
 export type TournamentFormat =
   | "GROUPS_ELIMINATION"
   | "DIRECT_ELIMINATION"
@@ -66,15 +76,24 @@ export type MatchSlotSourceType =
   | "PAIR"
   | "GROUP_POSITION"
   | "MATCH_WINNER"
-  | "MATCH_LOSER";
+  | "MATCH_LOSER"
+  /** Lugar sin rival: la pareja del otro lado pasa directo. */
+  | "BYE";
 
+/**
+ * Criterio de desempate (orden FIP). Entre dos: enfrentamiento directo. Entre tres o más: sets y games
+ * contando solo los partidos entre las empatadas; después games de toda la zona; y por último lo que
+ * fije el club (sorteo). `UNRESOLVED`: el reglamento no alcanzó y el club todavía no resolvió.
+ */
 export type TieBreaker =
   | "POINTS"
   | "HEAD_TO_HEAD"
   | "SET_DIFFERENCE"
   | "GAME_DIFFERENCE"
-  | "GAMES_WON"
-  | "DRAW";
+  | "TOTAL_GAME_DIFFERENCE"
+  | "TOTAL_GAMES_WON"
+  | "MANUAL"
+  | "UNRESOLVED";
 
 export type RulesetPreset = "QUALITY" | "STANDARD" | "CUSTOM";
 
@@ -491,6 +510,18 @@ export interface GroupStanding {
   gamesWon: number;
   gamesLost: number;
   position: number;
+  /** Criterio que ubicó a la pareja respecto de las que empataron en puntos. Null si no hizo falta. */
+  tieBreak: TieBreaker | null;
+  /** El reglamento no alcanzó: el puesto espera el desempate del club. */
+  unresolved: boolean;
+  /** Cómo resolvió el club, cuando `tieBreak` es MANUAL. */
+  tieBreakNote: string | null;
+}
+
+/** Zona con parejas empatadas que esperan el desempate del club. */
+export interface UnresolvedTie {
+  groupId: string;
+  pairIds: string[];
 }
 
 export interface TournamentRound {
@@ -523,6 +554,10 @@ export interface Match {
   sets: SetScore[];
   /** Si true, AutoMatch no sobrescribe horario/cancha. */
   scheduleManual: boolean;
+  /** El club fijó las parejas del cruce a mano; el motor no las recalcula. */
+  pairingManual: boolean;
+  /** Motivo del cruce manual. */
+  pairingNote: string | null;
   /** Orden dentro de la zona o de la ronda. */
   sortOrder: number;
 }
@@ -789,12 +824,10 @@ export interface CuadroBoardView {
   pairLabels: Record<string, string>;
   pairPlayerNames: Record<string, [string, string]>;
   matchRules: MatchRules;
-  /** Parejas aceptadas y completas que aún no están en ninguna zona. */
-  unassignedPairs: Array<{
-    pairId: string;
-    label: string;
-    playerNames: [string, string];
-  }>;
+  /** Zonas con empates que esperan al club; sus puestos no pasan al cuadro. */
+  unresolvedTies: UnresolvedTie[];
+  /** Parejas que pueden ocupar un cruce a mano: aceptadas, en el cuadro y sin retiro. */
+  pairingCandidates: string[];
   notice: string | null;
 }
 
@@ -813,9 +846,40 @@ export interface ZonesBoardView {
   slots: MatchSlot[];
   /** Zonas con todos los partidos finalizados (pueden mostrar clasificados). */
   finishedGroupIds: string[];
-  unassignedPairs: CuadroBoardView["unassignedPairs"];
+  /** Zonas con empates que esperan al club. */
+  unresolvedTies: UnresolvedTie[];
   notice: string | null;
   autoAssign: AutoAssignPreview;
+}
+
+/** Respuesta del desempate manual de una zona. */
+export interface ResolveTieResult {
+  groupId: string;
+  standings: GroupStanding[];
+  message: string;
+}
+
+/** Respuesta del cruce manual. */
+export interface SetMatchPairingResult {
+  match: Match;
+  message: string;
+}
+
+/** Si la categoría puede recibir otra pareja y, si no, el motivo para mostrar. */
+export interface PairAdmission {
+  allowed: boolean;
+  reason: string | null;
+}
+
+/** Cupo de la categoría con la misma cuenta que valida la API: completas + solos de a dos. */
+export interface CategoryCapacity {
+  maxPairs: number;
+  completePairs: number;
+  soloPlayers: number;
+  heldSpots: number;
+  /** Parejas sentadas en alguna zona del cuadro. */
+  inDraw: number;
+  full: boolean;
 }
 
 /** Jugador de una inscripción, para el detalle de la tarjeta. */
@@ -872,8 +936,15 @@ export interface ParticipantsBoardView {
     availability?: RegistrationAvailability[];
     incomplete: boolean;
     disqualified: boolean;
+    /** La pareja está sentada en alguna zona del cuadro. */
+    inDraw: boolean;
+    /** Aceptada pero fuera del cuadro con el torneo comenzado: por qué. Null si no aplica. */
+    outOfDrawReason: string | null;
   }>;
+  /** El club dio comienzo al torneo (o ya terminó). No depende de horarios ni fechas. */
   tournamentStarted: boolean;
+  admission: PairAdmission;
+  capacity: CategoryCapacity;
   notice: string | null;
   /** Matches de solos aplicados (y persistidos) al armar este board. */
   autoMatches: SoloPairAutoMatchResult[];
@@ -1153,20 +1224,6 @@ export interface FindIdentityMatchesInput {
 
 export interface FindIdentityMatchesResult {
   matches: IdentityMatch[];
-}
-
-/** Opciones al sincronizar zonas / partidos / cuadro. */
-export interface SyncCategoryStructureOptions {
-  /**
-   * Si hay partidos jugados: conservar zonas y resultados (no regenerar).
-   * Si false, regenera anclando parejas ya jugadas a su zona.
-   */
-  preserveResults?: boolean;
-  /**
-   * Limpia agendas automáticas (!scheduleManual) y vuelve a auto-agendar.
-   * Usar al cambiar fechas / franja / tipo de partido del torneo.
-   */
-  rescheduleAuto?: boolean;
 }
 
 export interface DisqualifyRegistrationInput {

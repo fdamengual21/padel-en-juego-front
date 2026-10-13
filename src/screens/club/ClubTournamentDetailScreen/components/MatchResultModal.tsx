@@ -5,6 +5,7 @@ import {
   deriveWinnerPairIdFromSets,
   enteredMatchSets,
   isScoreSlotPlayable,
+  matchWinnerSide,
   scoreboardSlotCount,
   validateMatchResultSets,
 } from "@/domain";
@@ -27,6 +28,8 @@ interface MatchResultModalProps {
   pairBNames: [string, string];
   matchRules: MatchRules;
   isSubmitting?: boolean;
+  /** Marcador visible, sin editar ni guardar. */
+  readOnly?: boolean;
   onSubmit: (input: MatchResultInput) => Promise<void> | void;
 }
 
@@ -55,6 +58,7 @@ export default function MatchResultModal({
   pairBNames,
   matchRules,
   isSubmitting = false,
+  readOnly = false,
   onSubmit,
 }: MatchResultModalProps) {
   const maxSlots = scoreboardSlotCount(matchRules);
@@ -63,9 +67,10 @@ export default function MatchResultModal({
 
   useEffect(() => {
     if (!open || !match) return;
-    setSets(clearUnplayable(emptySets(maxSlots, match.sets), matchRules));
+    const filled = emptySets(maxSlots, match.sets);
+    setSets(readOnly ? filled : clearUnplayable(filled, matchRules));
     setError(null);
-  }, [open, match, maxSlots, matchRules]);
+  }, [open, match, maxSlots, matchRules, readOnly]);
 
   const enteredSets = useMemo(() => enteredMatchSets(sets), [sets]);
 
@@ -128,14 +133,18 @@ export default function MatchResultModal({
       >
         <DialogHeader className="px-4 pt-4">
           <DialogTitle>
-            {isEditingExisting ? "Editar resultado" : "Cargar resultado"}
+            {readOnly
+              ? "Resultado"
+              : isEditingExisting
+                ? "Editar resultado"
+                : "Cargar resultado"}
           </DialogTitle>
           <DialogDescription>
             Sets a ganar: {matchRules.setsToWin}
             {matchRules.superTiebreakEnabled
               ? `. La última columna es tie-break (a ${matchRules.superTiebreakPoints}) si van empatados.`
-              : "."}{" "}
-            Tocá los números para editar el marcador.
+              : "."}
+            {readOnly ? "" : " Tocá los números para editar el marcador."}
           </DialogDescription>
         </DialogHeader>
 
@@ -146,31 +155,40 @@ export default function MatchResultModal({
             sets={sets}
             slotCount={maxSlots}
             decidingSlotIndex={decidingSlotIndex}
-            editable
+            editable={!readOnly}
+            winnerSide={readOnly && match ? matchWinnerSide(match) : null}
             isSlotPlayable={(index) => isScoreSlotPlayable(sets, index, matchRules)}
             size="md"
-            onChange={patchSet}
+            onChange={readOnly ? undefined : patchSet}
           />
           {error ? <p className="mt-2 text-sm text-destructive">{error}</p> : null}
         </div>
 
         <DialogFooter className="px-4 pb-4">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isSubmitting}
-          >
-            Cancelar
-          </Button>
-          <Button
-            type="button"
-            data-testid="match-result-save"
-            disabled={!canSave || isSubmitting}
-            onClick={() => void handleSave()}
-          >
-            {isSubmitting ? "Guardando…" : "Guardar resultado"}
-          </Button>
+          {readOnly ? (
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cerrar
+            </Button>
+          ) : (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={isSubmitting}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                data-testid="match-result-save"
+                disabled={!canSave || isSubmitting}
+                onClick={() => void handleSave()}
+              >
+                {isSubmitting ? "Guardando…" : "Guardar resultado"}
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

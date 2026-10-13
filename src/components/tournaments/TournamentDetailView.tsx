@@ -5,6 +5,7 @@ import { LoaderCircle, Trash2 } from "lucide-react";
 import {
   OCCUPYING_REGISTRATION_STATUSES,
   createId,
+  canOpenMatchResult,
   isMatchResultComplete,
   isQualityPreset,
   resolveMatchDurationMinutes,
@@ -18,6 +19,7 @@ import MatchCard from "@/components/tournaments/MatchCard";
 import PlayerRegistrationPanel from "@/components/tournaments/PlayerRegistrationPanel";
 import RegistrationDetailModal from "@/components/tournaments/RegistrationDetailModal";
 import StatusBadge from "@/components/tournaments/StatusBadge";
+import TournamentRulesDialog from "@/components/tournaments/TournamentRulesDialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -131,6 +133,7 @@ export default function TournamentDetailView({
     ParticipantsBoardView["rows"][number]["pair"] | null
   >(null);
   const [confirmAddStartedOpen, setConfirmAddStartedOpen] = useState(false);
+  const [confirmStartOpen, setConfirmStartOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
   const [finishOpen, setFinishOpen] = useState(false);
   const [finishPhase, setFinishPhase] = useState<"confirm" | "pending" | "done">("confirm");
@@ -142,6 +145,7 @@ export default function TournamentDetailView({
   const [detailRow, setDetailRow] = useState<
     ParticipantsBoardView["rows"][number] | null
   >(null);
+  const [requestedPairId, setRequestedPairId] = useState<string | null>(null);
 
   const { data: tournament } = useQuery({
     queryKey: ["tournament", tournamentId, isClub],
@@ -172,7 +176,7 @@ export default function TournamentDetailView({
       isClub
         ? Api.TournamentOpsService().listPairs(categoryId)
         : Api.TournamentOpsService().listPublicPairs(categoryId),
-    enabled: Boolean(categoryId) && (activeTab === "partidos" || Boolean(resultMatchId)),
+    enabled: Boolean(categoryId),
   });
   const { data: registrations = [] } = useQuery({
     queryKey: ["registrations", categoryId],
@@ -233,18 +237,24 @@ export default function TournamentDetailView({
   });
   const {
     data: participantsBoard,
+    isFetching: participantsFetching,
+    isError: participantsError,
+    error: participantsQueryError,
   } = useQuery({
     queryKey: ["participants-board", categoryId],
     queryFn: () =>
       isClub
         ? Api.TournamentOpsService().getParticipantsBoard(categoryId)
         : Api.TournamentOpsService().getPublicParticipantsBoard(categoryId),
-    enabled: Boolean(categoryId) && activeTab === "participantes",
+    enabled:
+      Boolean(categoryId) &&
+      (activeTab === "participantes" || requestedPairId != null),
   });
 
   const toastedAutoMatchKeys = useRef(new Set<string>());
 
   useEffect(() => {
+    if (activeTab !== "participantes") return;
     const matches = participantsBoard?.autoMatches ?? [];
     if (!participantsBoard || matches.length === 0) return;
     const key = `${participantsBoard.generatedAt}:${matches
@@ -260,7 +270,34 @@ export default function TournamentDetailView({
     }
     void qc.invalidateQueries({ queryKey: ["pairs", categoryId] });
     void qc.invalidateQueries({ queryKey: ["registrations", categoryId] });
-  }, [participantsBoard, categoryId, qc]);
+  }, [participantsBoard, categoryId, qc, activeTab]);
+
+  useEffect(() => {
+    if (!requestedPairId || participantsFetching) return;
+    if (participantsError) {
+      setRequestedPairId(null);
+      toastError(
+        "No se pudo abrir la inscripción",
+        participantsQueryError instanceof Error ? participantsQueryError.message : undefined,
+      );
+      return;
+    }
+    if (!participantsBoard) return;
+    const row =
+      participantsBoard.rows.find((item) => item.pair.id === requestedPairId) ?? null;
+    setRequestedPairId(null);
+    if (row) setDetailRow(row);
+    else toastError("No se encontró la inscripción de esa pareja.");
+  }, [requestedPairId, participantsBoard, participantsFetching, participantsError, participantsQueryError]);
+
+  const openPairDetail = (pairId: string) => {
+    const row = participantsBoard?.rows.find((item) => item.pair.id === pairId);
+    if (row) {
+      setDetailRow(row);
+      return;
+    }
+    setRequestedPairId(pairId);
+  };
   const {
     data: cuadroBoard,
     isFetching: cuadroFetching,
@@ -570,12 +607,72 @@ export default function TournamentDetailView({
 
   const configRuleset = configBoard?.ruleset ?? ruleset;
 
+  const startMutation = useMutation({
+    mutationFn: () => Api.TournamentOpsService().startTournament(tournamentId),
+    onSuccess: async (result) => {
+      setConfirmStartOpen(false);
+      toastSuccess("Torneo comenzado", result.message);
+      await Promise.all([
+        invalidateOps(),
+        qc.invalidateQueries({ queryKey: ["tournaments"] }),
+      ]);
+    },
+    onError: (err: Error) => {
+      const logic = err instanceof ApiHttpError && err.status === 422;
+      toastError(
+        logic ? "No se puede comenzar" : "No se pudo comenzar el torneo",
+        logic ? err.message : undefined,
+      );
+    },
+  });
+
+  const resolveTieMutation = useMutation({
+    mutationFn: (input: { groupId: string; order: string[]; note: string }) =>
+      Api.TournamentOpsService().resolveTie(categoryId, input.groupId, {
+        order: input.order,
+        note: input.note,
+      }),
+    onSuccess: async (result) => {
+      toastSuccess("Empate resuelto", result.message);
+      await invalidateOps();
+    },
+    onError: (err: Error) => {
+      const logic = err instanceof ApiHttpError && err.status === 422;
+      toastError(
+        logic ? "No se puede desempatar así" : "No se pudo resolver el empate",
+        logic ? err.message : undefined,
+      );
+    },
+  });
+
+  const pairingMutation = useMutation({
+    mutationFn: (input: {
+      matchId: string;
+      pairAId: string;
+      pairBId: string;
+      note: string | null;
+    }) =>
+      Api.TournamentOpsService().setMatchPairing(input.matchId, {
+        pairAId: input.pairAId,
+        pairBId: input.pairBId,
+        note: input.note,
+      }),
+    onSuccess: async (result) => {
+      toastSuccess("Cruce actualizado", result.message);
+      await invalidateOps();
+    },
+    onError: (err: Error) => {
+      const logic = err instanceof ApiHttpError && err.status === 422;
+      toastError(
+        logic ? "No se puede fijar ese cruce" : "No se pudo modificar el cruce",
+        logic ? err.message : undefined,
+      );
+    },
+  });
+
   const saveConfig = useMutation({
-    mutationFn: async (input: {
-      values: TournamentFormValues;
-      preserveResults?: boolean;
-    }) => {
-      const { values, preserveResults } = input;
+    mutationFn: async (input: { values: TournamentFormValues }) => {
+      const { values } = input;
       const cfgTournament = configBoard?.tournament ?? tournament;
       const cfgCategory = configBoard?.category ?? category;
       if (!cfgTournament || !cfgCategory) throw new Error("Sin torneo");
@@ -624,10 +721,7 @@ export default function TournamentDetailView({
         ],
         groupCount: null,
       });
-      return Api.TournamentOpsService().syncCategoryStructure(cfgCategory.id, {
-        preserveResults,
-        rescheduleAuto: true,
-      });
+      return Api.TournamentOpsService().syncCategoryStructure(cfgCategory.id);
     },
     onSuccess: async (result) => {
       toastSuccess("Configuración guardada", result.message);
@@ -721,8 +815,40 @@ export default function TournamentDetailView({
     return <p className="text-muted-foreground">Cargando torneo…</p>;
   }
 
-  const accepted = registrations.filter((r) => r.status === "ACCEPTED").length;
-  const categoryFull = category != null && accepted >= category.maxPairs;
+  // Cupo con la misma cuenta que la API: parejas completas + solos de a dos.
+  // El tablero de participantes lo trae calculado; fuera de esa pestaña se arma local.
+  const localCapacity = (() => {
+    const pairById = new Map(pairs.map((pair) => [pair.id, pair]));
+    let completePairs = 0;
+    let soloPlayers = 0;
+    for (const reg of registrations) {
+      if (reg.status !== "ACCEPTED") continue;
+      const pair = pairById.get(reg.pairId);
+      if (pair && pair.player2Id == null) soloPlayers += 1;
+      else completePairs += 1;
+    }
+    const heldSpots = completePairs + Math.ceil(soloPlayers / 2);
+    const maxPairs = category?.maxPairs ?? 0;
+    const inDraw = new Set(
+      (zonesBoard?.groups ?? groups).flatMap((group) => group.pairIds),
+    ).size;
+    return {
+      maxPairs,
+      completePairs,
+      soloPlayers,
+      heldSpots,
+      inDraw,
+      full: maxPairs > 0 && heldSpots >= maxPairs,
+    };
+  })();
+  const capacity = participantsBoard?.capacity ?? localCapacity;
+  const categoryFull = category != null && capacity.full;
+  const admission = participantsBoard?.admission ?? { allowed: true, reason: null };
+  const addPairBlockedReason = !admission.allowed
+    ? (admission.reason ?? "No se pueden sumar parejas en este momento.")
+    : categoryFull
+      ? "El cupo de parejas aceptadas está completo."
+      : null;
   const matchRules =
     zonesBoard?.matchRules ??
     matchesBoard?.matchRules ??
@@ -733,20 +859,16 @@ export default function TournamentDetailView({
     (m) => resolveMatchPlayStatus(m, matchRules) === "started",
   ).length;
   const finishedCount = matches.filter((m) => isMatchResultComplete(m, matchRules)).length;
-  const structureLocked =
-    configBoard?.structureLocked ??
-    matches.some(
-      (m) =>
-        m.phase === "GROUP" &&
-        (m.status === "finished" || m.status === "walkover" || m.status === "inProgress"),
-    );
+  // Solo el botón «Comenzar torneo» inicia el torneo; horarios y canchas no cuentan.
   const tournamentStarted =
     participantsBoard?.tournamentStarted ??
-    (tournament.status === "inProgress" ||
-      tournament.status === "finished" ||
-      structureLocked);
+    (tournament.status === "inProgress" || tournament.status === "finished");
   const tournamentLocked =
     tournament.status === "finished" || tournament.status === "cancelled";
+  const canStartTournament =
+    isClub &&
+    !readOnly &&
+    (tournament.status === "draft" || tournament.status === "registrationOpen");
   const resultMatch = resultMatchId
     ? (matches.find((m) => m.id === resultMatchId) ??
         zonesBoard?.allMatches.find((m) => m.id === resultMatchId) ??
@@ -766,20 +888,9 @@ export default function TournamentDetailView({
   };
 
   const openResult = (match: Match) => {
-    if (readOnly) return;
-    if (!match.pairAId || !match.pairBId) return;
-    if (tournamentLocked) {
-      toastError(
-        tournament.status === "cancelled"
-          ? "No se puede modificar un partido de un torneo cancelado."
-          : "No se puede modificar un partido de un torneo finalizado.",
-      );
-      return;
-    }
-    if (match.status === "cancelled") {
-      toastError("No se puede modificar un partido cancelado.");
-      return;
-    }
+    const canEdit =
+      isClub && !readOnly && !tournamentLocked && match.status !== "cancelled";
+    if (!canOpenMatchResult(match, canEdit)) return;
     setResultMatchId(match.id);
   };
 
@@ -843,11 +954,20 @@ export default function TournamentDetailView({
   const visibleParticipantRows = (participantsBoard?.rows ?? []).filter(
     (row) => isClub || row.registration?.status === "ACCEPTED",
   );
+  const isOutOfDraw = (row: ParticipantsBoardView["rows"][number]) =>
+    row.outOfDrawReason != null && row.registration?.cancelledBy !== "club";
   const participantGroups = [
     {
       key: "active",
       title: null as string | null,
-      rows: visibleParticipantRows.filter((row) => row.registration?.cancelledBy !== "club"),
+      rows: visibleParticipantRows.filter(
+        (row) => row.registration?.cancelledBy !== "club" && !isOutOfDraw(row),
+      ),
+    },
+    {
+      key: "out-of-draw",
+      title: "Aceptadas fuera del cuadro",
+      rows: visibleParticipantRows.filter(isOutOfDraw),
     },
     {
       key: "removed",
@@ -855,6 +975,22 @@ export default function TournamentDetailView({
       rows: visibleParticipantRows.filter((row) => row.registration?.cancelledBy === "club"),
     },
   ].filter((group) => group.rows.length > 0);
+  // Resumen para la card: aceptadas que no entraron al cuadro, separando completas y solos.
+  const outOfDrawSummary = (() => {
+    if (!tournamentStarted) return null;
+    const outRows = (participantsBoard?.rows ?? []).filter(isOutOfDraw);
+    if (participantsBoard) {
+      const solos = outRows.filter((row) => row.incomplete).length;
+      const complete = outRows.length - solos;
+      const parts = [
+        complete > 0 ? `${complete} ${complete === 1 ? "aceptada" : "aceptadas"} fuera del cuadro` : null,
+        solos > 0 ? `${solos} sin pareja` : null,
+      ].filter(Boolean);
+      return parts.length ? parts.join(" · ") : null;
+    }
+    const outside = capacity.completePairs + capacity.soloPlayers - capacity.inDraw;
+    return outside > 0 ? `${outside} ${outside === 1 ? "aceptada" : "aceptadas"} fuera del cuadro` : null;
+  })();
 
   return (
     <div
@@ -872,6 +1008,11 @@ export default function TournamentDetailView({
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <h2 className="text-2xl font-semibold tracking-tight">{tournament.name}</h2>
             <StatusBadge status={tournament.status} />
+            <TournamentRulesDialog
+              format={tournament.format}
+              matchRules={matchRules}
+              categoryName={category?.name}
+            />
             {readOnly && categories.length > 1 ? (
               <select
                 aria-label="Categoría"
@@ -895,7 +1036,7 @@ export default function TournamentDetailView({
                 tournament={tournament}
                 categories={categories}
                 categoryId={categoryId}
-                acceptedPairs={accepted}
+                acceptedPairs={capacity.heldSpots}
                 onCategoryChange={setSelectedCategoryId}
               />
             </div>
@@ -912,6 +1053,17 @@ export default function TournamentDetailView({
                 pending={scheduleMutation.isPending || finishMutation.isPending}
                 onOpen={() => setAssignOpen(true)}
               />
+              {canStartTournament ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={startMutation.isPending}
+                  onClick={() => setConfirmStartOpen(true)}
+                  data-testid="start-tournament-button"
+                >
+                  Comenzar torneo
+                </Button>
+              ) : null}
               {tournament.status !== "finished" && tournament.status !== "cancelled" ? (
                 <Button
                   type="button"
@@ -946,7 +1098,22 @@ export default function TournamentDetailView({
                 : formatTournamentDayEs(tournament.startDate)
             }
           />
-          <SummaryStat label="Aceptados" value={`${accepted} parejas`} />
+          {tournamentStarted ? (
+            <SummaryStat
+              label="En cuadro"
+              value={`${capacity.inDraw} parejas`}
+              detail={outOfDrawSummary}
+            />
+          ) : (
+            <SummaryStat
+              label="Aceptados"
+              value={
+                capacity.soloPlayers > 0
+                  ? `${capacity.completePairs} parejas · ${capacity.soloPlayers} buscando pareja`
+                  : `${capacity.completePairs} parejas`
+              }
+            />
+          )}
           <SummaryStat
             label="Inscripción"
             value={
@@ -1000,24 +1167,37 @@ export default function TournamentDetailView({
                 : "Parejas inscriptas en la categoría."}
             </p>
             {isClub ? (
-              categoryFull ? (
+              addPairBlockedReason ? (
                 <TooltipProvider delay={200}>
                   <Tooltip>
                     <TooltipTrigger render={<span className="inline-flex" />}>
-                      <Button type="button" size="sm" disabled>
+                      <Button type="button" size="sm" disabled data-testid="add-pair-button">
                         Agregar pareja
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>El cupo de parejas aceptadas está completo.</TooltipContent>
+                    <TooltipContent className="max-w-xs">{addPairBlockedReason}</TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               ) : (
-                <Button type="button" size="sm" onClick={openAddPair}>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={openAddPair}
+                  data-testid="add-pair-button"
+                >
                   Agregar pareja
                 </Button>
               )
             ) : null}
           </div>
+          {isClub && !admission.allowed && admission.reason ? (
+            <p
+              className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+              data-testid="admission-notice"
+            >
+              {admission.reason}
+            </p>
+          ) : null}
           {participantsBoard?.notice ? (
             <p className="text-sm text-muted-foreground">{participantsBoard.notice}</p>
           ) : null}
@@ -1108,6 +1288,23 @@ export default function TournamentDetailView({
                           Incompleta
                         </span>
                       ) : null}
+                      {isOutOfDraw(row) ? (
+                        <TooltipProvider delay={200}>
+                          <Tooltip>
+                            <TooltipTrigger render={<span className="inline-flex" />}>
+                              <span
+                                className="rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-900"
+                                data-testid={`out-of-draw-${pair.id}`}
+                              >
+                                Fuera del cuadro
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              {row.outOfDrawReason}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      ) : null}
                     </div>
                     <p className="text-xs text-muted-foreground">
                       {reg?.registeredAt
@@ -1130,14 +1327,29 @@ export default function TournamentDetailView({
                     {isClub &&
                     (reg?.status === "PENDING" || reg?.status === "WAITLIST") ? (
                       <>
-                        <Button
-                          type="button"
-                          size="sm"
-                          disabled={acceptMutation.isPending}
-                          onClick={() => acceptMutation.mutate(reg.id)}
-                        >
-                          Aceptar
-                        </Button>
+                        {admission.allowed ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            disabled={acceptMutation.isPending}
+                            onClick={() => acceptMutation.mutate(reg.id)}
+                          >
+                            Aceptar
+                          </Button>
+                        ) : (
+                          <TooltipProvider delay={200}>
+                            <Tooltip>
+                              <TooltipTrigger render={<span className="inline-flex" />}>
+                                <Button type="button" size="sm" disabled>
+                                  Aceptar
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs">
+                                {admission.reason ?? "No se pueden sumar parejas en este momento."}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
                         <Button
                           type="button"
                           size="sm"
@@ -1247,6 +1459,7 @@ export default function TournamentDetailView({
                   : undefined
               }
               onOpenResult={openResult}
+              onOpenPair={openPairDetail}
               statusSavingMatchId={
                 isClub && setLive.isPending
                   ? (setLive.variables?.matchId ?? null)
@@ -1256,6 +1469,19 @@ export default function TournamentDetailView({
                 isClub
                   ? async (input) => {
                       await setLive.mutateAsync(input);
+                    }
+                  : undefined
+              }
+              unresolvedTies={zonesBoard.unresolvedTies}
+              tieSavingGroupId={
+                isClub && resolveTieMutation.isPending
+                  ? (resolveTieMutation.variables?.groupId ?? null)
+                  : null
+              }
+              onResolveTie={
+                isClub
+                  ? async (input) => {
+                      await resolveTieMutation.mutateAsync(input);
                     }
                   : undefined
               }
@@ -1271,7 +1497,22 @@ export default function TournamentDetailView({
               board={cuadroBoard}
               isLoading={cuadroFetching}
               onOpenResult={openResult}
+              onOpenPair={openPairDetail}
               readOnly={readOnly}
+              tournamentStarted={tournamentStarted}
+              tournamentLocked={tournamentLocked}
+              pairingSavingMatchId={
+                isClub && pairingMutation.isPending
+                  ? (pairingMutation.variables?.matchId ?? null)
+                  : null
+              }
+              onSetPairing={
+                isClub
+                  ? async (input) => {
+                      await pairingMutation.mutateAsync(input);
+                    }
+                  : undefined
+              }
             />
           ) : (
             <p className="text-sm text-muted-foreground">
@@ -1285,51 +1526,39 @@ export default function TournamentDetailView({
             <p className="text-sm text-muted-foreground">{matchesBoard.notice}</p>
           ) : null}
           <div className="grid gap-3 md:grid-cols-2">
-            {(matchesBoard?.groupMatches ?? []).map((match) => (
+            {(matchesBoard?.groupMatches ?? []).map((match) => {
+              const canEditMatch =
+                isClub && !readOnly && !tournamentLocked && match.status !== "cancelled";
+              const canOpen = canOpenMatchResult(match, canEditMatch);
+              const matchCard = (
+                <MatchCard
+                  match={match}
+                  pairALabel={
+                    (matchesBoard?.pairLabels ?? pairLabels)[match.pairAId ?? ""] ?? "A"
+                  }
+                  pairBLabel={
+                    (matchesBoard?.pairLabels ?? pairLabels)[match.pairBId ?? ""] ?? "B"
+                  }
+                  phaseLabel="Zonas"
+                  courtLabel={
+                    match.courtId
+                      ? (matchesBoard?.courtLabels[match.courtId] ?? null)
+                      : null
+                  }
+                />
+              );
+              return (
               <div key={match.id} className="space-y-2">
-                {readOnly ? (
-                  <MatchCard
-                    match={match}
-                    pairALabel={
-                      (matchesBoard?.pairLabels ?? pairLabels)[match.pairAId ?? ""] ??
-                      "A"
-                    }
-                    pairBLabel={
-                      (matchesBoard?.pairLabels ?? pairLabels)[match.pairBId ?? ""] ??
-                      "B"
-                    }
-                    phaseLabel="Zonas"
-                    courtLabel={
-                      match.courtId
-                        ? (matchesBoard?.courtLabels[match.courtId] ?? null)
-                        : null
-                    }
-                  />
-                ) : (
+                {canOpen ? (
                   <button
                     type="button"
                     className="w-full text-left"
                     onClick={() => openResult(match)}
-                    disabled={!match.pairAId || !match.pairBId}
                   >
-                    <MatchCard
-                      match={match}
-                      pairALabel={
-                        (matchesBoard?.pairLabels ?? pairLabels)[match.pairAId ?? ""] ??
-                        "A"
-                      }
-                      pairBLabel={
-                        (matchesBoard?.pairLabels ?? pairLabels)[match.pairBId ?? ""] ??
-                        "B"
-                      }
-                      phaseLabel="Zonas"
-                      courtLabel={
-                        match.courtId
-                          ? (matchesBoard?.courtLabels[match.courtId] ?? null)
-                          : null
-                      }
-                    />
+                    {matchCard}
                   </button>
+                ) : (
+                  matchCard
                 )}
                 {isClub &&
                 match.status === "scheduled" &&
@@ -1360,7 +1589,8 @@ export default function TournamentDetailView({
                   </Button>
                 ) : null}
               </div>
-            ))}
+              );
+            })}
           </div>
           {!matchesBoard ? (
             <p className="text-sm text-muted-foreground">Cargando partidos…</p>
@@ -1404,10 +1634,7 @@ export default function TournamentDetailView({
                   setPendingDateValues(values);
                   return;
                 }
-                await saveConfig.mutateAsync({
-                  values,
-                  preserveResults: true,
-                });
+                await saveConfig.mutateAsync({ values });
               }}
             />
           ) : (
@@ -1447,10 +1674,7 @@ export default function TournamentDetailView({
               disabled={saveConfig.isPending || !pendingDateValues}
               onClick={() => {
                 if (!pendingDateValues) return;
-                void saveConfig.mutateAsync({
-                  values: pendingDateValues,
-                  preserveResults: true,
-                });
+                void saveConfig.mutateAsync({ values: pendingDateValues });
               }}
             >
               Cambiar fecha
@@ -1582,13 +1806,34 @@ export default function TournamentDetailView({
         open={isClub && confirmAddStartedOpen}
         onOpenChange={setConfirmAddStartedOpen}
         title="Torneo en curso"
-        description="El torneo ya comenzó, ¿seguro que desea agregar una pareja? Se rearmará la estructura conservando resultados ya jugados cuando sea posible."
+        description="El torneo ya comenzó. La pareja nueva se suma a una zona que todavía no jugó y los partidos ya jugados quedan como están. ¿Querés agregarla?"
         cancelLabel="No"
         confirmLabel="Sí"
         onConfirm={() => {
           setConfirmAddStartedOpen(false);
           setEditingPair(null);
           setPairModalOpen(true);
+        }}
+      />
+
+      <WarningDialog
+        open={isClub && confirmStartOpen}
+        onOpenChange={(open) => {
+          if (startMutation.isPending) return;
+          setConfirmStartOpen(open);
+        }}
+        title="Comenzar torneo"
+        description={
+          capacity.soloPlayers > 0
+            ? `Se cierra la inscripción y se arma el cuadro con las ${capacity.completePairs} parejas aceptadas. Hay ${capacity.soloPlayers} jugadores sin pareja: se emparejan entre sí por orden de inscripción aunque jueguen del mismo lado; si queda uno impar, queda afuera. Esta acción no se deshace.`
+            : `Se cierra la inscripción y se arma el cuadro con las ${capacity.completePairs} parejas aceptadas. Esta acción no se deshace.`
+        }
+        cancelLabel="Cancelar"
+        confirmLabel="Comenzar"
+        isConfirming={startMutation.isPending}
+        onConfirm={() => {
+          if (startMutation.isPending) return;
+          startMutation.mutate();
         }}
       />
 
@@ -1760,7 +2005,13 @@ export default function TournamentDetailView({
       />
 
       <MatchResultModal
-        open={isClub && Boolean(resultMatch)}
+        open={Boolean(resultMatch)}
+        readOnly={
+          !isClub ||
+          readOnly ||
+          tournamentLocked ||
+          resultMatch?.status === "cancelled"
+        }
         onOpenChange={(open) => {
           if (!open) setResultMatchId(null);
         }}
@@ -1792,7 +2043,10 @@ export default function TournamentDetailView({
         isClub={isClub}
         showAvailability={isClub && requirePairAvailability}
         onOpenChange={(open) => {
-          if (!open) setDetailRow(null);
+          if (!open) {
+            setDetailRow(null);
+            setRequestedPairId(null);
+          }
         }}
       />
 
@@ -1810,11 +2064,21 @@ export default function TournamentDetailView({
   );
 }
 
-function SummaryStat({ label, value }: { label: string; value: string }) {
+function SummaryStat({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  /** Línea secundaria bajo el valor (p. ej. aceptadas que no entraron al cuadro). */
+  detail?: string | null;
+}) {
   return (
     <div>
       <dt className="text-sm text-muted-foreground">{label}</dt>
       <dd className="mt-1 text-base font-semibold text-foreground">{value}</dd>
+      {detail ? <dd className="text-xs text-amber-700">{detail}</dd> : null}
     </div>
   );
 }

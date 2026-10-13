@@ -22,10 +22,6 @@ export type HomeTournamentCardData = Pick<
 interface HomeTournamentCardProps {
   tournament: HomeTournamentCardData;
   to: string;
-  /** En el club la foto del predio se repite en todas las filas. */
-  showImage?: boolean;
-  /** En el club el nombre del predio también se repite. */
-  showClubName?: boolean;
 }
 
 const inscriptionChip: Record<string, { label: string; className: string }> = {
@@ -47,8 +43,6 @@ const inscriptionChip: Record<string, { label: string; className: string }> = {
 export default function HomeTournamentCard({
   tournament,
   to,
-  showImage = true,
-  showClubName = true,
 }: HomeTournamentCardProps) {
   const [failed, setFailed] = useState(false);
   const photo = failed ? null : (tournament.clubCoverUrl ?? tournament.clubAvatarUrl);
@@ -64,28 +58,26 @@ export default function HomeTournamentCard({
       className="flex gap-3 rounded-xl border border-border bg-card p-3.5 text-left"
       data-testid={`home-tournament-${tournament.id}`}
     >
-      {showImage ? (
-        <div className="relative size-[72px] shrink-0 overflow-hidden rounded-md bg-muted">
-          {photo ? (
-            <img
-              src={photo}
-              alt=""
-              className="absolute inset-0 size-full object-cover"
-              onError={() => setFailed(true)}
-            />
-          ) : (
-            <span className="absolute inset-0 flex items-center justify-center text-sm font-medium text-muted-foreground">
-              {initials(tournament.clubName || tournament.name)}
-            </span>
-          )}
-        </div>
-      ) : null}
+      <div className="relative size-[72px] shrink-0 overflow-hidden rounded-md bg-muted">
+        {photo ? (
+          <img
+            src={photo}
+            alt=""
+            className="absolute inset-0 size-full object-cover"
+            onError={() => setFailed(true)}
+          />
+        ) : (
+          <span className="absolute inset-0 flex items-center justify-center text-sm font-medium text-muted-foreground">
+            {initials(tournament.clubName || tournament.name)}
+          </span>
+        )}
+      </div>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex items-start justify-between gap-2">
           <p className="truncate text-sm font-semibold tracking-tight">{tournament.name}</p>
           <StatusBadge status={tournament.status} className="shrink-0" />
         </div>
-        {showClubName && tournament.clubName ? (
+        {tournament.clubName ? (
           <p className="truncate text-sm text-muted-foreground">{tournament.clubName}</p>
         ) : null}
         <p className="truncate text-sm text-muted-foreground">{category}</p>

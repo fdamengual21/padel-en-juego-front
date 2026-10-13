@@ -12,7 +12,8 @@ import {
   tournamentFormatLabel,
   type TournamentFormValues,
 } from "@/modules/tournaments/types";
-import { formatLongDateEs, parseIsoDateOnly } from "@/lib/dates";
+import { formatLongDateEs, parseIsoDateOnly, toIsoDateOnly } from "@/lib/dates";
+import { toastError } from "@/lib/toast";
 import {
   CATEGORY_LEVELS,
   formatCategoryLevel,
@@ -36,6 +37,12 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { circuitTypeLabel } from "@/modules/tournaments/types";
 
+function isoPlusDays(iso: string, days: number): string {
+  const date = parseIsoDateOnly(iso);
+  if (!date) return iso;
+  return toIsoDateOnly(new Date(date.getFullYear(), date.getMonth(), date.getDate() + days));
+}
+
 function isScoringFormat(format: TournamentFormat): boolean {
   return format === "GROUPS_ELIMINATION" || format === "DIRECT_ELIMINATION";
 }
@@ -43,8 +50,9 @@ function isScoringFormat(format: TournamentFormat): boolean {
 export function defaultTournamentFormValues(
   partial?: Partial<TournamentFormValues>,
 ): TournamentFormValues {
-  const startDate = partial?.startDate ?? "2026-10-01";
-  const endDate = partial?.endDate ?? "2026-10-03";
+  const today = toIsoDateOnly(new Date());
+  const startDate = partial?.startDate ?? today;
+  const endDate = partial?.endDate ?? isoPlusDays(startDate, 2);
   const requestedFormat = partial?.format ?? "GROUPS_ELIMINATION";
   const { phaseDays, ...rest } = partial ?? {};
   const matchPlayType = rest.matchPlayType ?? "STANDARD";
@@ -123,6 +131,10 @@ export default function TournamentForm({
   const [values, setValues] = useState<TournamentFormValues>(() =>
     defaultTournamentFormValues(initialValues),
   );
+  const [savedDates] = useState(() => ({
+    startDate: values.startDate,
+    endDate: values.endDate,
+  }));
 
   const patch = <K extends keyof TournamentFormValues>(
     key: K,
@@ -181,6 +193,12 @@ export default function TournamentForm({
 
   const summary = useMemo(() => buildCategoryDisplayName(values), [values]);
   const rulesPreview = useMemo(() => buildMatchRulesFromForm(values), [values]);
+  const today = useMemo(() => toIsoDateOnly(new Date()), []);
+  const endDateShown = values.format === "QUALITY" ? values.startDate : values.endDate;
+  const startDateInvalid = values.startDate !== savedDates.startDate && values.startDate < today;
+  const endDateInvalid = endDateShown !== savedDates.endDate && endDateShown < today;
+  const datesInvalid = startDateInvalid || endDateInvalid;
+  const endMinDate = values.startDate > today ? values.startDate : today;
 
   return (
     <form
@@ -188,6 +206,16 @@ export default function TournamentForm({
       data-testid="tournament-form"
       onSubmit={(e) => {
         e.preventDefault();
+        if (
+          (values.startDate !== savedDates.startDate && values.startDate < today) ||
+          (values.endDate !== savedDates.endDate && values.endDate < today)
+        ) {
+          toastError(
+            "La fecha no puede ser anterior a hoy",
+            "Elegí el día de hoy o uno posterior.",
+          );
+          return;
+        }
         void onSubmit(values);
       }}
     >
@@ -228,8 +256,10 @@ export default function TournamentForm({
                 <DatePicker
                   id="start"
                   value={values.startDate}
+                  minDate={today}
+                  invalid={startDateInvalid}
                   onChange={(next) => {
-                    if (next) patch("startDate", next);
+                    if (next && next >= today) patch("startDate", next);
                   }}
                 />
               </Field>
@@ -237,13 +267,19 @@ export default function TournamentForm({
                 <DatePicker
                   id="end"
                   value={values.format === "QUALITY" ? values.startDate : values.endDate}
-                  minDate={values.startDate}
+                  minDate={endMinDate}
+                  invalid={endDateInvalid}
                   disabled={values.format === "QUALITY"}
                   onChange={(next) => {
-                    if (next) patch("endDate", next);
+                    if (next && next >= today) patch("endDate", next);
                   }}
                 />
               </Field>
+              {datesInvalid ? (
+                <p className="col-span-2 text-xs text-destructive">
+                  La fecha no puede ser anterior a hoy.
+                </p>
+              ) : null}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Horario desde" htmlFor="tstart">
@@ -644,7 +680,11 @@ export default function TournamentForm({
       </div>
 
       <div className="flex justify-end pt-1">
-        <Button type="submit" data-testid="tournament-form-submit" disabled={isSubmitting}>
+        <Button
+          type="submit"
+          data-testid="tournament-form-submit"
+          disabled={isSubmitting || datesInvalid}
+        >
           {submitLabel}
         </Button>
       </div>

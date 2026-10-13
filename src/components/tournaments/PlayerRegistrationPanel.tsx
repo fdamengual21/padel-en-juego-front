@@ -30,6 +30,7 @@ interface PlayerRegistrationPanelProps {
   categories: TournamentCategory[];
   categoryId: string;
   /** Parejas aceptadas en la categoría seleccionada. */
+  /** Lugares ocupados del cupo (parejas completas + solos de a dos), igual que la API. */
   acceptedPairs: number;
   onCategoryChange: (categoryId: string) => void;
 }
@@ -85,28 +86,9 @@ function registrationNotice(
   };
 }
 
-function startInstant(tournament: Tournament): Date | null {
-  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(tournament.startDate ?? "");
-  if (!match) return null;
-  const time = /^(\d{2}):(\d{2})/.exec(tournament.dailyStartTime || "");
-  const hours = time ? Number(time[1]) : 0;
-  const minutes = time ? Number(time[2]) : 0;
-  return new Date(
-    Number(match[1]),
-    Number(match[2]) - 1,
-    Number(match[3]),
-    hours,
-    minutes,
-    0,
-    0,
-  );
-}
-
-/** El torneo ya salió de inscripción o llegó la hora de inicio. */
-function tournamentHasStarted(tournament: Tournament, now = new Date()): boolean {
-  if (tournament.status === "inProgress" || tournament.status === "finished") return true;
-  const start = startInstant(tournament);
-  return start != null && now >= start;
+/** El club dio comienzo al torneo (o ya terminó). La fecha sola no lo inicia. */
+function tournamentHasStarted(tournament: Tournament): boolean {
+  return tournament.status === "inProgress" || tournament.status === "finished";
 }
 
 export default function PlayerRegistrationPanel({

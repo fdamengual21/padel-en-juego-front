@@ -92,6 +92,10 @@ export class TournamentOpsService {
     return this.repository.finishTournament(tournamentId);
   }
 
+  startTournament(tournamentId: string) {
+    return this.repository.startTournament(tournamentId);
+  }
+
   listCourts(clubId: string) {
     return this.repository.listCourts(clubId);
   }
@@ -343,11 +347,8 @@ export class TournamentOpsService {
     return this.repository.updatePairPlayers(pairId, input);
   }
 
-  syncCategoryStructure(
-    categoryId: string,
-    options?: import("@/domain").SyncCategoryStructureOptions,
-  ) {
-    return this.repository.syncCategoryStructure(categoryId, options);
+  syncCategoryStructure(categoryId: string) {
+    return this.repository.syncCategoryStructure(categoryId);
   }
 
   acceptRegistration(registrationId: string) {
@@ -376,6 +377,19 @@ export class TournamentOpsService {
 
   setMatchStatus(matchId: string, status: import("@/domain").MatchStatus) {
     return this.repository.setMatchStatus(matchId, status);
+  }
+
+  /** Desempate manual (sorteo o criterio del club) cuando el reglamento no alcanzó. */
+  resolveTie(categoryId: string, groupId: string, input: { order: string[]; note: string }) {
+    return this.repository.resolveTie(categoryId, groupId, input);
+  }
+
+  /** Fija a mano las parejas de un cruce de eliminación sin jugar. */
+  setMatchPairing(
+    matchId: string,
+    input: { pairAId: string; pairBId: string; note: string | null },
+  ) {
+    return this.repository.setMatchPairing(matchId, input);
   }
 
   updateCategory(

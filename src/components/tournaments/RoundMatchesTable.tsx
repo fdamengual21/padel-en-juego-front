@@ -1,7 +1,14 @@
+import { Pencil } from "lucide-react";
 import type { Match } from "@/domain";
 import MatchPlayStatusChip from "@/components/tournaments/MatchPlayStatusChip";
 import MatchScoreBoxes from "@/components/tournaments/MatchScoreBoxes";
 import PairVsBlock from "@/components/tournaments/PairVsBlock";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { MatchPlayStatus } from "@/lib/matchPlayStatus";
 import { cn } from "@/lib/utils";
 
@@ -10,11 +17,22 @@ export interface MatchTableRow {
   vs: string;
   schedule: string;
   matchId: string;
+  pairAId?: string | null;
+  pairBId?: string | null;
   pairALabel: string;
   pairBLabel: string;
   sets: Match["sets"];
+  winnerSide?: "A" | "B" | null;
   playStatus: MatchPlayStatus;
-  canEdit: boolean;
+  /** Tooltip del estado (p. ej. por qué clasificó sin jugar). */
+  statusHint?: string | null;
+  /** La fila abre el marcador, para cargarlo o solo verlo. */
+  canOpen: boolean;
+  /** El club fijó este cruce a mano. */
+  pairingManual?: boolean;
+  pairingNote?: string | null;
+  /** Por qué no se puede modificar el cruce. Null si se puede. Undefined: sin opción de cruce manual. */
+  pairingBlockedReason?: string | null;
 }
 
 interface RoundMatchesTableProps {
@@ -26,6 +44,9 @@ interface RoundMatchesTableProps {
   showIndexColumn?: boolean;
   emptyLabel?: string;
   onOpenMatch?: (matchId: string) => void;
+  onOpenPair?: (pairId: string) => void;
+  /** Cruce manual (eliminación). Si falta, no se muestra el lápiz. */
+  onEditPairing?: (matchId: string) => void;
 }
 
 export default function RoundMatchesTable({
@@ -36,6 +57,8 @@ export default function RoundMatchesTable({
   showIndexColumn = true,
   emptyLabel = "Sin partidos.",
   onOpenMatch,
+  onOpenPair,
+  onEditPairing,
 }: RoundMatchesTableProps) {
   const colCount = showIndexColumn ? 5 : 4;
 
@@ -75,10 +98,10 @@ export default function RoundMatchesTable({
               key={row.matchId}
               className={cn(
                 "nodrag nopan border-t border-foreground/15",
-                row.canEdit && "cursor-pointer hover:bg-muted/50",
+                row.canOpen && "cursor-pointer hover:bg-muted/50",
               )}
               onClick={() => {
-                if (!row.canEdit || !onOpenMatch) return;
+                if (!row.canOpen || !onOpenMatch) return;
                 onOpenMatch(row.matchId);
               }}
             >
@@ -94,15 +117,66 @@ export default function RoundMatchesTable({
               <td className="px-1.5 py-1 align-middle">
                 <MatchPlayStatusChip
                   status={row.playStatus}
+                  hint={row.statusHint}
                   className="h-4 px-1.5 text-[10px]"
                 />
               </td>
               <td className="px-1.5 py-1 align-middle">
-                <PairVsBlock
-                  className="text-[10px]"
-                  pairALabel={row.pairALabel}
-                  pairBLabel={row.pairBLabel}
-                />
+                <div className="flex items-center gap-1.5">
+                  <PairVsBlock
+                    className="text-[10px]"
+                    pairAId={row.pairAId}
+                    pairBId={row.pairBId}
+                    pairALabel={row.pairALabel}
+                    pairBLabel={row.pairBLabel}
+                    winnerSide={row.winnerSide}
+                    onOpenPair={onOpenPair}
+                  />
+                  {row.pairingManual ? (
+                    <TooltipProvider delay={200}>
+                      <Tooltip>
+                        <TooltipTrigger render={<span className="inline-flex" />}>
+                          <span
+                            className="rounded border border-amber-300 bg-amber-50 px-1 py-px text-[9px] font-medium text-amber-900"
+                            data-testid={`pairing-manual-${row.matchId}`}
+                          >
+                            Manual
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          {row.pairingNote
+                            ? `Cruce fijado por el club: ${row.pairingNote}`
+                            : "Cruce fijado por el club. El motor no lo recalcula."}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  ) : null}
+                  {onEditPairing && row.pairingBlockedReason !== undefined ? (
+                    <TooltipProvider delay={200}>
+                      <Tooltip>
+                        <TooltipTrigger render={<span className="ml-auto inline-flex" />}>
+                          <button
+                            type="button"
+                            aria-label="Modificar cruce"
+                            data-testid={`edit-pairing-${row.matchId}`}
+                            disabled={row.pairingBlockedReason != null}
+                            className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              if (row.pairingBlockedReason != null) return;
+                              onEditPairing(row.matchId);
+                            }}
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          {row.pairingBlockedReason ?? "Modificar cruce: elegir a mano las dos parejas."}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  ) : null}
+                </div>
               </td>
               <td className="px-1.5 py-1 align-middle text-right">
                 <div className="inline-flex justify-end">
@@ -110,6 +184,7 @@ export default function RoundMatchesTable({
                     sets={row.sets}
                     slotCount={slotCount}
                     decidingSlotIndex={decidingSlotIndex}
+                    winnerSide={row.winnerSide}
                   />
                 </div>
               </td>

@@ -1,13 +1,9 @@
 import {
-  hasMatchStartedBySchedule,
+  matchPlayStatusHint,
   matchPlayStatusLabel,
   resolveMatchPlayStatus,
   type MatchPlayStatus,
 } from "@/domain";
 
 export type { MatchPlayStatus };
-export {
-  hasMatchStartedBySchedule,
-  matchPlayStatusLabel,
-  resolveMatchPlayStatus,
-};
+export { matchPlayStatusHint, matchPlayStatusLabel, resolveMatchPlayStatus };
