@@ -51,4 +51,8 @@ export class AuthService {
   resendConfirmation(email: string) {
     return this.repository.resendConfirmation(email);
   }
+
+  logout(refreshToken: string) {
+    return this.repository.logout(refreshToken);
+  }
 }

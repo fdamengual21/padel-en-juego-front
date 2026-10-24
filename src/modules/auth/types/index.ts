@@ -12,11 +12,6 @@ export interface LoginResponse {
   user: UserSummary;
 }
 
-export interface RegisterResponse {
-  userId: string;
-  email: string;
-}
-
 export interface LoginInput {
   email: string;
   password: string;

@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import Api from "@/api/Api";
 import type { AuthSession, PublicUser, Player } from "@/domain";
 import { toAuthSessionFromMe } from "@/modules/auth/mapAuthSession";
 import { userHasAssociatedClub } from "@/modules/auth/postAuthRedirect";
@@ -132,6 +133,12 @@ export function MockSessionProvider({ children }: { children: ReactNode }) {
   }, [clearAuth, queryClient]);
 
   const logout = useCallback(() => {
+    const refreshToken = useAuthStore.getState().refreshToken?.trim() ?? "";
+    if (refreshToken) {
+      void Api.AuthService()
+        .logout(refreshToken)
+        .catch(() => undefined);
+    }
     wipeSession();
   }, [wipeSession]);
 

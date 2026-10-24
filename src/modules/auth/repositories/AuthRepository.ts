@@ -8,15 +8,15 @@ import type {
   LoginInput,
   LoginResponse,
   RegisterInput,
-  RegisterResponse,
 } from "../types";
 
 export interface IAuthRepository {
-  register(input: RegisterInput): Promise<RegisterResponse>;
+  register(input: RegisterInput): Promise<string>;
   login(input: LoginInput): Promise<LoginResponse>;
   confirmEmail(input: ConfirmEmailInput): Promise<LoginResponse>;
   acceptInvite(input: AcceptInviteInput): Promise<AcceptInviteResponse>;
   resendConfirmation(email: string): Promise<string>;
+  logout(refreshToken: string): Promise<string>;
 }
 
 function compactRegister(input: RegisterInput): RegisterInput {
@@ -45,7 +45,7 @@ export class AuthRepository implements IAuthRepository {
   }
 
   async register(input: RegisterInput) {
-    const response = await this.axiosInstance.post<ApiEnvelope<RegisterResponse>>(
+    const response = await this.axiosInstance.post<ApiEnvelope<string>>(
       "/auth/register",
       compactRegister(input),
     );
@@ -80,6 +80,14 @@ export class AuthRepository implements IAuthRepository {
     const response = await this.axiosInstance.post<ApiEnvelope<string>>(
       "/auth/resend-confirmation",
       { email },
+    );
+    return readData(response);
+  }
+
+  async logout(refreshToken: string) {
+    const response = await this.axiosInstance.post<ApiEnvelope<string>>(
+      "/auth/logout",
+      { refreshToken },
     );
     return readData(response);
   }
