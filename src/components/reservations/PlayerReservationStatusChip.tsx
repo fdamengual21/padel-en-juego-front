@@ -25,6 +25,10 @@ const chips: Record<PlayerReservationStatus, { label: string; className: string 
     className:
       "border-transparent! bg-[color-mix(in_oklch,var(--destructive)_16%,var(--card))]! text-destructive",
   },
+  completed: {
+    label: "Jugado",
+    className: "border-transparent! bg-muted! text-muted-foreground",
+  },
 };
 
 export default function PlayerReservationStatusChip({

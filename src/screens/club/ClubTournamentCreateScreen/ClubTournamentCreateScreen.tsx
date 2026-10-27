@@ -35,15 +35,6 @@ export default function ClubTournamentCreateScreen() {
         endDate: values.endDate,
         dailyStartTime: values.dailyStartTime,
         dailyEndTime: values.dailyEndTime,
-        courtHoldStartTime:
-          values.format === "QUALITY" && values.courtHoldCourtIds.length > 0
-            ? values.courtHoldStartTime
-            : undefined,
-        courtHoldEndTime:
-          values.format === "QUALITY" && values.courtHoldCourtIds.length > 0
-            ? values.courtHoldEndTime
-            : undefined,
-        courtHoldCourtIds: values.format === "QUALITY" ? values.courtHoldCourtIds : [],
         status: "registrationOpen",
         format: values.format,
         registrationFee: values.registrationFee,

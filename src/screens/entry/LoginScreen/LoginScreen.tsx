@@ -4,6 +4,7 @@ import { FormProvider, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
 import { useUser } from "@/app/UserProvider";
+import TurnstileField from "@/components/auth/TurnstileField";
 import { InputField } from "@/components/Form";
 import { Button } from "@/components/ui/button";
 import { ApiHttpError } from "@/lib/apiClient";
@@ -30,6 +31,8 @@ export default function LoginScreen() {
   const [searchParams] = useSearchParams();
   const { loginAndResolveUser } = useUser();
   const [error, setError] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaReset, setCaptchaReset] = useState(0);
   const nextParam = searchParams.get("next");
   const redirectTo = nextParam && !isPlayerHomePath(nextParam) ? nextParam : "";
 
@@ -58,8 +61,14 @@ export default function LoginScreen() {
 
   const onSubmit = handleSubmit(async (values) => {
     setError(null);
+    if (!captchaToken) {
+      const message = "Completá la verificación.";
+      setError(message);
+      toastError("No se pudo ingresar", message);
+      return;
+    }
     try {
-      const me = await loginAndResolveUser(values);
+      const me = await loginAndResolveUser({ ...values, captchaToken });
       toastSuccess("Sesión iniciada");
       navigate(resolvePostAuthPath(me, nextParam), { replace: true });
     } catch (err) {
@@ -70,6 +79,9 @@ export default function LoginScreen() {
       if (err instanceof ApiHttpError && err.status === 403) {
         navigate(checkEmailHref(getValues("email")), { replace: false });
       }
+    } finally {
+      setCaptchaToken(null);
+      setCaptchaReset((value) => value + 1);
     }
   });
 
@@ -80,7 +92,7 @@ export default function LoginScreen() {
     >
       <div className="w-full max-w-md space-y-6">
         <div className="text-center">
-          <p className="text-sm text-muted-foreground">Easy padel</p>
+          <p className="text-sm text-muted-foreground">Start point</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">Ingresar</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             Usá el email y la contraseña de tu cuenta.
@@ -111,11 +123,16 @@ export default function LoginScreen() {
               id="login-password"
               required
             />
+            <TurnstileField
+              action="login"
+              resetKey={captchaReset}
+              onTokenChange={setCaptchaToken}
+            />
             {error ? <p className="text-sm text-destructive">{error}</p> : null}
             <Button
               type="submit"
               className="w-full"
-              disabled={isSubmitting || !isValid}
+              disabled={isSubmitting || !isValid || !captchaToken}
             >
               {isSubmitting ? "Ingresando…" : "Ingresar"}
             </Button>

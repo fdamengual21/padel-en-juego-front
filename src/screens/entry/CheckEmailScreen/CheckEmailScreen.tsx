@@ -66,7 +66,7 @@ export default function CheckEmailScreen() {
           <Mail className="size-6" />
         </div>
         <div>
-          <p className="text-sm text-muted-foreground">Easy padel</p>
+          <p className="text-sm text-muted-foreground">Start point</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">
             Revisá tu correo
           </h1>
@@ -83,30 +83,30 @@ export default function CheckEmailScreen() {
         </div>
 
         <FormProvider {...methods}>
-        <form
-          className="space-y-4 rounded-xl border border-border bg-card p-5 text-left"
-          onSubmit={onSubmit}
-          noValidate
-        >
-          <InputField
-            control={control}
-            name="email"
-            label="Email"
-            type="email"
-            autoComplete="email"
-            id="resend-email"
-            required
-          />
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
-          <Button
-            type="submit"
-            className="w-full"
-            variant="outline"
-            disabled={isSubmitting || !isValid}
+          <form
+            className="space-y-4 rounded-xl border border-border bg-card p-5 text-left"
+            onSubmit={onSubmit}
+            noValidate
           >
-            {isSubmitting ? "Enviando…" : "Reenviar correo"}
-          </Button>
-        </form>
+            <InputField
+              control={control}
+              name="email"
+              label="Email"
+              type="email"
+              autoComplete="email"
+              id="resend-email"
+              required
+            />
+            {error ? <p className="text-sm text-destructive">{error}</p> : null}
+            <Button
+              type="submit"
+              className="w-full"
+              variant="outline"
+              disabled={isSubmitting || !isValid}
+            >
+              {isSubmitting ? "Enviando…" : "Reenviar correo"}
+            </Button>
+          </form>
         </FormProvider>
 
         <p className="text-sm text-muted-foreground">

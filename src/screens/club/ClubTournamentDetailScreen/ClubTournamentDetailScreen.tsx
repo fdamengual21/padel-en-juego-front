@@ -5,6 +5,6 @@ import TournamentDetailView from "@/components/tournaments/TournamentDetailView"
 export default function ClubTournamentDetailScreen() {
   const { tournamentId = "" } = useParams();
   return (
-    <TournamentDetailView audience="club" tournamentId={tournamentId} />
+    <TournamentDetailView tournamentId={tournamentId} />
   );
 }

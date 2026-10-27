@@ -137,7 +137,9 @@ function normalizeSummary(raw: Record<string, unknown> | null): ClubReservationS
 }
 
 function asMineStatus(value: unknown): PlayerReservationStatus | null {
-  if (value === "pending" || value === "booked" || value === "rejected") return value;
+  if (value === "pending" || value === "booked" || value === "rejected" || value === "completed") {
+    return value;
+  }
   return null;
 }
 

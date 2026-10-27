@@ -1,7 +1,7 @@
 import type { AxiosInstance } from "axios";
 import { readData } from "@/config/axiosInstance";
 import type { PaginatedResult } from "@/domain";
-import { isCategoryLevel, isPlayerSidePreference } from "@/domain";
+import { CATEGORY_LEVELS, isCategoryLevel, isPlayerSidePreference } from "@/domain";
 import type { ApiEnvelope } from "@/lib/apiClient";
 import { resolveClubHeaderId } from "@/modules/auth/clubContext";
 import { useAuthStore } from "@/stores/authStore";
@@ -37,24 +37,40 @@ function asNullableNumber(value: unknown): number | null {
 
 function normalizeListItem(raw: Record<string, unknown>): ClubClientListItem {
   const level = asNullableNumber(raw.categoryLevel);
+  const sexId = asNullableNumber(raw.sexId);
   return {
     id: asString(raw.id),
     fullName: asString(raw.fullName),
     phone: asNullableString(raw.phone),
+    sexId: sexId != null && sexId > 0 ? sexId : null,
     categoryLevel: isCategoryLevel(level) ? level : null,
     avatarUrl: asNullableString(raw.avatarUrl),
   };
 }
 
+function uniqueSortedIds(values: number[] | undefined, valid: (id: number) => boolean): number[] {
+  return [...new Set((values ?? []).filter(valid))].sort((a, b) => a - b);
+}
+
+function categoryLevelsParam(values: number[] | undefined): number[] | undefined {
+  const levels = uniqueSortedIds(values, isCategoryLevel);
+  if (levels.length === 0 || levels.length === CATEGORY_LEVELS.length) return undefined;
+  return levels;
+}
+
+function sexIdsParam(values: number[] | undefined): number[] | undefined {
+  const ids = uniqueSortedIds(values, (id) => Number.isInteger(id) && id > 0);
+  return ids.length > 0 ? ids : undefined;
+}
+
 function normalizeClient(raw: Record<string, unknown>): ClubClient {
   const item = normalizeListItem(raw);
-  const sexId = asNullableNumber(raw.sexId);
   return {
     ...item,
     firstName: asString(raw.firstName),
     lastName: asString(raw.lastName),
     documentNumber: asNullableString(raw.documentNumber),
-    sexId: sexId != null && sexId > 0 ? sexId : null,
+    sexId: item.sexId,
     categoryLevel: item.categoryLevel,
     sidePreference: isPlayerSidePreference(raw.sidePreference) ? raw.sidePreference : null,
     hasAccount: raw.hasAccount === true,
@@ -76,10 +92,12 @@ export class ClientRepository implements IClientRepository {
     >("/club/clients", {
       params: {
         q: query.q?.trim() || undefined,
-        categoryLevel: query.categoryLevel ?? undefined,
+        categoryLevels: categoryLevelsParam(query.categoryLevels),
+        sexIds: sexIdsParam(query.sexIds),
         page: query.page,
         pageSize: query.pageSize,
       },
+      paramsSerializer: { indexes: null },
     });
     const data = readData(response) ?? {};
     const itemsRaw = Array.isArray(data.items) ? data.items : [];

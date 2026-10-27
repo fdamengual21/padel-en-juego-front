@@ -13,6 +13,9 @@ export type {
   TournamentFormat,
   TournamentStatus,
 } from "@/domain";
+export type { PublicTournamentPage } from "./publicTournamentPage";
+export type { PublicTournamentCategoryRef } from "./publicTournamentPage";
+export type { PublicTournamentPageDto } from "./publicTournamentPageDto";
 
 export interface CreateTournamentRequest {
   clubId: string;
@@ -21,10 +24,7 @@ export interface CreateTournamentRequest {
   startDate: string;
   endDate: string | null;
   dailyStartTime: string;
-  dailyEndTime: string;
-  courtHoldStartTime?: string;
-  courtHoldEndTime?: string;
-  courtHoldCourtIds?: string[];
+  dailyEndTime?: string;
   status: import("@/domain").TournamentStatus;
   format: TournamentFormat;
   registrationFee: number;
@@ -38,12 +38,6 @@ export interface TournamentFormValues {
   endDate: string;
   dailyStartTime: string;
   dailyEndTime: string;
-  /** Inicio del bloqueo de canchas. Solo Quality. */
-  courtHoldStartTime: string;
-  /** Fin del bloqueo de canchas. Solo Quality. */
-  courtHoldEndTime: string;
-  /** Canchas que ocupa el bloqueo. Solo Quality. */
-  courtHoldCourtIds: string[];
   /** Precio de inscripción del torneo. */
   registrationFee: number;
   /** Estructura del cuadro (grupos, eliminación, etc.). */
@@ -117,8 +111,6 @@ export function tournamentFormatLabel(format: TournamentFormat): string {
       return "Eliminación directa";
     case "ROUND_ROBIN":
       return "Todos contra todos";
-    case "QUALITY":
-      return "Quality";
     default:
       return "Zonas + eliminación";
   }
@@ -129,7 +121,7 @@ export interface PhaseOption {
   label: string;
 }
 
-/** Fases que se pueden ubicar en el calendario. Quality no usa esta grilla. */
+/** Fases que se pueden ubicar en el calendario. */
 export function phasesForFormat(format: TournamentFormat): PhaseOption[] {
   switch (format) {
     case "ROUND_ROBIN":
@@ -142,8 +134,6 @@ export function phasesForFormat(format: TournamentFormat): PhaseOption[] {
         { code: "SF", label: "Semifinal" },
         { code: "FINAL", label: "Final" },
       ];
-    case "QUALITY":
-      return [];
     default:
       return [
         { code: "GROUP", label: "Zonas" },

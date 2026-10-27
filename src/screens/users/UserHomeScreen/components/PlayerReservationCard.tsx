@@ -2,15 +2,18 @@ import { useState } from "react";
 import dayjs from "dayjs";
 import { ChevronRight } from "lucide-react";
 import { PlayerReservationStatusChip } from "@/components/reservations";
+import { cn } from "@/lib/utils";
 import type { PlayerReservation } from "@/modules/reservations";
 
 interface PlayerReservationCardProps {
   reservation: PlayerReservation;
+  className?: string;
   onOpen: (reservation: PlayerReservation) => void;
 }
 
 export default function PlayerReservationCard({
   reservation,
+  className,
   onOpen,
 }: PlayerReservationCardProps) {
   const [courtFailed, setCourtFailed] = useState(false);
@@ -24,7 +27,10 @@ export default function PlayerReservationCard({
   return (
     <button
       type="button"
-      className="flex w-96 shrink-0 cursor-pointer items-stretch gap-3 rounded-xl border border-border bg-card p-3.5 text-left"
+      className={cn(
+        "flex w-96 shrink-0 cursor-pointer items-stretch gap-3 rounded-xl border border-border bg-card p-3.5 text-left",
+        className,
+      )}
       data-testid={`player-reservation-card-${reservation.id}`}
       onClick={() => onOpen(reservation)}
     >

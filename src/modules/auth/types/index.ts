@@ -15,6 +15,7 @@ export interface LoginResponse {
 export interface LoginInput {
   email: string;
   password: string;
+  captchaToken: string;
 }
 
 export interface RegisterInput {
@@ -31,6 +32,7 @@ export interface RegisterInput {
   municipalityId?: number | null;
   acceptedPrivacyDocumentId: string;
   acceptedTermsDocumentId: string;
+  captchaToken: string;
 }
 
 export interface ConfirmEmailInput {

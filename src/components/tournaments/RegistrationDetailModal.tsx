@@ -29,7 +29,6 @@ interface RegistrationDetailModalProps {
   registration: ParticipantRegistrationView | null;
   categoryId: string;
   categoryName: string | null;
-  isClub: boolean;
   showAvailability: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -40,7 +39,6 @@ export default function RegistrationDetailModal({
   registration,
   categoryId,
   categoryName,
-  isClub,
   showAvailability,
   onOpenChange,
 }: RegistrationDetailModalProps) {
@@ -50,9 +48,7 @@ export default function RegistrationDetailModal({
   const playersQuery = useQuery({
     queryKey: ["participant-players", categoryId, playerIds.join(",")],
     queryFn: () =>
-      isClub
-        ? Api.TournamentOpsService().getParticipantPlayers(categoryId, playerIds)
-        : Api.TournamentOpsService().getPublicParticipantPlayers(categoryId, playerIds),
+      Api.TournamentOpsService().getParticipantPlayers(categoryId, playerIds),
     enabled: open && Boolean(categoryId) && playerIds.length > 0,
   });
 

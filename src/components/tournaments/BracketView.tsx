@@ -27,7 +27,7 @@ import { roundSectionLabel } from "@/lib/tournamentLabels";
 import { cn } from "@/lib/utils";
 
 const ZONE_W = 680;
-const ROUND_W = 600;
+const ROUND_W = 680;
 const COL_GAP = 64;
 const ROW_GAP = 28;
 const HEADER_H = 44;
@@ -52,6 +52,10 @@ interface BracketViewProps {
   onEditPairing?: (match: Match) => void;
   /** Motivo por el que un cruce no se puede modificar; null si se puede. */
   pairingBlockedReason?: (match: Match) => string | null;
+  /** Mover pareja entre rondas de eliminación. Si falta, no se muestra. */
+  onMovePair?: (match: Match) => void;
+  /** Motivo por el que no se puede mover; null si se puede. */
+  moveBlockedReason?: (match: Match) => string | null;
   heightClassName?: string;
 }
 
@@ -67,6 +71,7 @@ type MatchesTableNodeData = {
   onOpenMatch?: (matchId: string) => void;
   onOpenPair?: (pairId: string) => void;
   onEditPairing?: (matchId: string) => void;
+  onMovePair?: (matchId: string) => void;
 };
 
 export function displayZoneName(name: string): string {
@@ -115,6 +120,7 @@ function MatchesTableNode({ data }: NodeProps) {
         onOpenMatch={d.onOpenMatch}
         onOpenPair={d.onOpenPair}
         onEditPairing={d.onEditPairing}
+        onMovePair={d.onMovePair}
       />
     </div>
   );
@@ -199,6 +205,8 @@ export default function BracketView({
   onOpenPair,
   onEditPairing,
   pairingBlockedReason,
+  onMovePair,
+  moveBlockedReason,
   heightClassName = "h-[560px]",
 }: BracketViewProps) {
   const groupNames = useMemo(() => {
@@ -350,6 +358,7 @@ export default function BracketView({
         pairingBlockedReason: onEditPairing
           ? (pairingBlockedReason?.(match) ?? null)
           : undefined,
+        moveBlockedReason: onMovePair ? (moveBlockedReason?.(match) ?? null) : undefined,
       }));
       const h = tableNodeHeight(rows.length);
       const y = HEADER_H + Math.max(0, (referenceHeight - h) / 2);
@@ -381,6 +390,12 @@ export default function BracketView({
           onOpenMatch: openMatchHandler(roundMatches, onMatchClick),
           onOpenPair,
           onEditPairing: openMatchHandler(roundMatches, onEditPairing),
+          onMovePair: onMovePair
+            ? (matchId) => {
+                const match = roundMatches.find((item) => item.id === matchId);
+                if (match) onMovePair(match);
+              }
+            : undefined,
         } satisfies MatchesTableNodeData,
         sourcePosition: Position.Right,
         targetPosition: Position.Left,
@@ -427,6 +442,8 @@ export default function BracketView({
     onOpenPair,
     onEditPairing,
     pairingBlockedReason,
+    onMovePair,
+    moveBlockedReason,
     groupNames,
   ]);
 

@@ -26,3 +26,12 @@ export type {
   GroupConfigValidation,
   TournamentRuleset,
 } from '@/domain'
+export type { PublicZonesBoard } from './publicZonesBoard'
+export type { PublicZonesBoardDto } from './publicZonesBoardDto'
+export type { PublicParticipantsBoard, PublicParticipantRow } from './publicParticipantsBoard'
+export type { PublicParticipantsBoardDto } from './publicParticipantsBoardDto'
+export type { PublicCuadroBoard } from './publicCuadroBoard'
+export type { PublicCuadroBoardDto } from './publicCuadroBoardDto'
+export type { PublicMatchesBoard } from './publicMatchesBoard'
+export type { PublicMatchesBoardDto } from './publicMatchesBoardDto'
+export type { PlayerPlayedItem } from './playerPlayedItem'

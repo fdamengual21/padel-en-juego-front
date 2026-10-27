@@ -1,17 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import { CircleAlert, Plus, Users } from "lucide-react";
 import Api from "@/api/Api";
 import { PERMISSION_CLUB_CLIENTS_WRITE } from "@/authorization";
+import { EmptyState } from "@/components/EmptyState";
 import { PermissionsGuard } from "@/components/guards";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { CATEGORY_LEVELS, formatCategoryLevel } from "@/domain";
+import type { CategoryLevel } from "@/domain";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useMockSession } from "@/app/MockSessionProvider";
 import ClientFormDialog from "./components/ClientFormDialog";
 import ClientDetailModal from "@/screens/club/ClubClientDetailScreen/components/ClientDetailModal";
 import ClientSummaryCard from "./components/ClientSummaryCard";
+import ClientsFilters from "./components/ClientsFilters";
 import ClientsPagination from "./components/ClientsPagination";
 
 const PAGE_SIZE = 12;
@@ -20,22 +21,42 @@ export default function ClubClientsScreen() {
   const { clubId } = useMockSession();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const [categoryLevel, setCategoryLevel] = useState<number | "">("");
+  const [categoryLevels, setCategoryLevels] = useState<CategoryLevel[]>([]);
+  const [sexIds, setSexIds] = useState<number[]>([]);
   const [page, setPage] = useState(1);
   const [formOpen, setFormOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const debouncedSearch = useDebounce(search, 350);
 
+  const { data: sexes = [] } = useQuery({
+    queryKey: ["sexes"],
+    queryFn: () => Api.SexService().list(),
+  });
+
+  const sexById = useMemo(
+    () => new Map(sexes.map((sex) => [sex.id, sex])),
+    [sexes],
+  );
+
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, categoryLevel]);
+  }, [debouncedSearch, categoryLevels, sexIds]);
 
   const { data, isLoading, isFetching, isError } = useQuery({
-    queryKey: ["club-clients", clubId, debouncedSearch, categoryLevel, page, PAGE_SIZE],
+    queryKey: [
+      "club-clients",
+      clubId,
+      debouncedSearch,
+      categoryLevels.join(","),
+      sexIds.join(","),
+      page,
+      PAGE_SIZE,
+    ],
     queryFn: () =>
       Api.ClientService().list({
         q: debouncedSearch,
-        categoryLevel: categoryLevel === "" ? null : categoryLevel,
+        categoryLevels,
+        sexIds,
         page,
         pageSize: PAGE_SIZE,
       }),
@@ -47,7 +68,9 @@ export default function ClubClientsScreen() {
   const totalPages = data?.totalPages ?? 1;
   const totalItems = data?.totalItems ?? 0;
   const showSkeletons = isLoading || (isFetching && !data);
-  const hasFilters = Boolean(debouncedSearch.trim()) || categoryLevel !== "";
+  const hasFilters =
+    Boolean(debouncedSearch.trim()) || categoryLevels.length > 0 || sexIds.length > 0;
+  const showEmpty = !showSkeletons && items.length === 0;
 
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: ["club-clients", clubId] });
@@ -75,86 +98,63 @@ export default function ClubClientsScreen() {
         </PermissionsGuard>
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="w-full sm:w-[28rem]">
-          <label htmlFor="clients-search" className="sr-only">
-            Buscar clientes
-          </label>
-          <Input
-            id="clients-search"
-            type="search"
-            placeholder="Buscar por nombre, teléfono o DNI"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-10 px-3"
-            data-testid="clients-search"
-          />
-        </div>
-        <label className="sr-only" htmlFor="clients-category">
-          Categoría
-        </label>
-        <select
-          id="clients-category"
-          className="h-10 w-full shrink-0 rounded-lg border border-input bg-transparent px-3 text-sm sm:w-52"
-          value={categoryLevel}
-          onChange={(e) =>
-            setCategoryLevel(e.target.value === "" ? "" : Number(e.target.value))
-          }
-          data-testid="clients-category"
-        >
-          <option value="">Todas las categorías</option>
-          {CATEGORY_LEVELS.map((level) => (
-            <option key={level} value={level}>
-              {formatCategoryLevel(level)}
-            </option>
-          ))}
-        </select>
-        <Button
-          type="button"
-          variant="outline"
-          className="h-10 shrink-0"
-          disabled={!search.trim() && categoryLevel === ""}
-          onClick={() => {
-            setSearch("");
-            setCategoryLevel("");
-          }}
-          data-testid="clients-clear-filters"
-        >
-          Limpiar filtros
-        </Button>
-      </div>
+      <ClientsFilters
+        search={search}
+        onSearchChange={setSearch}
+        categoryLevels={categoryLevels}
+        onCategoryLevelsChange={setCategoryLevels}
+        sexIds={sexIds}
+        onSexIdsChange={setSexIds}
+        sexes={sexes}
+        canClear={hasFilters || Boolean(search.trim())}
+        onClear={() => {
+          setSearch("");
+          setCategoryLevels([]);
+          setSexIds([]);
+        }}
+      />
 
       {isFetching && data ? (
         <p className="text-xs text-muted-foreground">Actualizando…</p>
       ) : null}
 
-      {isError ? (
-        <p className="text-sm text-muted-foreground">
-          No se pudieron cargar los clientes.
-        </p>
-      ) : null}
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {showSkeletons
-          ? Array.from({ length: PAGE_SIZE }, (_, i) => (
-              <ClientCardSkeleton key={`sk-${i}`} />
-            ))
-          : items.map((client) => (
-              <ClientSummaryCard
-                key={client.id}
-                client={client}
-                onOpen={(id) => setDetailId(id)}
-              />
-            ))}
-      </div>
-
-      {!showSkeletons && items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          {hasFilters
-            ? "No hay clientes que coincidan con la búsqueda."
-            : "Todavía no hay clientes en este club."}
-        </p>
-      ) : null}
+      {showEmpty && isError ? (
+        <EmptyState
+          icon={CircleAlert}
+          tone="error"
+          title="No se pudieron cargar los clientes"
+          description="Reintentá en un momento."
+        />
+      ) : showEmpty ? (
+        <EmptyState
+          icon={Users}
+          title={
+            hasFilters
+              ? "No hay clientes que coincidan con la búsqueda."
+              : "Todavía no hay clientes en este club."
+          }
+        />
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {showSkeletons
+            ? Array.from({ length: PAGE_SIZE }, (_, i) => (
+                <ClientCardSkeleton key={`sk-${i}`} />
+              ))
+            : items.map((client) => (
+                <ClientSummaryCard
+                  key={client.id}
+                  client={client}
+                  sexCode={
+                    client.sexId != null ? (sexById.get(client.sexId)?.code ?? null) : null
+                  }
+                  sexLabel={
+                    client.sexId != null ? (sexById.get(client.sexId)?.name ?? null) : null
+                  }
+                  onOpen={(id) => setDetailId(id)}
+                />
+              ))}
+        </div>
+      )}
 
       <ClientsPagination
         page={data?.page ?? page}

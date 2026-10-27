@@ -9,4 +9,3 @@ export { default as MatchPlayStatusChip } from "./MatchPlayStatusChip";
 export { default as StatusBadge } from "./StatusBadge";
 export { default as Score } from "./Score";
 export { default as TournamentDetailView } from "./TournamentDetailView";
-export type { TournamentDetailAudience } from "./TournamentDetailView";

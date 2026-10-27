@@ -24,6 +24,8 @@ interface MatchPairingModalProps {
   isSubmitting?: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (input: { pairAId: string; pairBId: string; note: string | null }) => Promise<void> | void;
+  /** Abre el flujo para marcar Clasificó en este cruce. Si falta, no se muestra. */
+  onQualify?: () => void;
 }
 
 /**
@@ -40,6 +42,7 @@ export default function MatchPairingModal({
   isSubmitting = false,
   onOpenChange,
   onSubmit,
+  onQualify,
 }: MatchPairingModalProps) {
   const [pairAId, setPairAId] = useState("");
   const [pairBId, setPairBId] = useState("");
@@ -73,6 +76,15 @@ export default function MatchPairingModal({
   const sameChoice = pairAId !== "" && pairAId === pairBId;
   const unchanged = pairAId === (match?.pairAId ?? "") && pairBId === (match?.pairBId ?? "");
   const canSave = Boolean(pairAId && pairBId) && !sameChoice && !unchanged && !isSubmitting;
+  const canQualify =
+    Boolean(onQualify) &&
+    Boolean(match?.pairAId || match?.pairBId) &&
+    match != null &&
+    match.status !== "finished" &&
+    match.status !== "inProgress" &&
+    match.status !== "walkover" &&
+    match.status !== "cancelled" &&
+    !isSubmitting;
 
   const renderSelect = (id: string, value: string, onChange: (next: string) => void, label: string) => (
     <div className="space-y-1.5">
@@ -144,26 +156,44 @@ export default function MatchPairingModal({
           </p>
         </div>
 
-        <DialogFooter>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={isSubmitting}
-            onClick={() => onOpenChange(false)}
-          >
-            Cancelar
-          </Button>
-          <Button
-            type="button"
-            disabled={!canSave}
-            data-testid="match-pairing-submit"
-            onClick={() => {
-              if (!canSave) return;
-              void onSubmit({ pairAId, pairBId, note: note.trim() || null });
-            }}
-          >
-            {isSubmitting ? "Guardando…" : "Guardar cruce"}
-          </Button>
+        <DialogFooter className="sm:justify-between">
+          {onQualify ? (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!canQualify}
+              data-testid="match-pairing-qualify"
+              onClick={() => {
+                if (!canQualify) return;
+                onQualify();
+              }}
+            >
+              Clasificar a
+            </Button>
+          ) : (
+            <span />
+          )}
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isSubmitting}
+              onClick={() => onOpenChange(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              disabled={!canSave}
+              data-testid="match-pairing-submit"
+              onClick={() => {
+                if (!canSave) return;
+                void onSubmit({ pairAId, pairBId, note: note.trim() || null });
+              }}
+            >
+              {isSubmitting ? "Guardando…" : "Guardar cruce"}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

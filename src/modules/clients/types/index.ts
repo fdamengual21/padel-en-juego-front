@@ -2,6 +2,7 @@ export interface ClubClientListItem {
   id: string;
   fullName: string;
   phone: string | null;
+  sexId: number | null;
   categoryLevel: number | null;
   avatarUrl: string | null;
 }
@@ -23,7 +24,8 @@ export interface ClubClient {
 
 export interface ClubClientListQuery {
   q?: string;
-  categoryLevel?: number | null;
+  categoryLevels?: number[];
+  sexIds?: number[];
   page?: number;
   pageSize?: number;
 }

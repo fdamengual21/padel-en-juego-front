@@ -8,8 +8,8 @@ import type {
 /** Partidos estándar / no Quality: ~1 h. */
 export const NON_QUALITY_MATCH_DURATION_MINUTES = 60;
 
-/** Quality: referencia 2 h 15 (rango 2 h – 2 h 30). */
-export const QUALITY_MATCH_DURATION_MINUTES = 135;
+/** Quality: un set, ~30 min. */
+export const QUALITY_MATCH_DURATION_MINUTES = 30;
 
 /** Alias histórico; preferir `resolveMatchDurationMinutes`. */
 export const DEFAULT_MATCH_DURATION_MINUTES = NON_QUALITY_MATCH_DURATION_MINUTES;

@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import type { Court, CourtReservation, Match } from "@/domain";
+import { useQuery } from "@tanstack/react-query";
+import Api from "@/api/Api";
+import type { Court, CourtOccupancyItem, CourtReservation, Match } from "@/domain";
 import { findScheduleConflicts } from "@/domain";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -104,6 +106,14 @@ async function saveWithConflictCheck(input: {
   return true;
 }
 
+function occupancyHint(item: CourtOccupancyItem | undefined): string {
+  if (!item || item.status !== "occupied") return "";
+  if (item.reason === "reservation") return " (reserva)";
+  if (item.reason === "fixed") return " (fijo)";
+  if (item.reason === "match") return " (partido)";
+  return " (ocupada)";
+}
+
 interface MatchScheduleTimeModalProps {
   open: boolean;
   match: Match | null;
@@ -112,6 +122,7 @@ interface MatchScheduleTimeModalProps {
   allMatches: Match[];
   reservations?: CourtReservation[];
   matchDurationMinutes?: number;
+  showCourtOccupancy?: boolean;
   isSaving?: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (input: SaveSchedulePayload) => Promise<void> | void;
@@ -125,6 +136,7 @@ export function MatchScheduleTimeModal({
   allMatches,
   reservations,
   matchDurationMinutes,
+  showCourtOccupancy = false,
   isSaving = false,
   onOpenChange,
   onSave,
@@ -134,6 +146,14 @@ export function MatchScheduleTimeModal({
   const [courtId, setCourtId] = useState("");
   const { confirmConflicts, dialog: conflictDialog } =
     useScheduleConflictConfirm(pairLabels);
+  const occupancyAt = fromScheduleDateAndTime(date, time);
+  const { data: occupancy = [] } = useQuery({
+    queryKey: ["match-court-occupancy", match?.id, occupancyAt],
+    queryFn: () =>
+      Api.TournamentOpsService().listMatchCourtOccupancy(match!.id, occupancyAt!),
+    enabled: Boolean(showCourtOccupancy && open && match && occupancyAt),
+  });
+  const occupancyByCourt = new Map(occupancy.map((item) => [item.courtId, item]));
 
   useEffect(() => {
     if (!open || !match) return;
@@ -197,11 +217,16 @@ export function MatchScheduleTimeModal({
               onChange={(e) => setCourtId(e.target.value)}
             >
               <option value="">Sin cancha</option>
-              {courts.map((court) => (
-                <option key={court.id} value={court.id}>
-                  {court.name}
-                </option>
-              ))}
+              {courts.map((court) => {
+                const taken = occupancyByCourt.get(court.id);
+                const busy = taken?.status === "occupied" && court.id !== courtId;
+                return (
+                  <option key={court.id} value={court.id} disabled={busy}>
+                    {court.name}
+                    {occupancyHint(taken)}
+                  </option>
+                );
+              })}
             </select>
           </div>
           {!scheduleComplete ? (
@@ -262,6 +287,7 @@ interface MatchCourtSelectProps {
   allMatches: Match[];
   reservations?: CourtReservation[];
   matchDurationMinutes?: number;
+  showCourtOccupancy?: boolean;
   disabled?: boolean;
   isSaving?: boolean;
   onSave: (input: SaveSchedulePayload) => Promise<void> | void;
@@ -275,6 +301,7 @@ export default function MatchCourtSelect({
   allMatches,
   reservations,
   matchDurationMinutes,
+  showCourtOccupancy = false,
   disabled = false,
   isSaving = false,
   onSave,
@@ -283,6 +310,16 @@ export default function MatchCourtSelect({
     useScheduleConflictConfirm(pairLabels);
   /** Fuerza remount del select si se cancela (sin re-render el DOM queda en el valor nuevo). */
   const [selectEpoch, setSelectEpoch] = useState(0);
+  const { data: occupancy = [] } = useQuery({
+    queryKey: ["match-court-occupancy", match.id, match.scheduledAt],
+    queryFn: () =>
+      Api.TournamentOpsService().listMatchCourtOccupancy(
+        match.id,
+        match.scheduledAt!,
+      ),
+    enabled: Boolean(showCourtOccupancy && match.scheduledAt),
+  });
+  const occupancyByCourt = new Map(occupancy.map((item) => [item.courtId, item]));
 
   return (
     <>
@@ -321,11 +358,16 @@ export default function MatchCourtSelect({
           }}
         >
           <option value="">Sin cancha</option>
-          {courts.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
+          {courts.map((c) => {
+            const taken = occupancyByCourt.get(c.id);
+            const busy = taken?.status === "occupied" && c.id !== match.courtId;
+            return (
+              <option key={c.id} value={c.id} disabled={busy}>
+                {c.name}
+                {occupancyHint(taken)}
+              </option>
+            );
+          })}
         </select>
         {match.scheduleManual ? (
           <span className="text-[10px] text-muted-foreground">Manual</span>

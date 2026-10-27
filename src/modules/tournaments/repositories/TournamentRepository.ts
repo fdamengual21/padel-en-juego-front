@@ -1,9 +1,10 @@
 import type { AxiosInstance } from "axios";
 import { readData } from "@/config/axiosInstance";
 import type { PaginatedResult, TournamentCard } from "@/domain";
+import { asTournamentFormat } from "@/domain";
 import type { ApiEnvelope } from "@/lib/apiClient";
 import { normalizeTournamentCardPage } from "../mapTournamentCard";
-import type { CreateTournamentRequest, Tournament } from "../types";
+import type { CreateTournamentRequest, PublicTournamentPageDto, Tournament } from "../types";
 
 export interface PublicTournamentListQuery {
   q?: string | null;
@@ -26,6 +27,7 @@ export interface ITournamentRepository {
   listPublic(query?: PublicTournamentListQuery): Promise<PaginatedResult<TournamentCard>>;
   getById(id: string): Promise<Tournament | null>;
   getPublic(id: string): Promise<Tournament | null>;
+  getPublicView(id: string, categoryId?: string): Promise<PublicTournamentPageDto>;
   create(input: CreateTournamentRequest): Promise<Tournament>;
   update(
     id: string,
@@ -40,9 +42,7 @@ function asTournament(raw: Tournament): Tournament {
     endDate: raw.endDate ?? raw.startDate,
     dailyStartTime: raw.dailyStartTime ?? "",
     dailyEndTime: raw.dailyEndTime ?? "",
-    courtHoldStartTime: raw.courtHoldStartTime ?? "",
-    courtHoldEndTime: raw.courtHoldEndTime ?? "",
-    courtHoldCourtIds: raw.courtHoldCourtIds ?? [],
+    format: asTournamentFormat(raw.format),
     registrationFee: Number(raw.registrationFee ?? 0),
     clubName: raw.clubName ?? null,
     clubAvatarUrl: raw.clubAvatarUrl ?? null,
@@ -117,6 +117,14 @@ export class TournamentRepository implements ITournamentRepository {
     const response = await this.http.get<ApiEnvelope<Tournament>>(`/public/tournaments/${id}`);
     const data = readData(response);
     return data ? asTournament(data) : null;
+  }
+
+  async getPublicView(id: string, categoryId?: string): Promise<PublicTournamentPageDto> {
+    const response = await this.http.get<ApiEnvelope<PublicTournamentPageDto>>(
+      `/public/tournaments/${id}/view`,
+      { params: categoryId ? { categoryId } : undefined },
+    );
+    return readData(response);
   }
 
   async create(input: CreateTournamentRequest): Promise<Tournament> {

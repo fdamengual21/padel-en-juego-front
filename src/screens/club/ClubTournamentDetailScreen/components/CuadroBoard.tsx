@@ -1,9 +1,11 @@
 import { useState } from "react";
-import type { CuadroBoardView, Match } from "@/domain";
-import { matchPairingBlockedReason } from "@/domain";
+import type { CuadroBoardView, Match, MatchPhase } from "@/domain";
+import { knockoutRebuildBlockedReason, matchPairingBlockedReason } from "@/domain";
 import BracketView, { displayZoneName } from "@/components/tournaments/BracketView";
 import { roundSectionLabel } from "@/lib/tournamentLabels";
 import MatchPairingModal from "./MatchPairingModal";
+import MovePairPhaseModal from "./MovePairPhaseModal";
+import QualifyPairModal from "./QualifyPairModal";
 
 interface CuadroBoardProps {
   board: CuadroBoardView;
@@ -23,6 +25,10 @@ interface CuadroBoardProps {
     note: string | null;
   }) => Promise<void> | void;
   pairingSavingMatchId?: string | null;
+  onMovePair?: (input: { pairId: string; phase: MatchPhase }) => Promise<void> | void;
+  moveSaving?: boolean;
+  onQualifyPair?: (input: { matchId: string; pairId: string }) => Promise<void> | void;
+  qualifySaving?: boolean;
 }
 
 export default function CuadroBoard({
@@ -35,18 +41,50 @@ export default function CuadroBoard({
   tournamentLocked = false,
   onSetPairing,
   pairingSavingMatchId = null,
+  onMovePair,
+  moveSaving = false,
+  onQualifyPair,
+  qualifySaving = false,
 }: CuadroBoardProps) {
   const [pairingMatchId, setPairingMatchId] = useState<string | null>(null);
+  const [movingMatchId, setMovingMatchId] = useState<string | null>(null);
+  const [qualifyingMatchId, setQualifyingMatchId] = useState<string | null>(null);
   const sortedRounds = [...board.rounds].sort((a, b) => a.order - b.order);
   const sectionTrail = [
     ...(board.groups.length ? ["Zonas"] : []),
     ...sortedRounds.map((r) => roundSectionLabel(r.type, r.name)),
   ].join(" → ");
   const canEditPairing = Boolean(onSetPairing) && !readOnly && !tournamentLocked;
+  const canMovePairs =
+    Boolean(onMovePair) && !readOnly && !tournamentLocked && tournamentStarted;
+  const knockoutPhases = sortedRounds
+    .map((round) => round.type)
+    .filter((phase): phase is MatchPhase => phase !== "GROUP");
   const pairingMatch =
     pairingMatchId != null
       ? (board.elimMatches.find((m) => m.id === pairingMatchId) ?? null)
       : null;
+  const movingMatch =
+    movingMatchId != null
+      ? (board.elimMatches.find((m) => m.id === movingMatchId) ?? null)
+      : null;
+  const movingPairs = [movingMatch?.pairAId, movingMatch?.pairBId]
+    .filter((id): id is string => Boolean(id))
+    .map((pairId) => ({ pairId, names: pairMoveNames(pairId, board) }));
+  const qualifyingMatch =
+    qualifyingMatchId != null
+      ? (board.elimMatches.find((m) => m.id === qualifyingMatchId) ?? null)
+      : null;
+  const qualifyingPairs = [qualifyingMatch?.pairAId, qualifyingMatch?.pairBId]
+    .filter((id): id is string => Boolean(id))
+    .map((pairId) => ({ pairId, names: pairMoveNames(pairId, board) }));
+  const qualifyingRound = qualifyingMatch
+    ? (board.rounds.find((r) => r.id === qualifyingMatch.roundId) ?? null)
+    : null;
+  const nextQualifyIndex =
+    qualifyingMatch != null ? knockoutPhases.indexOf(qualifyingMatch.phase) : -1;
+  const nextQualifyPhase =
+    nextQualifyIndex >= 0 ? knockoutPhases[nextQualifyIndex + 1] : undefined;
   const pairingRound = pairingMatch
     ? (board.rounds.find((r) => r.id === pairingMatch.roundId) ?? null)
     : null;
@@ -117,6 +155,15 @@ export default function CuadroBoard({
         pairingBlockedReason={(match) =>
           matchPairingBlockedReason(match, board.slots, tournamentStarted)
         }
+        onMovePair={canMovePairs ? (match) => setMovingMatchId(match.id) : undefined}
+        moveBlockedReason={(match) =>
+          pairMoveBlockedReason(
+            match,
+            board.slots,
+            board.knockoutStructure?.rebuildBlockedReason ??
+              knockoutRebuildBlockedReason(board.elimMatches, board.slots),
+          )
+        }
         heightClassName="h-[720px]"
       />
 
@@ -143,8 +190,83 @@ export default function CuadroBoard({
             await onSetPairing({ matchId: pairingMatch.id, pairAId, pairBId, note });
             setPairingMatchId(null);
           }}
+          onQualify={
+            onQualifyPair && pairingMatch
+              ? () => {
+                  setQualifyingMatchId(pairingMatch.id);
+                  setPairingMatchId(null);
+                }
+              : undefined
+          }
+        />
+      ) : null}
+
+      {onQualifyPair ? (
+        <QualifyPairModal
+          open={Boolean(qualifyingMatch)}
+          roundLabel={
+            qualifyingRound
+              ? roundSectionLabel(qualifyingRound.type, qualifyingRound.name)
+              : "esta ronda"
+          }
+          nextRoundLabel={nextQualifyPhase ? roundSectionLabel(nextQualifyPhase) : null}
+          pairs={qualifyingPairs}
+          isSubmitting={qualifySaving}
+          onOpenChange={(open) => {
+            if (!open) setQualifyingMatchId(null);
+          }}
+          onSubmit={async (pairId) => {
+            if (!qualifyingMatch) return;
+            await onQualifyPair({ matchId: qualifyingMatch.id, pairId });
+            setQualifyingMatchId(null);
+          }}
+        />
+      ) : null}
+
+      {onMovePair ? (
+        <MovePairPhaseModal
+          open={Boolean(movingMatch)}
+          pairs={movingPairs}
+          currentPhase={movingMatch?.phase ?? null}
+          phases={knockoutPhases}
+          isSubmitting={moveSaving}
+          onOpenChange={(open) => {
+            if (!open) setMovingMatchId(null);
+          }}
+          onSubmit={async ({ pairId, phase }) => {
+            await onMovePair({ pairId, phase });
+            setMovingMatchId(null);
+          }}
         />
       ) : null}
     </div>
   );
+}
+
+function pairMoveNames(pairId: string, board: CuadroBoardView): [string, string] {
+  const named = board.pairPlayerNames[pairId];
+  if (named?.[0]) return named;
+  const label = board.pairLabels[pairId];
+  if (!label) return ["Pareja", ""];
+  const parts = label.split(/\s*\/\s*/).map((part) => part.trim()).filter(Boolean);
+  if (parts.length >= 2) return [parts[0], parts[1]];
+  return [label, ""];
+}
+
+function pairMoveBlockedReason(
+  match: Match,
+  slots: CuadroBoardView["slots"],
+  rebuildBlockedReason: string | null,
+): string | null {
+  if (rebuildBlockedReason) return rebuildBlockedReason;
+  if (match.status === "finished" || match.status === "inProgress") {
+    return "Esa pareja ya jugó en esta ronda.";
+  }
+  if (match.status === "walkover") {
+    const bye = slots.some((slot) => slot.matchId === match.id && slot.sourceType === "BYE");
+    if (!bye) return "Esa pareja ya jugó en esta ronda.";
+  }
+  if (match.status === "cancelled") return "Ese partido no está en el cuadro.";
+  if (!match.pairAId && !match.pairBId) return "Todavía no hay una pareja en este cruce.";
+  return null;
 }

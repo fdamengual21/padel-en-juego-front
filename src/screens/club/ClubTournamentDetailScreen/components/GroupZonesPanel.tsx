@@ -94,6 +94,8 @@ interface GroupZonesPanelProps {
   slots?: MatchSlot[];
   reservations?: import("@/domain").CourtReservation[];
   matchDurationMinutes?: number;
+  /** Quality: GET de ocupación al elegir fecha y hora. */
+  showCourtOccupancy?: boolean;
   scheduleSavingMatchId?: string | null;
   /** Torneo finalizado/cancelado: sin editar agenda, cancha ni resultado. */
   tournamentLocked?: boolean;
@@ -288,6 +290,7 @@ export default function GroupZonesPanel({
   slots = [],
   reservations = [],
   matchDurationMinutes,
+  showCourtOccupancy = false,
   scheduleSavingMatchId = null,
   tournamentLocked = false,
   finishedGroupIds = [],
@@ -668,6 +671,7 @@ export default function GroupZonesPanel({
                               allMatches={scheduleMatches}
                               reservations={reservations}
                               matchDurationMinutes={matchDurationMinutes}
+                              showCourtOccupancy={showCourtOccupancy}
                               disabled={!canEditSchedule}
                               isSaving={scheduleSavingMatchId === match.id}
                               onSave={onSaveSchedule}
@@ -812,6 +816,7 @@ export default function GroupZonesPanel({
                         allMatches={scheduleMatches}
                         reservations={reservations}
                         matchDurationMinutes={matchDurationMinutes}
+                        showCourtOccupancy={showCourtOccupancy}
                         disabled={!canEditSchedule}
                         isSaving={scheduleSavingMatchId === match.id}
                         onSave={onSaveSchedule}
@@ -834,6 +839,7 @@ export default function GroupZonesPanel({
           allMatches={scheduleMatches}
           reservations={reservations}
           matchDurationMinutes={matchDurationMinutes}
+          showCourtOccupancy={showCourtOccupancy}
           isSaving={
             scheduleMatch != null && scheduleSavingMatchId === scheduleMatch.id
           }

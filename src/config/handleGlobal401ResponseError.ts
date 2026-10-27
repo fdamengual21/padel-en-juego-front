@@ -9,6 +9,16 @@ type RetriableRequestConfig = InternalAxiosRequestConfig & {
   _retry?: boolean;
 };
 
+const ANONYMOUS_AUTH_PATHS = [
+  "/auth/login",
+  "/auth/refresh",
+  "/auth/register",
+  "/auth/confirm-email",
+  "/auth/resend-confirmation",
+  "/auth/logout",
+  "/auth/accept-invite",
+] as const;
+
 function endsWithAuthPath(url: string, suffix: string): boolean {
   if (url.startsWith("http://") || url.startsWith("https://")) {
     try {
@@ -20,18 +30,12 @@ function endsWithAuthPath(url: string, suffix: string): boolean {
   return url.endsWith(suffix);
 }
 
-/** Rutas de auth donde un 401 no debe disparar refresh. */
-export function shouldSkipGlobal401Handling(url: unknown): boolean {
+/** Login, registro y demás rutas anónimas: sin Bearer ni refresh global de 401. */
+export function isAnonymousAuthPath(url: unknown): boolean {
   if (typeof url !== "string" || url.trim() === "") {
     return false;
   }
-  return (
-    endsWithAuthPath(url, "/auth/login") ||
-    endsWithAuthPath(url, "/auth/refresh") ||
-    endsWithAuthPath(url, "/auth/register") ||
-    endsWithAuthPath(url, "/auth/confirm-email") ||
-    endsWithAuthPath(url, "/auth/resend-confirmation")
-  );
+  return ANONYMOUS_AUTH_PATHS.some((path) => endsWithAuthPath(url, path));
 }
 
 function clearStoredSession(): void {
@@ -53,7 +57,7 @@ export async function handleGlobal401ResponseError(
   const requestUrl = error.config?.url;
   if (
     error.response?.status !== 401 ||
-    shouldSkipGlobal401Handling(requestUrl) ||
+    isAnonymousAuthPath(requestUrl) ||
     !error.config
   ) {
     return Promise.reject(error);

@@ -31,11 +31,23 @@ export interface StartTournamentResult {
   leftOut: string[];
 }
 
+/** Respuesta al cancelar un torneo. */
+export interface CancelTournamentResult {
+  status: string;
+  message: string;
+}
+
 export type TournamentFormat =
   | "GROUPS_ELIMINATION"
   | "DIRECT_ELIMINATION"
-  | "ROUND_ROBIN"
-  | "QUALITY";
+  | "ROUND_ROBIN";
+
+/** Convierte un formato persistido. Quality viejo pasa a todos contra todos. */
+export function asTournamentFormat(value: string | null | undefined): TournamentFormat {
+  if (value === "DIRECT_ELIMINATION" || value === "ROUND_ROBIN") return value;
+  if (value === "QUALITY") return "ROUND_ROBIN";
+  return "GROUPS_ELIMINATION";
+}
 
 export type RegistrationStatus =
   | "PENDING"
@@ -96,6 +108,14 @@ export type TieBreaker =
   | "UNRESOLVED";
 
 export type RulesetPreset = "QUALITY" | "STANDARD" | "CUSTOM";
+
+/** Ocupación de una cancha en el horario de un partido Quality. */
+export interface CourtOccupancyItem {
+  courtId: string;
+  courtName: string;
+  status: "free" | "occupied";
+  reason: "reservation" | "fixed" | "match" | null;
+}
 
 /** Cómo se resuelven los iguales (40-40). */
 export type EqualsResolution = "goldenPoint" | "advantage";
@@ -237,6 +257,16 @@ export interface Player {
   createdAt: string;
 }
 
+/** Resultado de buscar un jugador con cuenta (compañero al inscribirse). */
+export interface RegisteredPlayerSearchItem {
+  id: string;
+  fullName: string;
+  categoryLevel: import("./categories").CategoryLevel | null;
+  avatarUrl: string | null;
+  /** Solo si el perfil lo publicó. */
+  phone: string | null;
+}
+
 export type {
   CategoryGender,
   CategoryKind,
@@ -260,15 +290,10 @@ export interface Tournament {
   description: string | null;
   startDate: string;
   endDate: string | null;
-  /** Ventana horaria diaria del torneo (HH:mm). */
+  /** Inicio de la ventana de juego (HH:mm). */
   dailyStartTime: string;
+  /** Legado. El autoasignado usa el cierre del club. */
   dailyEndTime: string;
-  /** Inicio del bloqueo de canchas de un Quality, HH:mm. */
-  courtHoldStartTime?: string;
-  /** Fin del bloqueo de canchas de un Quality, HH:mm. */
-  courtHoldEndTime?: string;
-  /** Canchas que ocupa el bloqueo de un Quality. */
-  courtHoldCourtIds?: string[];
   status: TournamentStatus;
   format: TournamentFormat;
   /**
@@ -413,6 +438,8 @@ export interface MyTournamentRegistration {
   registration: TournamentRegistration | null;
   pair: TournamentPair | null;
   partnerName: string | null;
+  partner: RegisteredPlayerSearchItem | null;
+  availability: RegistrationAvailability[];
 }
 
 /** Detalle de un auto-match de dos solos por preferencia de lado. */
@@ -485,6 +512,8 @@ export interface TournamentRuleset {
   tieBreakers: TieBreaker[];
   /** Derivado al sincronizar. No se configura a mano. */
   groupCount: number | null;
+  /** Rondas extra de la llave (R16, R32), separadas por coma. */
+  extraKnockoutPhases?: string;
 }
 
 export interface TournamentGroup {
@@ -812,6 +841,18 @@ export interface GenerateGroupsConfig {
   groupCount: number;
 }
 
+/** Rondas default, extra y las que el club puede agregar o quitar. */
+export interface KnockoutStructure {
+  pairCount: number;
+  extra: MatchPhase[];
+  defaultPhases: MatchPhase[];
+  addable: MatchPhase[];
+  removable: MatchPhase[];
+  active: MatchPhase[];
+  /** Por qué no se puede rearmar la llave (mover o cambiar fases). Null si se puede. */
+  rebuildBlockedReason?: string | null;
+}
+
 /** Vista procesada del cuadro (zonas + eliminación) para UI / futuro realtime. */
 export interface CuadroBoardView {
   categoryId: string;
@@ -828,6 +869,8 @@ export interface CuadroBoardView {
   unresolvedTies: UnresolvedTie[];
   /** Parejas que pueden ocupar un cruce a mano: aceptadas, en el cuadro y sin retiro. */
   pairingCandidates: string[];
+  /** Solo backoffice: rondas extra y acciones. El tab público no lo manda. */
+  knockoutStructure?: KnockoutStructure | null;
   notice: string | null;
 }
 
@@ -862,6 +905,12 @@ export interface ResolveTieResult {
 /** Respuesta del cruce manual. */
 export interface SetMatchPairingResult {
   match: Match;
+  message: string;
+}
+
+/** Respuesta al agregar, quitar o mover en la llave. */
+export interface KnockoutPhaseResult {
+  knockoutStructure: KnockoutStructure;
   message: string;
 }
 
@@ -1231,7 +1280,7 @@ export interface DisqualifyRegistrationInput {
   note: string;
 }
 
-/** Aceptar una inscripción pendiente (habilita armado de zonas/partidos). */
+/** Aceptar una inscripción pendiente y completa (habilita armado de zonas/partidos). */
 export interface AcceptRegistrationInput {
   registrationId: string;
 }

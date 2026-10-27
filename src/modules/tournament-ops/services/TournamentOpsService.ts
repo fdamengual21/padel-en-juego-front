@@ -1,3 +1,7 @@
+import { toPublicCuadroBoard } from "../helpers/toPublicCuadroBoard";
+import { toPublicMatchesBoard } from "../helpers/toPublicMatchesBoard";
+import { toPublicParticipantsBoard } from "../helpers/toPublicParticipantsBoard";
+import { toPublicZonesBoard } from "../helpers/toPublicZonesBoard";
 import type { ITournamentOpsRepository } from "../repositories/TournamentOpsRepository";
 import type { GenerateGroupsConfig, MatchResultInput } from "../types";
 
@@ -94,6 +98,10 @@ export class TournamentOpsService {
 
   startTournament(tournamentId: string) {
     return this.repository.startTournament(tournamentId);
+  }
+
+  cancelTournament(tournamentId: string) {
+    return this.repository.cancelTournament(tournamentId);
   }
 
   listCourts(clubId: string) {
@@ -210,6 +218,10 @@ export class TournamentOpsService {
     return this.repository.getPlayerHistory(...args);
   }
 
+  getPlayerPlayed(...args: Parameters<ITournamentOpsRepository["getPlayerPlayed"]>) {
+    return this.repository.getPlayerPlayed(...args);
+  }
+
   getPlayerPairMatches(...args: Parameters<ITournamentOpsRepository["getPlayerPairMatches"]>) {
     return this.repository.getPlayerPairMatches(...args);
   }
@@ -253,6 +265,10 @@ export class TournamentOpsService {
     return this.repository.searchPlayers(query, options);
   }
 
+  searchRegisteredPlayers(query: string, options?: { signal?: AbortSignal }) {
+    return this.repository.searchRegisteredPlayers(query, options);
+  }
+
   findIdentityMatches(input: import("@/domain").FindIdentityMatchesInput) {
     return this.repository.findIdentityMatches(input);
   }
@@ -288,6 +304,10 @@ export class TournamentOpsService {
     return this.repository.registerPairByPlayer(input);
   }
 
+  updateMyRegistration(input: import("@/domain").RegisterPairInput) {
+    return this.repository.updateMyRegistration(input);
+  }
+
   cancelMyRegistration(categoryId: string) {
     return this.repository.cancelMyRegistration(categoryId);
   }
@@ -316,24 +336,26 @@ export class TournamentOpsService {
     return this.repository.listPublicMatches(categoryId);
   }
 
-  getPublicCuadroBoard(categoryId: string) {
-    return this.repository.getPublicCuadroBoard(categoryId);
+  async getPublicCuadroBoard(categoryId: string) {
+    return toPublicCuadroBoard(await this.repository.getPublicCuadroBoard(categoryId));
   }
 
-  getPublicZonesBoard(categoryId: string) {
-    return this.repository.getPublicZonesBoard(categoryId);
+  async getPublicZonesBoard(categoryId: string) {
+    return toPublicZonesBoard(await this.repository.getPublicZonesBoard(categoryId));
   }
 
-  getPublicParticipantsBoard(categoryId: string) {
-    return this.repository.getPublicParticipantsBoard(categoryId);
+  async getPublicParticipantsBoard(categoryId: string) {
+    return toPublicParticipantsBoard(
+      await this.repository.getPublicParticipantsBoard(categoryId),
+    );
   }
 
   getPublicParticipantPlayers(categoryId: string, ids: string[]) {
     return this.repository.getPublicParticipantPlayers(categoryId, ids);
   }
 
-  getPublicMatchesBoard(categoryId: string) {
-    return this.repository.getPublicMatchesBoard(categoryId);
+  async getPublicMatchesBoard(categoryId: string) {
+    return toPublicMatchesBoard(await this.repository.getPublicMatchesBoard(categoryId));
   }
 
   getMyRegistration(categoryId: string) {
@@ -375,6 +397,10 @@ export class TournamentOpsService {
     return this.repository.updateMatchSchedule(matchId, input, options);
   }
 
+  listMatchCourtOccupancy(matchId: string, at: string) {
+    return this.repository.listMatchCourtOccupancy(matchId, at);
+  }
+
   setMatchStatus(matchId: string, status: import("@/domain").MatchStatus) {
     return this.repository.setMatchStatus(matchId, status);
   }
@@ -390,6 +416,26 @@ export class TournamentOpsService {
     input: { pairAId: string; pairBId: string; note: string | null },
   ) {
     return this.repository.setMatchPairing(matchId, input);
+  }
+
+  /** Marca que una pareja pasa este cruce sin jugar. */
+  qualifyMatchPair(matchId: string, pairId: string) {
+    return this.repository.qualifyMatchPair(matchId, pairId);
+  }
+
+  addKnockoutPhase(categoryId: string, phase: import("@/domain").MatchPhase) {
+    return this.repository.addKnockoutPhase(categoryId, phase);
+  }
+
+  removeKnockoutPhase(categoryId: string, phase: import("@/domain").MatchPhase) {
+    return this.repository.removeKnockoutPhase(categoryId, phase);
+  }
+
+  movePairToKnockoutPhase(
+    categoryId: string,
+    input: { pairId: string; phase: import("@/domain").MatchPhase },
+  ) {
+    return this.repository.movePairToKnockoutPhase(categoryId, input);
   }
 
   updateCategory(

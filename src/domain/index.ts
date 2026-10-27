@@ -36,6 +36,7 @@ export {
 } from "./matchPlayStatus";
 export {
   matchPairingBlockedReason,
+  knockoutRebuildBlockedReason,
   tieBreakLabel,
   tieBreakHint,
   tournamentFormatLabel,

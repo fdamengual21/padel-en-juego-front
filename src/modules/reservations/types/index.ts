@@ -32,7 +32,7 @@ export interface UpdateReservationInput {
 }
 
 /** Turno propio que Inicio lista. */
-export type PlayerReservationStatus = "pending" | "booked" | "rejected";
+export type PlayerReservationStatus = "pending" | "booked" | "rejected" | "completed";
 
 /** Club tal como llega en la reserva propia. */
 export interface PlayerReservationClub {

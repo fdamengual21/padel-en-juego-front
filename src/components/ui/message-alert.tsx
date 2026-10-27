@@ -2,6 +2,7 @@ import type { ComponentProps } from "react";
 import type { LucideIcon } from "lucide-react";
 import { CircleCheck, CircleX, Info, TriangleAlert } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { cn } from "@/lib/utils";
 
 export type MessageAlertType = "info" | "success" | "warning" | "red";
 
@@ -28,9 +29,16 @@ export default function MessageAlert({
 }: MessageAlertProps) {
   const { variant, icon: Icon } = presentation[type];
   return (
-    <Alert variant={variant} className={className} {...props}>
-      <Icon aria-hidden />
-      <AlertDescription>{message}</AlertDescription>
+    <Alert
+      variant={variant}
+      className={cn(
+        "flex h-8 items-center gap-1.5 py-0 *:[svg]:row-auto *:[svg]:translate-y-0",
+        className,
+      )}
+      {...props}
+    >
+      <Icon aria-hidden className="size-3.5" />
+      <AlertDescription className="leading-none">{message}</AlertDescription>
     </Alert>
   );
 }

@@ -22,6 +22,24 @@ export function matchPairingBlockedReason(
   return null;
 }
 
+/**
+ * Por qué no se puede rearmar la llave (mover parejas o agregar/quitar fases).
+ * Un clasificó por bye no cuenta: ese cruce no se jugó.
+ */
+export function knockoutRebuildBlockedReason(
+  matches: Pick<Match, "id" | "roundId" | "status">[],
+  slots: Pick<MatchSlot, "matchId" | "sourceType">[],
+): string | null {
+  const locked = matches.some((match) => {
+    if (!match.roundId) return false;
+    if (match.status === "finished" || match.status === "inProgress") return true;
+    if (match.status !== "walkover") return false;
+    const bye = slots.some((slot) => slot.matchId === match.id && slot.sourceType === "BYE");
+    return !bye;
+  });
+  return locked ? "No se puede rearmar la llave porque ya hay partidos jugados." : null;
+}
+
 /** Etiqueta corta del criterio que ubicó a una pareja en la tabla. */
 export function tieBreakLabel(code: TieBreaker): string {
   switch (code) {
@@ -81,8 +99,6 @@ export function tournamentFormatLabel(format: TournamentFormat): string {
       return "Eliminación directa";
     case "ROUND_ROBIN":
       return "Todos contra todos";
-    case "QUALITY":
-      return "Quality (un día)";
   }
 }
 
@@ -130,12 +146,6 @@ function zoneItems(format: TournamentFormat): string[] {
       ...base,
     ];
   }
-  if (format === "QUALITY") {
-    return [
-      "Una sola zona, todos contra todos, en un mismo día.",
-      ...base,
-    ];
-  }
   return ["Una sola zona, todos contra todos. El orden final de la tabla es el resultado del torneo.", ...base];
 }
 
@@ -169,7 +179,7 @@ function bracketItems(format: TournamentFormat): string[] {
       "De cada zona de 3 pasan dos; de cada zona de 4 pasan tres.",
       "El cuadro se arma con la cantidad de clasificados llevada a la potencia de 2 siguiente; los lugares que sobran son byes para los mejores ubicados.",
       "Primeros contra segundos cruzados entre zonas: nunca se repite un cruce de la misma zona en la primera ronda.",
-      "Una pareja que pasa sin rival figura como «Clasificó» con el motivo.",
+      "Si una pareja pasa sin rival, el club la marca como «Clasificó» en ese cruce.",
       "El club puede modificar un cruce todavía no jugado desde el cuadro, solo con parejas aceptadas que estén dentro del cuadro. Si la pareja ya estaba en otro cruce de la ronda, se intercambian.",
     ];
   }
@@ -191,7 +201,7 @@ export function tournamentRulesSections(
     sections.push({ title: "Zonas y puntos", items: zoneItems(format) });
     sections.push({
       title: "Desempate en la tabla",
-      items: format === "QUALITY" ? QUALITY_TIE_BREAK_ITEMS : TIE_BREAK_ITEMS,
+      items: rules.setsToWin === 1 ? QUALITY_TIE_BREAK_ITEMS : TIE_BREAK_ITEMS,
     });
   }
   const bracket = bracketItems(format);

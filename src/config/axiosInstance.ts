@@ -1,5 +1,8 @@
 import axios, { type AxiosResponse } from "axios";
-import { handleGlobal401ResponseError } from "./handleGlobal401ResponseError";
+import {
+  handleGlobal401ResponseError,
+  isAnonymousAuthPath,
+} from "./handleGlobal401ResponseError";
 import {
   ApiHttpError,
   messageFromEnvelope,
@@ -18,6 +21,12 @@ const axiosInstance = axios.create({
 });
 
 axiosInstance.interceptors.request.use((config) => {
+  if (isAnonymousAuthPath(config.url)) {
+    delete config.headers.Authorization;
+    delete config.headers["X-Club-Id"];
+    return config;
+  }
+
   const auth = useAuthStore.getState();
   const token = auth.token?.trim();
   if (token) {

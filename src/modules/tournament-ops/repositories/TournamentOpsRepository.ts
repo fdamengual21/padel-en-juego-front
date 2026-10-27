@@ -4,12 +4,15 @@ import type { ApiEnvelope } from "@/lib/apiClient";
 import { asTournamentCard, normalizeTournamentCardPage } from "@/modules/tournaments";
 import type { PlayerReservation } from "@/modules/reservations";
 import { normalizeMine, normalizeReservation } from "@/modules/reservations/repositories/ReservationRepository";
+import { toPlayerPlayedPage } from "../helpers/toPlayerPlayedPage";
+import type { PlayerPlayedItem } from "../types/playerPlayedItem";
 import {
   PLAYER_COVER_PATHS,
   emptyClubDashboard,
   emptyCourtsAgendaBoard,
   emptyCourtsDayOverview,
   emptyPaginated,
+  isCategoryLevel,
   notConnectedError,
   type AuthSession,
   type Club,
@@ -47,6 +50,7 @@ import {
   type ParticipantsBoardView,
   type RegistrationPlayerDetail,
   type Player,
+  type RegisteredPlayerSearchItem,
   type PlayerDashboard,
   type PlayerMatchView,
   type TournamentCard,
@@ -57,7 +61,10 @@ import {
   type RegisterPairResult,
   type FinishTournamentResult,
   type StartTournamentResult,
+  type CancelTournamentResult,
   type ResolveTieResult,
+  type KnockoutPhaseResult,
+  type MatchPhase,
   type SetMatchPairingResult,
   type ScheduleResult,
   type AcceptRegistrationResult,
@@ -73,8 +80,15 @@ import {
   type UpdatePlayerInput,
   type ZonesBoardView,
   type Client,
+  type CourtOccupancyItem,
   type GroupConfigValidation,
 } from "@/domain";
+import type {
+  PublicCuadroBoardDto,
+  PublicMatchesBoardDto,
+  PublicParticipantsBoardDto,
+  PublicZonesBoardDto,
+} from "../types";
 
 export interface ITournamentOpsRepository {
   listCategories(tournamentId: string): Promise<TournamentCategory[]>;
@@ -112,6 +126,7 @@ export interface ITournamentOpsRepository {
   scheduleCategory(categoryId: string): Promise<ScheduleResult>;
   finishTournament(tournamentId: string): Promise<FinishTournamentResult>;
   startTournament(tournamentId: string): Promise<StartTournamentResult>;
+  cancelTournament(tournamentId: string): Promise<CancelTournamentResult>;
   listCourts(clubId: string): Promise<Court[]>;
   createCourt(input: CreateCourtInput): Promise<Court>;
   updateClub(id: string, patch: UpdateClubInput): Promise<Club>;
@@ -169,6 +184,7 @@ export interface ITournamentOpsRepository {
   getRanking(categoryId?: string): Promise<GroupStanding[]>;
   getPlayerHome(playerId: string): Promise<PlayerDashboard>;
   getPlayerHistory(query: PageQuery): Promise<PaginatedResult<TournamentCard>>;
+  getPlayerPlayed(query: PageQuery): Promise<PaginatedResult<PlayerPlayedItem>>;
   getPlayerPairMatches(pairId: string): Promise<PlayerMatchView[]>;
   getPlayerFeed(location?: {
     provinceId?: number | null;
@@ -193,6 +209,10 @@ export interface ITournamentOpsRepository {
     query: string,
     options?: { signal?: AbortSignal },
   ): Promise<Player[]>;
+  searchRegisteredPlayers(
+    query: string,
+    options?: { signal?: AbortSignal },
+  ): Promise<RegisteredPlayerSearchItem[]>;
   findIdentityMatches(
     input: FindIdentityMatchesInput,
   ): Promise<FindIdentityMatchesResult>;
@@ -203,6 +223,7 @@ export interface ITournamentOpsRepository {
   registerPair(input: RegisterPairInput): Promise<RegisterPairResult>;
   registerPairByAdmin(input: RegisterPairInput): Promise<RegisterPairResult>;
   registerPairByPlayer(input: RegisterPairInput): Promise<RegisterPairResult>;
+  updateMyRegistration(input: RegisterPairInput): Promise<MyTournamentRegistration>;
   cancelMyRegistration(categoryId: string): Promise<TournamentRegistration>;
   updatePairPlayers(
     pairId: string,
@@ -232,6 +253,7 @@ export interface ITournamentOpsRepository {
     input: { scheduledAt: string | null; courtId: string | null },
     options?: { force?: boolean; pairLabels?: Record<string, string> },
   ): Promise<Match>;
+  listMatchCourtOccupancy(matchId: string, at: string): Promise<CourtOccupancyItem[]>;
   setMatchStatus(matchId: string, status: MatchStatus): Promise<Match>;
   resolveTie(
     categoryId: string,
@@ -242,6 +264,13 @@ export interface ITournamentOpsRepository {
     matchId: string,
     input: { pairAId: string; pairBId: string; note: string | null },
   ): Promise<SetMatchPairingResult>;
+  qualifyMatchPair(matchId: string, pairId: string): Promise<SetMatchPairingResult>;
+  addKnockoutPhase(categoryId: string, phase: MatchPhase): Promise<KnockoutPhaseResult>;
+  removeKnockoutPhase(categoryId: string, phase: MatchPhase): Promise<KnockoutPhaseResult>;
+  movePairToKnockoutPhase(
+    categoryId: string,
+    input: { pairId: string; phase: MatchPhase },
+  ): Promise<KnockoutPhaseResult>;
   updateCategory(
     id: string,
     patch: Partial<Omit<TournamentCategory, "id" | "tournamentId">>,
@@ -253,11 +282,11 @@ export interface ITournamentOpsRepository {
   getPublicRuleset(categoryId: string): Promise<TournamentRuleset | null>;
   listPublicGroups(categoryId: string): Promise<TournamentGroup[]>;
   listPublicMatches(categoryId: string): Promise<Match[]>;
-  getPublicCuadroBoard(categoryId: string): Promise<CuadroBoardView>;
-  getPublicZonesBoard(categoryId: string): Promise<ZonesBoardView>;
-  getPublicParticipantsBoard(categoryId: string): Promise<ParticipantsBoardView>;
+  getPublicCuadroBoard(categoryId: string): Promise<PublicCuadroBoardDto>;
+  getPublicZonesBoard(categoryId: string): Promise<PublicZonesBoardDto>;
+  getPublicParticipantsBoard(categoryId: string): Promise<PublicParticipantsBoardDto>;
   getPublicParticipantPlayers(categoryId: string, ids: string[]): Promise<RegistrationPlayerDetail[]>;
-  getPublicMatchesBoard(categoryId: string): Promise<MatchesBoardView>;
+  getPublicMatchesBoard(categoryId: string): Promise<PublicMatchesBoardDto>;
   getMyRegistration(categoryId: string): Promise<MyTournamentRegistration>;
 }
 
@@ -375,6 +404,10 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
 
   async startTournament(tournamentId: string) {
     return this.read<StartTournamentResult>(`/club/tournaments/${tournamentId}/start`, "post");
+  }
+
+  async cancelTournament(tournamentId: string) {
+    return this.read<CancelTournamentResult>(`/club/tournaments/${tournamentId}/cancel`, "post");
   }
 
   async listCourts(_clubId: string) {
@@ -517,6 +550,21 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
     return normalizeTournamentCardPage(readData(response), { page, pageSize });
   }
 
+  async getPlayerPlayed(query: PageQuery) {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 10;
+    const response = await this.http.get<ApiEnvelope<Record<string, unknown>>>(
+      "/users/me/tournaments/played",
+      {
+        params: {
+          page,
+          pageSize,
+        },
+      },
+    );
+    return toPlayerPlayedPage(readData(response), { page, pageSize });
+  }
+
   async getPlayerPairMatches(pairId: string) {
     return this.read<PlayerMatchView[]>(`/users/me/tournaments/pairs/${pairId}/matches`);
   }
@@ -600,6 +648,20 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
     return readData(response) ?? [];
   }
 
+  async searchRegisteredPlayers(query: string, options?: { signal?: AbortSignal }) {
+    const response = await this.http.get<ApiEnvelope<RegisteredPlayerSearchItem[]>>(
+      "/users/me/players",
+      {
+        params: { q: query },
+        signal: options?.signal,
+      },
+    );
+    const rows = readData(response) ?? [];
+    return rows
+      .map((row) => asRegisteredPlayerSearchItem(row as unknown as Record<string, unknown>))
+      .filter((item) => item.id.length > 0);
+  }
+
   async findIdentityMatches(_input: FindIdentityMatchesInput) {
     return { matches: [] };
   }
@@ -644,6 +706,19 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
     );
   }
 
+  async updateMyRegistration(input: RegisterPairInput) {
+    const raw = await this.read<MyTournamentRegistration>(
+      `/users/me/tournaments/categories/${input.tournamentCategoryId}`,
+      "patch",
+      {
+        sidePreference: input.sidePreference ?? null,
+        player2Id: input.player2Id ?? null,
+        availability: input.availability ?? [],
+      },
+    );
+    return asMyRegistration(raw);
+  }
+
   async cancelMyRegistration(categoryId: string) {
     return this.read<TournamentRegistration>(
       `/users/me/tournaments/categories/${categoryId}`,
@@ -680,15 +755,19 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
   }
 
   async getPublicCuadroBoard(categoryId: string) {
-    return this.read<CuadroBoardView>(`/public/tournaments/categories/${categoryId}/boards/cuadro`);
+    return this.read<PublicCuadroBoardDto>(
+      `/public/tournaments/categories/${categoryId}/boards/cuadro`,
+    );
   }
 
   async getPublicZonesBoard(categoryId: string) {
-    return this.read<ZonesBoardView>(`/public/tournaments/categories/${categoryId}/boards/zones`);
+    return this.read<PublicZonesBoardDto>(
+      `/public/tournaments/categories/${categoryId}/boards/zones`,
+    );
   }
 
   async getPublicParticipantsBoard(categoryId: string) {
-    return this.read<ParticipantsBoardView>(
+    return this.read<PublicParticipantsBoardDto>(
       `/public/tournaments/categories/${categoryId}/boards/participants`,
     );
   }
@@ -700,15 +779,16 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
   }
 
   async getPublicMatchesBoard(categoryId: string) {
-    return this.read<MatchesBoardView>(
+    return this.read<PublicMatchesBoardDto>(
       `/public/tournaments/categories/${categoryId}/boards/matches`,
     );
   }
 
   async getMyRegistration(categoryId: string) {
-    return this.read<MyTournamentRegistration>(
+    const raw = await this.read<MyTournamentRegistration>(
       `/users/me/tournaments/categories/${categoryId}`,
     );
+    return asMyRegistration(raw);
   }
 
   async updatePairPlayers(pairId: string, input: UpdatePairPlayersInput) {
@@ -763,6 +843,12 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
     return this.read<Match>(`/club/tournaments/matches/${matchId}/schedule`, "patch", input);
   }
 
+  async listMatchCourtOccupancy(matchId: string, at: string) {
+    return this.read<CourtOccupancyItem[]>(
+      `/club/tournaments/matches/${matchId}/court-occupancy?at=${encodeURIComponent(at)}`,
+    );
+  }
+
   async setMatchStatus(matchId: string, status: MatchStatus) {
     return this.read<Match>(`/club/tournaments/matches/${matchId}/status`, "patch", { status });
   }
@@ -782,6 +868,40 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
     return this.read<SetMatchPairingResult>(
       `/club/tournaments/matches/${matchId}/pairing`,
       "patch",
+      input,
+    );
+  }
+
+  async qualifyMatchPair(matchId: string, pairId: string) {
+    return this.read<SetMatchPairingResult>(
+      `/club/tournaments/matches/${matchId}/qualify`,
+      "post",
+      { pairId },
+    );
+  }
+
+  async addKnockoutPhase(categoryId: string, phase: MatchPhase) {
+    return this.read<KnockoutPhaseResult>(
+      `/club/tournaments/categories/${categoryId}/knockout-phases`,
+      "post",
+      { phase },
+    );
+  }
+
+  async removeKnockoutPhase(categoryId: string, phase: MatchPhase) {
+    return this.read<KnockoutPhaseResult>(
+      `/club/tournaments/categories/${categoryId}/knockout-phases/${phase}`,
+      "delete",
+    );
+  }
+
+  async movePairToKnockoutPhase(
+    categoryId: string,
+    input: { pairId: string; phase: MatchPhase },
+  ) {
+    return this.read<KnockoutPhaseResult>(
+      `/club/tournaments/categories/${categoryId}/knockout-pairs`,
+      "post",
       input,
     );
   }
@@ -827,4 +947,44 @@ function asWeekEvent(raw: Record<string, unknown>): PlayerWeekEvent | null {
 
 function playerIdsQuery(ids: string[]): string {
   return ids.map((id) => `ids=${encodeURIComponent(id)}`).join("&");
+}
+
+function asRegisteredPlayerSearchItem(
+  raw: Record<string, unknown>,
+): RegisteredPlayerSearchItem {
+  const level =
+    typeof raw.categoryLevel === "number" && Number.isFinite(raw.categoryLevel)
+      ? raw.categoryLevel
+      : null;
+  const text = (value: unknown) =>
+    typeof value === "string" && value.trim() ? value.trim() : null;
+  return {
+    id: typeof raw.id === "string" ? raw.id : "",
+    fullName: text(raw.fullName) ?? "",
+    categoryLevel: isCategoryLevel(level) ? level : null,
+    avatarUrl: text(raw.avatarUrl),
+    phone: text(raw.phone),
+  };
+}
+
+function asMyRegistration(raw: MyTournamentRegistration): MyTournamentRegistration {
+  const partnerRaw = raw.partner as unknown;
+  const partner =
+    partnerRaw && typeof partnerRaw === "object"
+      ? asRegisteredPlayerSearchItem(partnerRaw as Record<string, unknown>)
+      : null;
+  const availability = Array.isArray(raw.availability)
+    ? raw.availability.filter(
+        (item) =>
+          typeof item?.date === "string" &&
+          typeof item.startTime === "string" &&
+          typeof item.endTime === "string",
+      )
+    : [];
+  return {
+    ...raw,
+    partner: partner && partner.id ? partner : null,
+    partnerName: raw.partnerName ?? partner?.fullName ?? null,
+    availability,
+  };
 }

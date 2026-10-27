@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 interface RequirePlayerAuthProps {
   /** Ruta a la que volver tras login/registro. */
   nextPath: string;
-  children: React.ReactNode;
+  children?: React.ReactNode;
   /** Texto del CTA principal. */
   actionLabel?: string;
   className?: string;

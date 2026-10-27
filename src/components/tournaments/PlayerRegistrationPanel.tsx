@@ -20,18 +20,33 @@ import {
 import { Label } from "@/components/ui/label";
 import MessageAlert, { type MessageAlertType } from "@/components/ui/message-alert";
 import WarningDialog from "@/components/ui/warning-dialog";
-import type { PairSidePreference, Tournament, TournamentCategory } from "@/domain";
+import type {
+  PairSidePreference,
+  RegisteredPlayerSearchItem,
+  TournamentStatus,
+} from "@/domain";
 import { formatTournamentDayEs } from "@/lib/dates";
 import { toastError, toastSuccess } from "@/lib/toast";
+import { cn } from "@/lib/utils";
 import { ROUTES } from "@/router/routes";
+import RegisteredPlayerPicker from "./RegisteredPlayerPicker";
 
 interface PlayerRegistrationPanelProps {
-  tournament: Tournament;
-  categories: TournamentCategory[];
+  tournament: {
+    id: string;
+    name: string;
+    status: TournamentStatus;
+    startDate: string;
+    endDate: string | null;
+    dailyStartTime: string;
+    dailyEndTime: string;
+  };
+  categories: Array<{ id: string; name: string }>;
   categoryId: string;
-  /** Parejas aceptadas en la categoría seleccionada. */
-  /** Lugares ocupados del cupo (parejas completas + solos de a dos), igual que la API. */
-  acceptedPairs: number;
+  /** Lo calcula la API pública: no hay lugar para otra pareja. */
+  quotaFull: boolean;
+  /** Quality no pide disponibilidad. */
+  omitAvailability?: boolean;
   onCategoryChange: (categoryId: string) => void;
 }
 
@@ -55,6 +70,11 @@ function sideFromPlayer(value: string | null | undefined): PairSidePreference {
   return "any";
 }
 
+function sideFromPair(value: string | null | undefined): PairSidePreference {
+  if (value === "drive" || value === "reves" || value === "any") return value;
+  return "any";
+}
+
 function registrationNotice(
   status: string,
   partnerName: string | null,
@@ -62,7 +82,7 @@ function registrationNotice(
   if (status === "PENDING") {
     return {
       type: "warning",
-      message: "Tu inscripción quedó pendiente hasta que el club la acepte.",
+      message: "Pendiente de aceptación",
     };
   }
   if (status === "ACCEPTED" && partnerName) {
@@ -87,26 +107,31 @@ function registrationNotice(
 }
 
 /** El club dio comienzo al torneo (o ya terminó). La fecha sola no lo inicia. */
-function tournamentHasStarted(tournament: Tournament): boolean {
-  return tournament.status === "inProgress" || tournament.status === "finished";
+function tournamentHasStarted(status: TournamentStatus): boolean {
+  return status === "inProgress" || status === "finished";
 }
 
 export default function PlayerRegistrationPanel({
   tournament,
   categories,
   categoryId,
-  acceptedPairs,
+  quotaFull,
+  omitAvailability = false,
   onCategoryChange,
 }: PlayerRegistrationPanelProps) {
   const { isAuthenticated, player } = useMockSession();
   const qc = useQueryClient();
-  const quality = tournament.format === "QUALITY";
+  const quality = omitAvailability;
   const days = useMemo(
     () => (quality ? [] : daysBetween(tournament.startDate, tournament.endDate)),
     [quality, tournament.startDate, tournament.endDate],
   );
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [confirmSave, setConfirmSave] = useState(false);
+  const [pairMode, setPairMode] = useState<"solo" | "partner">("solo");
+  const [partner, setPartner] = useState<RegisteredPlayerSearchItem | null>(null);
   const [side, setSide] = useState<PairSidePreference>(sideFromPlayer(player?.sidePreference));
   const [ranges, setRanges] = useState<Record<string, { start: string; end: string }>>({});
 
@@ -126,32 +151,55 @@ export default function PlayerRegistrationPanel({
     enabled: isAuthenticated && Boolean(categoryId),
   });
 
+  const withPartner = pairMode === "partner";
+  const payload = () => ({
+    tournamentCategoryId: categoryId,
+    player1Id: player?.id ?? "",
+    player2Id: withPartner ? partner?.id ?? null : null,
+    sidePreference: withPartner ? null : side,
+    availability: quality
+      ? []
+      : days.map((day) => ({
+          date: day,
+          startTime: ranges[day]?.start || tournament.dailyStartTime || "10:00",
+          endTime: ranges[day]?.end || tournament.dailyEndTime || "22:00",
+        })),
+  });
+
+  const invalidateMine = async () => {
+    await qc.invalidateQueries({ queryKey: ["my-registration", categoryId] });
+    await qc.invalidateQueries({ queryKey: ["categories", tournament.id] });
+    await qc.invalidateQueries({ queryKey: ["participants-board", categoryId] });
+    await qc.invalidateQueries({ queryKey: ["player-home"] });
+    await qc.invalidateQueries({ queryKey: ["player-history"] });
+    await qc.invalidateQueries({ queryKey: ["player-played"] });
+  };
+
   const register = useMutation({
-    mutationFn: () =>
-      Api.TournamentOpsService().registerPairByPlayer({
-        tournamentCategoryId: categoryId,
-        player1Id: player?.id ?? "",
-        sidePreference: side,
-        availability: quality
-          ? []
-          : days.map((day) => ({
-              date: day,
-              startTime: ranges[day]?.start || tournament.dailyStartTime || "10:00",
-              endTime: ranges[day]?.end || tournament.dailyEndTime || "22:00",
-            })),
-      }),
+    mutationFn: () => Api.TournamentOpsService().registerPairByPlayer(payload()),
     onSuccess: async () => {
       toastSuccess(
         "Inscripción enviada",
         "Queda pendiente hasta que el club la acepte.",
       );
       setOpen(false);
-      await qc.invalidateQueries({ queryKey: ["my-registration", categoryId] });
-      await qc.invalidateQueries({ queryKey: ["categories", tournament.id] });
-      await qc.invalidateQueries({ queryKey: ["player-home"] });
-      await qc.invalidateQueries({ queryKey: ["player-history"] });
+      await invalidateMine();
     },
     onError: (err: Error) => toastError("No se pudo inscribir", err.message),
+  });
+
+  const update = useMutation({
+    mutationFn: () => Api.TournamentOpsService().updateMyRegistration(payload()),
+    onSuccess: async () => {
+      toastSuccess(
+        "Inscripción actualizada",
+        "Queda pendiente hasta que el club la acepte.",
+      );
+      setConfirmSave(false);
+      setOpen(false);
+      await invalidateMine();
+    },
+    onError: (err: Error) => toastError("No se pudo guardar", err.message),
   });
 
   const cancel = useMutation({
@@ -159,11 +207,7 @@ export default function PlayerRegistrationPanel({
     onSuccess: async () => {
       toastSuccess("Inscripción cancelada");
       setConfirmCancel(false);
-      await qc.invalidateQueries({ queryKey: ["my-registration", categoryId] });
-      await qc.invalidateQueries({ queryKey: ["categories", tournament.id] });
-      await qc.invalidateQueries({ queryKey: ["participants-board", categoryId] });
-      await qc.invalidateQueries({ queryKey: ["player-home"] });
-      await qc.invalidateQueries({ queryKey: ["player-history"] });
+      await invalidateMine();
     },
     onError: (err: Error) => toastError("No se pudo cancelar", err.message),
   });
@@ -174,9 +218,8 @@ export default function PlayerRegistrationPanel({
     current != null &&
     current.status !== "REJECTED" &&
     current.status !== "CANCELLED";
-  const started = tournamentHasStarted(tournament);
+  const started = tournamentHasStarted(tournament.status);
   const closed = tournament.status !== "registrationOpen";
-  const quotaFull = category != null && acceptedPairs >= category.maxPairs;
   const canRegister = Boolean(categoryId) && !holdsSpot && !started && !closed && !quotaFull;
   const canCancel =
     holdsSpot &&
@@ -186,6 +229,49 @@ export default function PlayerRegistrationPanel({
       current.status === "WAITLIST") &&
     !started &&
     !closed;
+  const canEdit = canCancel;
+
+  const resetDialog = () => {
+    setEditing(false);
+    setConfirmSave(false);
+    setPairMode("solo");
+    setPartner(null);
+    setSide(sideFromPlayer(player?.sidePreference));
+  };
+
+  const openCreate = () => {
+    resetDialog();
+    setOpen(true);
+  };
+
+  const openEdit = () => {
+    const mineData = mine.data;
+    const nextPartner = mineData?.partner ?? null;
+    setEditing(true);
+    setConfirmSave(false);
+    if (nextPartner) {
+      setPairMode("partner");
+      setPartner(nextPartner);
+    } else {
+      setPairMode("solo");
+      setPartner(null);
+      setSide(sideFromPair(mineData?.pair?.sidePreference));
+    }
+    const start = tournament.dailyStartTime || "10:00";
+    const end = tournament.dailyEndTime || "22:00";
+    const byDate = new Map(
+      (mineData?.availability ?? []).map((item) => [item.date, item]),
+    );
+    setRanges(
+      Object.fromEntries(
+        days.map((day) => {
+          const row = byDate.get(day);
+          return [day, { start: row?.startTime || start, end: row?.endTime || end }];
+        }),
+      ),
+    );
+    setOpen(true);
+  };
 
   let blockedNotice: { message: string; type: MessageAlertType } | null = null;
   if (holdsSpot && current) {
@@ -227,13 +313,19 @@ export default function PlayerRegistrationPanel({
             type="button"
             className="shrink-0"
             data-testid="tournament-subscribe-cta"
-            onClick={() => setOpen(true)}
+            onClick={openCreate}
           >
             Inscribirme
           </Button>
         )
       ) : blockedNotice ? (
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <MessageAlert
+            className="w-fit whitespace-nowrap"
+            data-testid="tournament-subscribe-cta"
+            message={blockedNotice.message}
+            type={blockedNotice.type}
+          />
           {canCancel ? (
             <Button
               type="button"
@@ -244,12 +336,15 @@ export default function PlayerRegistrationPanel({
               Cancelar inscripción
             </Button>
           ) : null}
-          <MessageAlert
-            className="max-w-sm"
-            data-testid="tournament-subscribe-cta"
-            message={blockedNotice.message}
-            type={blockedNotice.type}
-          />
+          {canEdit ? (
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => openEdit()}
+            >
+              Editar
+            </Button>
+          ) : null}
         </div>
       ) : null}
 
@@ -265,10 +360,16 @@ export default function PlayerRegistrationPanel({
         onConfirm={() => cancel.mutate()}
       />
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (!next) resetDialog();
+        }}
+      >
         <DialogContent className="max-w-md" data-testid="player-registration-dialog">
           <DialogHeader>
-            <DialogTitle>Inscripción</DialogTitle>
+            <DialogTitle>{editing ? "Editar inscripción" : "Inscripción"}</DialogTitle>
             <DialogDescription>
               {category?.name
                 ? `${tournament.name} · ${category.name}`
@@ -286,10 +387,15 @@ export default function PlayerRegistrationPanel({
               className="space-y-3"
               onSubmit={(event) => {
                 event.preventDefault();
+                if (withPartner && !partner) return;
+                if (editing) {
+                  setConfirmSave(true);
+                  return;
+                }
                 register.mutate();
               }}
             >
-              {categories.length > 1 ? (
+              {categories.length > 1 && !editing ? (
                 <div className="space-y-1">
                   <Label htmlFor="player-category">Categoría</Label>
                   <select
@@ -310,24 +416,64 @@ export default function PlayerRegistrationPanel({
                 <p className="text-sm text-muted-foreground">
                   El club no aceptó esta inscripción. Podés volver a anotarte.
                 </p>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Te anotás solo. Si hay otro jugador con un lado que combine, el club los junta al aceptar.
-                </p>
-              )}
-              <div className="space-y-1">
-                <Label htmlFor="player-side">Lado</Label>
-                <select
-                  id="player-side"
-                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  value={side}
-                  onChange={(event) => setSide(event.target.value as PairSidePreference)}
+              ) : null}
+              <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Cómo te anotás">
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={!withPartner}
+                  className={cn(
+                    "rounded-lg border px-3 py-2 text-left text-sm transition-colors",
+                    !withPartner
+                      ? "border-primary bg-primary/10 font-medium"
+                      : "border-border hover:bg-muted/50",
+                  )}
+                  onClick={() => {
+                    setPairMode("solo");
+                    setPartner(null);
+                  }}
                 >
-                  <option value="drive">Drive</option>
-                  <option value="reves">Revés</option>
-                  <option value="any">Cualquiera</option>
-                </select>
+                  {editing ? "Sin compañero" : "Me anoto solo"}
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={withPartner}
+                  className={cn(
+                    "rounded-lg border px-3 py-2 text-left text-sm transition-colors",
+                    withPartner
+                      ? "border-primary bg-primary/10 font-medium"
+                      : "border-border hover:bg-muted/50",
+                  )}
+                  onClick={() => setPairMode("partner")}
+                >
+                  Con un compañero
+                </button>
               </div>
+              {withPartner ? (
+                <RegisteredPlayerPicker value={partner} onChange={setPartner} />
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    El club tiene que asignarte un compañero para aceptar la inscripción.
+                  </p>
+                  <div className="space-y-1">
+                    <Label htmlFor="player-side">Lado</Label>
+                    <select
+                      id="player-side"
+                      className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      value={side}
+                      onChange={(event) =>
+                        setSide(event.target.value as PairSidePreference)
+                      }
+                    >
+                      <option value="drive">Drive</option>
+                      <option value="reves">Revés</option>
+                      <option value="any">Cualquiera</option>
+                    </select>
+                  </div>
+                </>
+              )}
               {days.length > 0 ? (
                 <div className="space-y-2">
                   <p className="text-sm text-muted-foreground">Disponibilidad por día</p>
@@ -368,13 +514,33 @@ export default function PlayerRegistrationPanel({
                   ))}
                 </div>
               ) : null}
-              <Button type="submit" disabled={register.isPending || !categoryId || quotaFull}>
-                Inscribirme
+              <Button
+                type="submit"
+                disabled={
+                  register.isPending ||
+                  update.isPending ||
+                  !categoryId ||
+                  (!editing && quotaFull) ||
+                  (withPartner && !partner)
+                }
+              >
+                {editing ? "Guardar" : "Inscribirme"}
               </Button>
             </form>
           )}
         </DialogContent>
       </Dialog>
+
+      <WarningDialog
+        open={confirmSave}
+        onOpenChange={setConfirmSave}
+        title="Guardar inscripción"
+        description="Si guardás, el club tiene que volver a aceptar esta inscripción."
+        confirmLabel="Guardar"
+        cancelLabel="Volver"
+        isConfirming={update.isPending}
+        onConfirm={() => update.mutate()}
+      />
     </>
   );
 }

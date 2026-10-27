@@ -4,6 +4,7 @@ import { FormProvider, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { useQuery } from "@tanstack/react-query";
 import * as yup from "yup";
+import TurnstileField from "@/components/auth/TurnstileField";
 import {
   CATEGORY_LEVELS,
   formatCategoryLevel,
@@ -103,6 +104,8 @@ export default function RegisterScreen() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [error, setError] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaReset, setCaptchaReset] = useState(0);
   const nextParam = searchParams.get("next");
   const redirectTo = nextParam && !isPlayerHomePath(nextParam) ? nextParam : "";
   const {
@@ -170,6 +173,12 @@ export default function RegisterScreen() {
           toastError("No se pudo crear la cuenta", message);
           return;
         }
+        if (!captchaToken) {
+          const message = "Completá la verificación.";
+          setError(message);
+          toastError("No se pudo crear la cuenta", message);
+          return;
+        }
         await Api.AuthService().register({
           firstName: values.firstName,
           lastName: values.lastName,
@@ -184,6 +193,7 @@ export default function RegisterScreen() {
           municipalityId: values.municipalityId,
           acceptedPrivacyDocumentId: legalDocuments.privacy.id,
           acceptedTermsDocumentId: legalDocuments.terms.id,
+          captchaToken,
         });
         toastSuccess("Cuenta creada", "Revisá tu correo para verificarla");
         const params = new URLSearchParams({ email: values.email });
@@ -196,6 +206,9 @@ export default function RegisterScreen() {
           err instanceof Error ? err.message : "No se pudo registrar";
         setError(message);
         toastError("No se pudo crear la cuenta", message);
+      } finally {
+        setCaptchaToken(null);
+        setCaptchaReset((value) => value + 1);
       }
     },
     (formErrors) => {
@@ -224,7 +237,7 @@ export default function RegisterScreen() {
     >
       <div className="w-full max-w-lg space-y-6">
         <div className="text-center">
-          <p className="text-sm text-muted-foreground">Easy padel</p>
+          <p className="text-sm text-muted-foreground">Start point</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">
             Crear cuenta
           </h1>
@@ -379,6 +392,12 @@ export default function RegisterScreen() {
               isError={legalError}
             />
 
+            <TurnstileField
+              action="register"
+              resetKey={captchaReset}
+              onTokenChange={setCaptchaToken}
+            />
+
             {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
             <Button
@@ -390,7 +409,8 @@ export default function RegisterScreen() {
                 legalLoading ||
                 legalError ||
                 sexesLoading ||
-                sexesError
+                sexesError ||
+                !captchaToken
               }
             >
               {isSubmitting ? "Creando cuenta…" : "Crear cuenta"}

@@ -4,7 +4,9 @@ interface HistoryPaginationProps {
   page: number;
   totalPages: number;
   totalItems: number;
+  itemLabel: string;
   disabled?: boolean;
+  testId?: string;
   onPageChange: (page: number) => void;
 }
 
@@ -12,7 +14,9 @@ export default function HistoryPagination({
   page,
   totalPages,
   totalItems,
+  itemLabel,
   disabled = false,
+  testId = "player-history-pagination",
   onPageChange,
 }: HistoryPaginationProps) {
   if (totalItems <= 0) return null;
@@ -23,7 +27,7 @@ export default function HistoryPagination({
   return (
     <div
       className="flex items-center justify-between gap-3"
-      data-testid="player-history-pagination"
+      data-testid={testId}
     >
       <Button
         type="button"
@@ -36,7 +40,7 @@ export default function HistoryPagination({
       <p className="text-sm text-muted-foreground">
         {current} de {pages}
         <span className="mx-1">·</span>
-        {totalItems} torneo{totalItems === 1 ? "" : "s"}
+        {totalItems} {itemLabel}
       </p>
       <Button
         type="button"

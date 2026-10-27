@@ -37,6 +37,7 @@ import UserRankingScreen from "@/screens/users/UserRankingScreen";
 import UserHistoryScreen from "@/screens/users/UserHistoryScreen";
 import UserProfileScreen from "@/screens/users/UserProfileScreen";
 import RequireFeature from "@/router/guards/RequireFeature";
+import RedirectIfAuthenticated from "@/router/guards/RedirectIfAuthenticated";
 import RequireAuth from "@/router/guards/RequireAuth";
 import RequireClubContext from "@/router/guards/RequireClubContext";
 import RequirePermission from "@/router/guards/RequirePermission";
@@ -60,8 +61,10 @@ function RootLayout() {
 const router = createBrowserRouter(
   createRoutesFromElements(
     <Route element={<RootLayout />}>
-      <Route path={ROUTES.auth.login} element={<LoginScreen />} />
-      <Route path={ROUTES.auth.register} element={<RegisterScreen />} />
+      <Route element={<RedirectIfAuthenticated />}>
+        <Route path={ROUTES.auth.login} element={<LoginScreen />} />
+        <Route path={ROUTES.auth.register} element={<RegisterScreen />} />
+      </Route>
       <Route path={ROUTES.auth.checkEmail} element={<CheckEmailScreen />} />
       <Route path={ROUTES.auth.verifyEmail} element={<VerifyEmailScreen />} />
       <Route path={ROUTES.auth.setPassword} element={<SetPasswordScreen />} />

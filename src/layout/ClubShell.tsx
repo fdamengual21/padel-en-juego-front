@@ -166,13 +166,13 @@ export default function ClubShell() {
   const accountActions = (placement: "sidebar" | "sheet") => [
     ...(placement === "sheet" && showSettings
       ? [
-          {
-            label: "Configuración",
-            icon: Settings,
-            group: "account" as const,
-            onSelect: () => navigate(ROUTES.club.settings),
-          },
-        ]
+        {
+          label: "Configuración",
+          icon: Settings,
+          group: "account" as const,
+          onSelect: () => navigate(ROUTES.club.settings),
+        },
+      ]
       : []),
     {
       label: "Ir a vista jugador",
@@ -182,13 +182,13 @@ export default function ClubShell() {
     },
     ...(clubs.length > 1
       ? [
-          {
-            label: "Cambiar club",
-            icon: ArrowLeftRight,
-            group: "context" as const,
-            onSelect: goToClubPicker,
-          },
-        ]
+        {
+          label: "Cambiar club",
+          icon: ArrowLeftRight,
+          group: "context" as const,
+          onSelect: goToClubPicker,
+        },
+      ]
       : []),
     {
       label: "Cerrar sesión",
@@ -207,7 +207,7 @@ export default function ClubShell() {
       >
         <div className="border-b border-sidebar-border px-4 py-5">
           <p className="text-xs font-medium uppercase tracking-wide text-sidebar-foreground/55">
-            Easy padel
+            Start point
           </p>
           <h1
             className="mt-1 line-clamp-2 text-xl font-semibold leading-snug tracking-tight text-sidebar-foreground"
@@ -250,7 +250,7 @@ export default function ClubShell() {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="border-b border-border bg-card px-4 py-3 md:hidden">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Easy padel
+            Start point
           </p>
           <h1 className="truncate text-lg font-semibold tracking-tight">
             {clubName}
@@ -284,7 +284,7 @@ export default function ClubShell() {
                         className={cn(
                           "flex size-8 items-center justify-center rounded-lg",
                           isActive &&
-                            "bg-sidebar-accent text-sidebar-accent-foreground",
+                          "bg-sidebar-accent text-sidebar-accent-foreground",
                         )}
                       >
                         <Icon className="size-5" />
@@ -312,7 +312,7 @@ export default function ClubShell() {
                   className={cn(
                     "flex size-8 items-center justify-center rounded-lg",
                     moreActive &&
-                      "bg-sidebar-accent text-sidebar-accent-foreground",
+                    "bg-sidebar-accent text-sidebar-accent-foreground",
                   )}
                 >
                   <Menu className="size-5" />

@@ -33,6 +33,8 @@ export interface MatchTableRow {
   pairingNote?: string | null;
   /** Por qué no se puede modificar el cruce. Null si se puede. Undefined: sin opción de cruce manual. */
   pairingBlockedReason?: string | null;
+  /** Por qué no se puede mover una pareja de esta fila. Null si se puede. Undefined: sin la acción. */
+  moveBlockedReason?: string | null;
 }
 
 interface RoundMatchesTableProps {
@@ -47,6 +49,8 @@ interface RoundMatchesTableProps {
   onOpenPair?: (pairId: string) => void;
   /** Cruce manual (eliminación). Si falta, no se muestra el lápiz. */
   onEditPairing?: (matchId: string) => void;
+  /** Abrir el modal para mover una pareja de este cruce. No se usa en zonas. */
+  onMovePair?: (matchId: string) => void;
 }
 
 export default function RoundMatchesTable({
@@ -59,6 +63,7 @@ export default function RoundMatchesTable({
   onOpenMatch,
   onOpenPair,
   onEditPairing,
+  onMovePair,
 }: RoundMatchesTableProps) {
   const colCount = showIndexColumn ? 5 : 4;
 
@@ -176,6 +181,13 @@ export default function RoundMatchesTable({
                       </Tooltip>
                     </TooltipProvider>
                   ) : null}
+                  {onMovePair && row.moveBlockedReason !== undefined ? (
+                    <MovePairButton
+                      matchId={row.matchId}
+                      blockedReason={row.moveBlockedReason}
+                      onMovePair={onMovePair}
+                    />
+                  ) : null}
                 </div>
               </td>
               <td className="px-1.5 py-1 align-middle text-right">
@@ -193,5 +205,40 @@ export default function RoundMatchesTable({
         )}
       </tbody>
     </table>
+  );
+}
+
+function MovePairButton({
+  matchId,
+  blockedReason,
+  onMovePair,
+}: {
+  matchId: string;
+  blockedReason: string | null;
+  onMovePair: (matchId: string) => void;
+}) {
+  return (
+    <TooltipProvider delay={200}>
+      <Tooltip>
+        <TooltipTrigger render={<span className="inline-flex" />}>
+          <button
+            type="button"
+            data-testid={`move-pair-${matchId}`}
+            disabled={blockedReason != null}
+            className="whitespace-nowrap rounded px-1 py-px text-[9px] font-medium text-primary-strong hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+            onClick={(event) => {
+              event.stopPropagation();
+              if (blockedReason != null) return;
+              onMovePair(matchId);
+            }}
+          >
+            Mover
+          </button>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs">
+          {blockedReason ?? "Mover una pareja a otra ronda de eliminación."}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }

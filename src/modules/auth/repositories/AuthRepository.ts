@@ -34,6 +34,7 @@ function compactRegister(input: RegisterInput): RegisterInput {
     ...(input.municipalityId != null ? { municipalityId: input.municipalityId } : {}),
     acceptedPrivacyDocumentId: input.acceptedPrivacyDocumentId,
     acceptedTermsDocumentId: input.acceptedTermsDocumentId,
+    captchaToken: input.captchaToken,
   };
 }
 

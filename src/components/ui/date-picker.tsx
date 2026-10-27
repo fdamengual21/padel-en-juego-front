@@ -65,8 +65,9 @@ export function DatePicker({
 
   return (
     <Popover
-      open={open}
+      open={disabled ? false : open}
       onOpenChange={(next) => {
+        if (disabled) return;
         setOpen(next);
         if (!next) onBlur?.();
       }}

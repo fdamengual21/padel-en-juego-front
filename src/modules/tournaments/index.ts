@@ -1,4 +1,4 @@
-export type { Tournament, CreateTournamentRequest } from './types'
+export type { Tournament, CreateTournamentRequest, PublicTournamentPage } from './types'
 export { asTournamentCard, normalizeTournamentCardPage } from './mapTournamentCard'
 export { TournamentRepository } from './repositories/TournamentRepository'
 export type { ITournamentRepository } from './repositories/TournamentRepository'

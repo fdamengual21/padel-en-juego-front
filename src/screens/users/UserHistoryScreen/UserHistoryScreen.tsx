@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { CircleAlert, Search, Trophy } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { CalendarDays, CircleAlert, Search, Trophy } from "lucide-react";
 import Api from "@/api/Api";
 import { useMockSession } from "@/app/MockSessionProvider";
 import RequirePlayerAuth from "@/components/auth/RequirePlayerAuth";
@@ -11,9 +11,12 @@ import { buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDebounce } from "@/hooks/useDebounce";
+import type { PlayerReservation } from "@/modules/reservations";
 import { ROUTES } from "@/router/routes";
 import { cn } from "@/lib/utils";
 import HomeTournamentCard from "../components/HomeTournamentCard";
+import PlayerReservationCard from "../UserHomeScreen/components/PlayerReservationCard";
+import PlayerReservationDetailModal from "../UserHomeScreen/components/PlayerReservationDetailModal";
 import HistoryPagination from "./components/HistoryPagination";
 
 const PAGE_SIZE = 10;
@@ -21,17 +24,20 @@ const PAGE_SIZE = 10;
 type HistoryTab = "tournaments" | "played";
 
 export default function UserHistoryScreen() {
+  const queryClient = useQueryClient();
   const { playerId, hasApiSession } = useMockSession();
   const [tab, setTab] = useState<HistoryTab>("tournaments");
   const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
+  const [tournamentPage, setTournamentPage] = useState(1);
+  const [playedPage, setPlayedPage] = useState(1);
+  const [selectedReservation, setSelectedReservation] = useState<PlayerReservation | null>(null);
   const debouncedSearch = useDebounce(search, 350);
   const [pagedSearch, setPagedSearch] = useState(debouncedSearch);
   if (pagedSearch !== debouncedSearch) {
     setPagedSearch(debouncedSearch);
-    setPage(1);
+    setTournamentPage(1);
   }
-  const requestPage = pagedSearch === debouncedSearch ? page : 1;
+  const requestPage = pagedSearch === debouncedSearch ? tournamentPage : 1;
   const canQuery = Boolean(playerId) && hasApiSession;
 
   const history = useQuery({
@@ -46,8 +52,12 @@ export default function UserHistoryScreen() {
   });
 
   const played = useQuery({
-    queryKey: ["player-home", playerId],
-    queryFn: () => Api.TournamentOpsService().getPlayerHome(playerId!),
+    queryKey: ["player-played", playerId, playedPage],
+    queryFn: () =>
+      Api.TournamentOpsService().getPlayerPlayed({
+        page: playedPage,
+        pageSize: PAGE_SIZE,
+      }),
     enabled: canQuery && tab === "played",
   });
 
@@ -57,7 +67,13 @@ export default function UserHistoryScreen() {
   const hasSearch = Boolean(debouncedSearch.trim());
   const showLoading = history.isLoading && items.length === 0;
   const showEmpty = !showLoading && !history.isError && totalItems === 0 && !history.isFetching;
-  const recentMatches = played.data?.recentMatches ?? [];
+
+  const playedItems = played.data?.items ?? [];
+  const playedTotal = played.data?.totalItems ?? 0;
+  const playedPages = played.data?.totalPages ?? 1;
+  const showPlayedLoading = played.isLoading && playedItems.length === 0;
+  const showPlayedEmpty =
+    !showPlayedLoading && !played.isError && playedTotal === 0 && !played.isFetching;
 
   return (
     <div className="space-y-4 p-4" data-testid="player-history">
@@ -149,36 +165,81 @@ export default function UserHistoryScreen() {
               page={history.data?.page ?? requestPage}
               totalPages={totalPages}
               totalItems={totalItems}
+              itemLabel={totalItems === 1 ? "torneo" : "torneos"}
               disabled={history.isFetching}
-              onPageChange={setPage}
+              onPageChange={setTournamentPage}
             />
           </TabsContent>
 
           <TabsContent value="played" className="mt-3 space-y-3">
-            {played.isLoading ? (
-              <p className="text-sm text-muted-foreground">Cargando partidos…</p>
-            ) : played.isError ? (
+            {played.isFetching && playedItems.length > 0 ? (
+              <p className="text-center text-xs text-muted-foreground">Actualizando…</p>
+            ) : null}
+
+            {showPlayedLoading ? (
+              <p className="text-sm text-muted-foreground">Cargando partidos y turnos…</p>
+            ) : null}
+
+            {played.isError && playedItems.length === 0 ? (
               <EmptyState
                 tone="error"
                 icon={CircleAlert}
-                title="No se pudieron cargar los partidos."
+                title="No se pudieron cargar los partidos y turnos."
               />
-            ) : recentMatches.length === 0 ? (
-              <EmptyState icon={Trophy} title="Sin partidos finalizados." />
-            ) : (
-              recentMatches.map((item) => (
-                <MatchCard
-                  key={item.match.id}
-                  match={item.match}
-                  pairALabel={item.pairALabel}
-                  pairBLabel={item.pairBLabel}
-                  courtLabel={item.courtLabel}
-                  phaseLabel={item.phaseLabel}
-                />
-              ))
-            )}
+            ) : null}
+
+            {showPlayedEmpty ? (
+              <EmptyState
+                icon={CalendarDays}
+                title="Todavía no hay partidos ni turnos jugados."
+              />
+            ) : null}
+
+            {playedItems.length > 0
+              ? playedItems.map((item) =>
+                  item.kind === "match" ? (
+                    <MatchCard
+                      key={`match-${item.match.match.id}`}
+                      match={item.match.match}
+                      pairALabel={item.match.pairALabel}
+                      pairBLabel={item.match.pairBLabel}
+                      courtLabel={item.match.courtLabel}
+                      phaseLabel={item.match.phaseLabel}
+                    />
+                  ) : (
+                    <PlayerReservationCard
+                      key={`reservation-${item.reservation.id}`}
+                      reservation={item.reservation}
+                      className="w-full"
+                      onOpen={setSelectedReservation}
+                    />
+                  ),
+                )
+              : null}
+
+            <HistoryPagination
+              page={played.data?.page ?? playedPage}
+              totalPages={playedPages}
+              totalItems={playedTotal}
+              itemLabel={playedTotal === 1 ? "partido o turno" : "partidos y turnos"}
+              disabled={played.isFetching}
+              testId="player-played-pagination"
+              onPageChange={setPlayedPage}
+            />
           </TabsContent>
         </Tabs>
+
+        <PlayerReservationDetailModal
+          reservation={selectedReservation}
+          onOpenChange={(open) => {
+            if (!open) setSelectedReservation(null);
+          }}
+          onCancelled={() => {
+            void queryClient.invalidateQueries({ queryKey: ["player-played"] });
+            void queryClient.invalidateQueries({ queryKey: ["player-home"] });
+            void queryClient.invalidateQueries({ queryKey: ["player-week"] });
+          }}
+        />
       </RequirePlayerAuth>
     </div>
   );

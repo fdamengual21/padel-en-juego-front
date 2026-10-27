@@ -1,9 +1,10 @@
+import { toPublicTournamentPage } from "../helpers/toPublicTournamentPage";
 import type {
   ClubTournamentListQuery,
   ITournamentRepository,
   PublicTournamentListQuery,
 } from "../repositories/TournamentRepository";
-import type { CreateTournamentRequest, Tournament } from "../types";
+import type { CreateTournamentRequest, PublicTournamentPage, Tournament } from "../types";
 
 export class TournamentService {
   private readonly repository: ITournamentRepository;
@@ -26,6 +27,11 @@ export class TournamentService {
 
   getPublic(id: string) {
     return this.repository.getPublic(id);
+  }
+
+  async getPublicView(id: string, categoryId?: string): Promise<PublicTournamentPage> {
+    const dto = await this.repository.getPublicView(id, categoryId);
+    return toPublicTournamentPage(dto);
   }
 
   create(input: CreateTournamentRequest) {
