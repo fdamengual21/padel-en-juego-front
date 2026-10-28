@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useSettingsStore } from "@/stores/settingsStore";
 
 const SCRIPT_ID = "cf-turnstile-script";
 const SCRIPT_SRC =
@@ -73,6 +74,7 @@ export default function TurnstileField({
   const widgetIdRef = useRef<string | null>(null);
   const onTokenChangeRef = useRef(onTokenChange);
   onTokenChangeRef.current = onTokenChange;
+  const theme = useSettingsStore((state) => state.theme);
 
   const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY?.trim() ?? "";
 
@@ -88,7 +90,7 @@ export default function TurnstileField({
         widgetIdRef.current = api.render(host, {
           sitekey: siteKey,
           action,
-          theme: "light",
+          theme,
           callback: (token) => onTokenChangeRef.current(token),
           "expired-callback": () => onTokenChangeRef.current(null),
           "error-callback": () => onTokenChangeRef.current(null),
@@ -105,7 +107,7 @@ export default function TurnstileField({
       if (id && window.turnstile) window.turnstile.remove(id);
       host.replaceChildren();
     };
-  }, [action, siteKey]);
+  }, [action, siteKey, theme]);
 
   useEffect(() => {
     const id = widgetIdRef.current;

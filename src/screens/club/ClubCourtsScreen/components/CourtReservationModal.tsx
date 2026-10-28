@@ -394,7 +394,7 @@ export default function CourtReservationModal({
         >
           <DialogHeader className="gap-2 border-b border-border px-4 py-4">
             <div className="flex items-start gap-3">
-              <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-sidebar">
+              <div className="flex size-10 items-center justify-center rounded-lg bg-primary/15 text-foreground">
                 <CalendarClock className="size-5" />
               </div>
               <div className="min-w-0 flex-1">
@@ -574,7 +574,7 @@ export default function CourtReservationModal({
                               "rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
                               selected
                                 ? "border-primary bg-primary text-primary-foreground"
-                                : "border-border bg-card text-sidebar hover:bg-muted",
+                                : "border-border bg-card text-foreground hover:bg-muted",
                             )}
                             onClick={() => setSelectedStartsAt(slot.startsAt)}
                           >

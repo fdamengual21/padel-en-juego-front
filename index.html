@@ -4,8 +4,24 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="light" />
+    <meta name="color-scheme" content="only light" />
     <title>Start Point</title>
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("padel-en-juego.settings");
+          if (!stored) return;
+          var theme = JSON.parse(stored).state.theme;
+          if (theme !== "dark") return;
+          var root = document.documentElement;
+          root.classList.remove("light");
+          root.classList.add("dark");
+          root.style.colorScheme = "only dark";
+          var meta = document.querySelector('meta[name="color-scheme"]');
+          if (meta) meta.setAttribute("content", "only dark");
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

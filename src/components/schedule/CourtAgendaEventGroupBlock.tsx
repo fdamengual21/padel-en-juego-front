@@ -19,11 +19,11 @@ interface CourtAgendaEventGroupBlockProps {
 
 const toneClasses = {
   primary:
-    "border-border bg-primary/10 text-sidebar border-l-primary",
+    "border-border bg-primary/10 text-foreground border-l-primary",
   success:
-    "border-border bg-success/10 text-sidebar border-l-success",
+    "border-border bg-success/10 text-foreground border-l-success",
   error:
-    "border-border bg-destructive/10 text-sidebar border-l-destructive",
+    "border-border bg-destructive/10 text-foreground border-l-destructive",
 } as const;
 
 function groupCountLabel(events: readonly CalendarEventGridItemDto[]): string {

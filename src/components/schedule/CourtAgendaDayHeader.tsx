@@ -48,7 +48,7 @@ export default function CourtAgendaDayHeader({
         onNoteClick && note.tone === "available" ? (
           <button
             type="button"
-            className="w-full truncate rounded-md border-l-2 border-l-primary bg-primary/10 px-1 py-1 text-center text-[11px] font-semibold leading-tight text-sidebar hover:brightness-95"
+            className="w-full truncate rounded-md border-l-2 border-l-primary bg-primary/10 px-1 py-1 text-center text-[11px] font-semibold leading-tight text-foreground hover:brightness-95"
             onClick={onNoteClick}
           >
             {note.label}
@@ -58,8 +58,8 @@ export default function CourtAgendaDayHeader({
             className={cn(
               "w-full truncate rounded-md border-l-2 px-1 py-1 text-center text-[11px] font-semibold leading-tight",
               note.tone === "unavailable"
-                ? "border-l-destructive bg-destructive/10 text-sidebar"
-                : "border-l-primary bg-primary/10 text-sidebar",
+                ? "border-l-destructive bg-destructive/10 text-foreground"
+                : "border-l-primary bg-primary/10 text-foreground",
             )}
           >
             {note.label}

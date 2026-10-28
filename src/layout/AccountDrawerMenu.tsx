@@ -7,9 +7,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import ThemeAppearanceSwitch from "@/layout/ThemeAppearanceSwitch";
 import { cn } from "@/lib/utils";
 
 export type AccountActionGroup = "account" | "context" | "session";
+type AccountSectionKey = AccountActionGroup | "appearance";
 
 export interface AccountDrawerAction {
   label: string;
@@ -31,7 +33,31 @@ interface AccountDrawerMenuProps {
   testId?: string;
 }
 
-const GROUP_ORDER: AccountActionGroup[] = ["account", "context", "session"];
+const SECTION_ORDER: AccountSectionKey[] = [
+  "account",
+  "context",
+  "appearance",
+  "session",
+];
+
+function SectionHeading({
+  onClub,
+  children,
+}: {
+  onClub: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <p
+      className={cn(
+        "px-1.5 pt-1 pb-0.5 text-[10px] font-medium uppercase tracking-wide",
+        onClub ? "text-sidebar-foreground/55" : "text-muted-foreground",
+      )}
+    >
+      {children}
+    </p>
+  );
+}
 
 export function AccountActionSections({
   actions,
@@ -42,42 +68,44 @@ export function AccountActionSections({
   onClub?: boolean;
   renderItem: (action: AccountDrawerAction) => ReactNode;
 }) {
-  const sections = GROUP_ORDER.map((group) =>
-    actions.filter((action) => (action.group ?? "account") === group),
-  ).filter((section) => section.length > 0);
+  const sections = SECTION_ORDER.map((key) => ({
+    key,
+    actions:
+      key === "appearance"
+        ? null
+        : actions.filter((action) => (action.group ?? "account") === key),
+  })).filter(
+    (section) =>
+      section.key === "appearance" || (section.actions?.length ?? 0) > 0,
+  );
 
   return (
     <>
-      {sections.map((section, index) => {
-        const isContext = section[0]?.group === "context";
-        return (
-          <Fragment key={section[0]?.label}>
-            {index > 0 ? (
-              <div
-                className={cn(
-                  "my-1 h-px",
-                  onClub ? "bg-sidebar-foreground/15" : "bg-border",
-                )}
-              />
-            ) : null}
-            {isContext ? (
-              <p
-                className={cn(
-                  "px-1.5 pt-1 pb-0.5 text-[10px] font-medium uppercase tracking-wide",
-                  onClub
-                    ? "text-sidebar-foreground/55"
-                    : "text-muted-foreground",
-                )}
-              >
-                Cambiar de vista
-              </p>
-            ) : null}
-            {section.map((action) => (
+      {sections.map((section, index) => (
+        <Fragment key={section.key}>
+          {index > 0 ? (
+            <div
+              className={cn(
+                "my-1 h-px",
+                onClub ? "bg-sidebar-foreground/15" : "bg-border",
+              )}
+            />
+          ) : null}
+          {section.key === "context" ? (
+            <SectionHeading onClub={onClub}>Cambiar de vista</SectionHeading>
+          ) : null}
+          {section.key === "appearance" ? (
+            <>
+              <SectionHeading onClub={onClub}>Apariencia</SectionHeading>
+              <ThemeAppearanceSwitch onClub={onClub} />
+            </>
+          ) : (
+            section.actions?.map((action) => (
               <Fragment key={action.label}>{renderItem(action)}</Fragment>
-            ))}
-          </Fragment>
-        );
-      })}
+            ))
+          )}
+        </Fragment>
+      ))}
     </>
   );
 }

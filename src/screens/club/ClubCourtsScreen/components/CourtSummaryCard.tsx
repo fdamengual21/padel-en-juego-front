@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 import {
@@ -7,6 +8,7 @@ import {
   MapPin,
 } from "lucide-react";
 import type { Club, Court, CourtAvailableSlot, CourtDaySummary } from "@/domain";
+import PendingReservationSlotTooltip from "@/components/courts/PendingReservationSlotTooltip";
 import { Button } from "@/components/ui/button";
 import { formatClubHoursEs } from "@/lib/clubSchedule";
 import { formatLocationEs } from "@/lib/dates";
@@ -191,27 +193,31 @@ export default function CourtSummaryCard({
                   const chipClass = cn(
                     "rounded-full border px-3 py-1 text-xs font-medium",
                     pending
-                      ? "border-warning bg-warning/15 text-sidebar"
+                      ? "border-warning bg-warning/15 text-foreground dark:bg-warning/25"
                       : "border-border bg-card text-muted-foreground",
                   );
-                  return onSelectSlot ? (
+                  const chip = onSelectSlot ? (
                     <button
-                      key={slot.startsAt}
                       type="button"
                       className={cn(
                         chipClass,
                         pending
-                          ? "hover:bg-warning/25"
-                          : "text-sidebar transition-colors hover:bg-muted",
+                          ? "hover:bg-warning/25 dark:hover:bg-warning/35"
+                          : "transition-colors hover:bg-muted hover:text-foreground",
                       )}
                       onClick={() => onSelectSlot(slot)}
                     >
                       {slot.label}
                     </button>
                   ) : (
-                    <span key={slot.startsAt} className={chipClass}>
-                      {slot.label}
-                    </span>
+                    <span className={chipClass}>{slot.label}</span>
+                  );
+                  return pending ? (
+                    <PendingReservationSlotTooltip key={slot.startsAt}>
+                      {chip}
+                    </PendingReservationSlotTooltip>
+                  ) : (
+                    <Fragment key={slot.startsAt}>{chip}</Fragment>
                   );
                 })}
               </div>

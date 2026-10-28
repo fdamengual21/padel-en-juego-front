@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Clock3 } from "lucide-react";
+import CourtStatusChip from "@/components/courts/CourtStatusChip";
+import PendingReservationSlotTooltip from "@/components/courts/PendingReservationSlotTooltip";
 import { formatArs } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
@@ -97,7 +99,7 @@ export default function CourtListingCard({
           ) : (
             media
           )}
-          {status ? <StatusChip status={status} /> : null}
+          {status ? <CourtStatusChip status={status} /> : null}
           <div className="pointer-events-none absolute bottom-3 left-3 z-10 inline-flex items-center rounded-full bg-sidebar/80 px-2.5 py-1 text-xs font-medium text-sidebar-foreground backdrop-blur-sm">
             {name}
           </div>
@@ -149,7 +151,7 @@ export default function CourtListingCard({
                   const className = cn(
                     "rounded-full border px-3 py-1 text-xs font-medium",
                     pending
-                      ? "border-warning bg-warning/15 text-sidebar"
+                      ? "border-warning bg-warning/15 text-foreground dark:bg-warning/25"
                       : "border-border bg-card text-muted-foreground",
                   );
                   const body = (
@@ -160,22 +162,28 @@ export default function CourtListingCard({
                       ) : null}
                     </>
                   );
-                  return slot.onSelect ? (
+                  const chip = slot.onSelect ? (
                     <button
-                      key={slot.key}
                       type="button"
                       className={cn(
                         className,
-                        pending ? "hover:bg-warning/25" : "transition-colors hover:bg-muted hover:text-foreground",
+                        pending
+                          ? "hover:bg-warning/25 dark:hover:bg-warning/35"
+                          : "transition-colors hover:bg-muted hover:text-foreground",
                       )}
                       onClick={slot.onSelect}
                     >
                       {body}
                     </button>
                   ) : (
-                    <span key={slot.key} className={className}>
-                      {body}
-                    </span>
+                    <span className={className}>{body}</span>
+                  );
+                  return pending ? (
+                    <PendingReservationSlotTooltip key={slot.key}>
+                      {chip}
+                    </PendingReservationSlotTooltip>
+                  ) : (
+                    <Fragment key={slot.key}>{chip}</Fragment>
                   );
                 })}
               </div>
@@ -184,32 +192,5 @@ export default function CourtListingCard({
         </div>
       </div>
     </article>
-  );
-}
-
-function StatusChip({ status }: { status: CourtListingStatus }) {
-  return (
-    <span
-      className={cn(
-        "pointer-events-none absolute top-3 left-3 z-10 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium backdrop-blur-sm",
-        status.tone === "available" && "border-primary/40 bg-card/90 text-sidebar",
-        status.tone === "occupied" && "border-warning/50 bg-card/90 text-foreground",
-        status.tone === "closed" && "border-border bg-card/90 text-muted-foreground",
-        status.tone === "neutral" && "border-border bg-card/90 text-muted-foreground",
-      )}
-    >
-      {status.tone !== "neutral" ? (
-        <span
-          className={cn(
-            "size-1.5 rounded-full",
-            status.tone === "available" && "bg-primary",
-            status.tone === "occupied" && "bg-warning",
-            status.tone === "closed" && "bg-muted-foreground",
-          )}
-          aria-hidden
-        />
-      ) : null}
-      {status.label}
-    </span>
   );
 }

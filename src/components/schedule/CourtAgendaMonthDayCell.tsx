@@ -26,10 +26,10 @@ interface CourtAgendaMonthDayCellProps {
 }
 
 const toneClasses: Record<CalendarAgendaStatusTone | "warning", string> = {
-  primary: "border-l-primary bg-primary/10 text-sidebar",
-  success: "border-l-success bg-success/10 text-sidebar",
-  error: "border-l-destructive bg-destructive/10 text-sidebar",
-  warning: "border-l-warning bg-warning/15 text-sidebar",
+  primary: "border-l-primary bg-primary/10 text-foreground",
+  success: "border-l-success bg-success/10 text-foreground",
+  error: "border-l-destructive bg-destructive/10 text-foreground",
+  warning: "border-l-warning bg-warning/15 text-foreground dark:bg-warning/25",
 };
 
 function eventTone(event: CalendarEventGridItemDto) {
@@ -167,7 +167,7 @@ export default function CourtAgendaMonthDayCell({
           {hidden.length > 0 ? (
             <button
               type="button"
-              className="truncate rounded-md bg-muted px-1 py-0.5 text-left text-[11px] font-semibold text-sidebar"
+              className="truncate rounded-md bg-muted px-1 py-0.5 text-left text-[11px] font-semibold text-foreground"
               aria-label={overflowLabel(events, hidden.length)}
               onClick={(clickEvent) => {
                 clickEvent.stopPropagation();

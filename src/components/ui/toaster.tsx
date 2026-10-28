@@ -1,9 +1,12 @@
 import { Toaster as Sonner, type ToasterProps } from "sonner";
+import { useSettingsStore } from "@/stores/settingsStore";
 
 export default function Toaster({ ...props }: ToasterProps) {
+  const theme = useSettingsStore((state) => state.theme);
+
   return (
     <Sonner
-      theme="light"
+      theme={theme}
       className="toaster group"
       position="top-right"
       richColors
