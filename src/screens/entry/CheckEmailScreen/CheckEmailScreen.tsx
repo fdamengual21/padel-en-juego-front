@@ -9,6 +9,7 @@ import { InputField } from "@/components/Form";
 import { Button } from "@/components/ui/button";
 import { toastError, toastSuccess } from "@/lib/toast";
 import { ROUTES } from "@/router/routes";
+import ExploreWithoutAccountLink from "@/screens/entry/components/ExploreWithoutAccountLink";
 
 interface ResendFormValues {
   email: string;
@@ -62,10 +63,13 @@ export default function CheckEmailScreen() {
 
   return (
     <div
-      className="flex min-h-svh items-center justify-center bg-background p-6"
+      className="relative flex min-h-svh items-center justify-center bg-background p-6"
       data-testid="check-email-screen"
     >
       <div className="w-full max-w-md space-y-6 text-center">
+        <div className="text-left">
+          <ExploreWithoutAccountLink />
+        </div>
         <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground">
           <Mail className="size-6" />
         </div>

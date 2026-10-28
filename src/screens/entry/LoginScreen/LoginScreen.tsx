@@ -11,6 +11,7 @@ import { ApiHttpError } from "@/lib/apiClient";
 import { toastError, toastSuccess } from "@/lib/toast";
 import { isPlayerHomePath, resolvePostAuthPath } from "@/modules/auth";
 import { ROUTES } from "@/router/routes";
+import ExploreWithoutAccountLink from "@/screens/entry/components/ExploreWithoutAccountLink";
 
 interface LoginFormValues {
   email: string;
@@ -87,10 +88,11 @@ export default function LoginScreen() {
 
   return (
     <div
-      className="flex min-h-svh items-center justify-center bg-background p-6"
+      className="relative flex min-h-svh items-center justify-center bg-background p-6"
       data-testid="login-screen"
     >
       <div className="w-full max-w-md space-y-6">
+        <ExploreWithoutAccountLink />
         <div className="text-center">
           <p className="text-sm text-muted-foreground">Start Point</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">Ingresar</h1>
@@ -155,14 +157,6 @@ export default function LoginScreen() {
             className="font-medium text-foreground underline-offset-4 hover:underline"
           >
             Registrate
-          </Link>
-        </p>
-        <p className="text-center text-sm">
-          <Link
-            to={ROUTES.home}
-            className="text-muted-foreground underline-offset-4 hover:underline"
-          >
-            Seguir sin cuenta
           </Link>
         </p>
         <p className="text-center text-xs text-muted-foreground">

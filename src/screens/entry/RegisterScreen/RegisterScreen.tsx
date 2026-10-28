@@ -20,6 +20,7 @@ import { toIsoDateOnly } from "@/lib/dates";
 import { toastError, toastSuccess } from "@/lib/toast";
 import { isPlayerHomePath } from "@/modules/auth";
 import { ROUTES } from "@/router/routes";
+import ExploreWithoutAccountLink from "@/screens/entry/components/ExploreWithoutAccountLink";
 import RegisterLegalConsent from "./components/RegisterLegalConsent";
 
 const schema = yup.object({
@@ -225,10 +226,11 @@ export default function RegisterScreen() {
 
   return (
     <div
-      className="flex min-h-svh items-center justify-center bg-background p-6"
+      className="relative flex min-h-svh items-center justify-center bg-background p-6"
       data-testid="register-screen"
     >
       <div className="w-full max-w-lg space-y-6">
+        <ExploreWithoutAccountLink />
         <div className="text-center">
           <p className="text-sm text-muted-foreground">Start Point</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">

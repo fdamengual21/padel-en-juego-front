@@ -4,15 +4,16 @@ import {
   Building2,
   History,
   Home,
+  LogIn,
   LogOut,
   Medal,
   Menu,
   Trophy,
   User,
+  UserPlus,
   type LucideIcon,
 } from "lucide-react";
 import { useMockSession } from "@/app/MockSessionProvider";
-import Avatar from "@/components/Avatar";
 import AccountDrawerMenu, {
   AccountActionSections,
   type AccountDrawerAction,
@@ -92,12 +93,10 @@ export default function UserShell() {
   const browseItems = visibleItems.filter(
     (item) => item.to !== ROUTES.player.profile,
   );
-  const bottomCount = browseItems.length + (isAuthenticated ? 1 : 0);
+  const bottomCount = browseItems.length + 1;
   const colsClass = gridColsClass[bottomCount] ?? "grid-cols-5";
   const moreActive = moreOpen || pathname === ROUTES.player.profile;
-  const displayName = isAuthenticated
-    ? player?.displayName ?? "Jugador"
-    : "Explorar";
+  const displayName = player?.displayName ?? "Jugador";
 
   const goToClub = () => {
     if (clubs.length === 1 && clubs[0]) {
@@ -108,35 +107,60 @@ export default function UserShell() {
     navigate(ROUTES.chooseMode);
   };
 
-  const accountActions = (placement: "sidebar" | "sheet"): AccountDrawerAction[] => [
-    ...(isFeatureEnabled("profile")
-      ? [
+  const accountActions = (placement: "sidebar" | "sheet"): AccountDrawerAction[] => {
+    if (!isAuthenticated) {
+      return [
         {
-          label: "Mi perfil",
-          icon: User,
-          group: "account" as const,
-          onSelect: () => navigate(ROUTES.player.profile),
+          label: "Ingresar",
+          icon: LogIn,
+          group: "session",
+          onSelect: () => navigate(ROUTES.auth.login),
+          testId:
+            placement === "sidebar" ? "player-sidebar-login" : "player-more-login",
         },
-      ]
-      : []),
-    ...(hasAssociatedClub
-      ? [
         {
-          label: "Ir a vista club",
-          icon: Building2,
-          group: "context" as const,
-          onSelect: goToClub,
+          label: "Registrarme",
+          icon: UserPlus,
+          group: "session",
+          onSelect: () => navigate(ROUTES.auth.register),
+          testId:
+            placement === "sidebar"
+              ? "player-sidebar-register"
+              : "player-more-register",
         },
-      ]
-      : []),
-    {
-      label: "Cerrar sesión",
-      icon: LogOut,
-      group: "session",
-      onSelect: logout,
-      testId: placement === "sidebar" ? "player-logout" : undefined,
-    },
-  ];
+      ];
+    }
+
+    return [
+      ...(isFeatureEnabled("profile")
+        ? [
+          {
+            label: "Mi perfil",
+            icon: User,
+            group: "account" as const,
+            onSelect: () => navigate(ROUTES.player.profile),
+          },
+        ]
+        : []),
+      ...(hasAssociatedClub
+        ? [
+          {
+            label: "Ir a vista club",
+            icon: Building2,
+            group: "context" as const,
+            onSelect: goToClub,
+          },
+        ]
+        : []),
+      {
+        label: "Cerrar sesión",
+        icon: LogOut,
+        group: "session",
+        onSelect: logout,
+        testId: placement === "sidebar" ? "player-logout" : undefined,
+      },
+    ];
+  };
 
   return (
     <div className="min-h-svh bg-background text-foreground flex">
@@ -182,22 +206,20 @@ export default function UserShell() {
               testId="player-account-menu"
             />
           ) : (
-            <>
-              <div className="flex items-center gap-2.5 rounded-lg px-2 py-1.5">
-                <Avatar name={displayName} size="sm" alt={displayName} />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{displayName}</p>
-                  <p className="text-xs text-muted-foreground">Sin sesión</p>
-                </div>
-              </div>
-              <Link
-                to={ROUTES.auth.login}
-                className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
-                data-testid="player-header-login"
-              >
-                Ingresar
-              </Link>
-            </>
+            <AccountActionSections
+              actions={accountActions("sidebar")}
+              renderItem={(action) => (
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
+                  data-testid={action.testId}
+                  onClick={action.onSelect}
+                >
+                  <action.icon className="size-4 text-muted-foreground" />
+                  {action.label}
+                </button>
+              )}
+            />
           )}
         </div>
       </aside>
@@ -211,6 +233,7 @@ export default function UserShell() {
             <Link
               to={ROUTES.auth.login}
               className="shrink-0 text-sm font-medium text-foreground underline-offset-4 hover:underline"
+              data-testid="player-header-login"
             >
               Ingresar
             </Link>
@@ -256,32 +279,30 @@ export default function UserShell() {
                 </NavLink>
               </li>
             ))}
-            {isAuthenticated ? (
-              <li>
-                <button
-                  type="button"
+            <li>
+              <button
+                type="button"
+                className={cn(
+                  "flex w-full flex-col items-center gap-0.5 py-1.5 text-[11px] transition-colors",
+                  moreActive
+                    ? "font-medium text-foreground"
+                    : "text-muted-foreground",
+                )}
+                aria-expanded={moreOpen}
+                data-testid="player-more"
+                onClick={() => setMoreOpen(true)}
+              >
+                <span
                   className={cn(
-                    "flex w-full flex-col items-center gap-0.5 py-1.5 text-[11px] transition-colors",
-                    moreActive
-                      ? "font-medium text-foreground"
-                      : "text-muted-foreground",
+                    "flex size-8 items-center justify-center rounded-lg",
+                    moreActive && "bg-primary text-primary-foreground",
                   )}
-                  aria-expanded={moreOpen}
-                  data-testid="player-more"
-                  onClick={() => setMoreOpen(true)}
                 >
-                  <span
-                    className={cn(
-                      "flex size-8 items-center justify-center rounded-lg",
-                      moreActive && "bg-primary text-primary-foreground",
-                    )}
-                  >
-                    <Menu className="size-5" />
-                  </span>
-                  Más
-                </button>
-              </li>
-            ) : null}
+                  <Menu className="size-5" />
+                </span>
+                Más
+              </button>
+            </li>
           </ul>
         </nav>
         <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
