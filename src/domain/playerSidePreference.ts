@@ -4,8 +4,8 @@ export const PLAYER_SIDE_PREFERENCES = ["left", "right", "both"] as const;
 export type PlayerSidePreference = (typeof PLAYER_SIDE_PREFERENCES)[number];
 
 export const PLAYER_SIDE_PREFERENCE_LABELS: Record<PlayerSidePreference, string> = {
-  left: "Izquierda",
-  right: "Derecha",
+  left: "Revés",
+  right: "Drive",
   both: "Ambos",
 };
 

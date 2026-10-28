@@ -17,6 +17,7 @@ export interface ManualClientDraft {
   lastName: string;
   phone: string;
   email: string;
+  sexId: number | null;
   age: string;
   categoryLevel: CategoryLevel;
 }
@@ -44,6 +45,7 @@ function draftToIdentity(draft: ManualClientDraft): PlayerIdentityValues {
     lastName: draft.lastName,
     age: draft.age,
     email: draft.email,
+    sexId: draft.sexId,
     categoryLevel: draft.categoryLevel,
     phone: draft.phone,
   };
@@ -55,6 +57,7 @@ function identityToDraft(values: PlayerIdentityValues): ManualClientDraft {
     lastName: values.lastName,
     age: values.age,
     email: values.email,
+    sexId: values.sexId,
     categoryLevel: values.categoryLevel,
     phone: values.phone ?? "",
   };
@@ -84,6 +87,7 @@ export default function ClientPickerField({
           lastName: "",
           phone: "",
           email: "",
+          sexId: null,
           age: "",
           categoryLevel: 6 as CategoryLevel,
         };
@@ -157,8 +161,8 @@ export default function ClientPickerField({
             }
           />
           <p className="text-xs text-muted-foreground">
-            Si cargás email o teléfono y ya existen, te vamos a avisar al
-            guardar.
+            Nombre, apellido, email y sexo son obligatorios. Si el email ya es
+            cliente de este club, se reutiliza esa ficha.
           </p>
         </div>
       </div>

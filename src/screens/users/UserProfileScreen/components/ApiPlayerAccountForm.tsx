@@ -22,10 +22,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ageFromDateOfBirth, isValidOptionalDateOfBirth } from "@/lib/dateOfBirth";
 import {
-  isValidArgentineDni,
-  normalizeDocumentNumber,
-} from "@/lib/documentNumber";
-import {
   combinePhone,
   DEFAULT_PHONE_DIAL,
   isValidOptionalPhone,
@@ -38,13 +34,6 @@ import { useAuthStore } from "@/stores/authStore";
 const schema = yup.object({
   firstName: yup.string().trim().required("Ingresá tu nombre"),
   lastName: yup.string().trim().required("Ingresá tu apellido"),
-  documentNumber: yup
-    .string()
-    .transform((value) => normalizeDocumentNumber(value))
-    .required("Ingresá tu DNI")
-    .test("dni", "Ingresá un DNI de 7 u 8 dígitos", (value) =>
-      isValidArgentineDni(value),
-    ),
   sexId: yup
     .number()
     .nullable()
@@ -103,7 +92,6 @@ function toFormValues(user: UserMeDto) {
   return {
     firstName: user.firstName ?? "",
     lastName: user.lastName ?? "",
-    documentNumber: user.documentNumber ?? "",
     sexId: user.sexId ?? undefined,
     dateOfBirth: user.dateOfBirth ?? null,
     categoryLevel: user.categoryLevel ?? null,
@@ -173,7 +161,6 @@ export default function ApiPlayerAccountForm({ user }: ApiPlayerAccountFormProps
       return Api.UserService().updateMe({
         firstName: values.firstName.trim(),
         lastName: values.lastName.trim(),
-        documentNumber: normalizeDocumentNumber(values.documentNumber),
         sexId: values.sexId,
         dateOfBirth: hasPlayer ? values.dateOfBirth || null : null,
         categoryLevel: hasPlayer ? values.categoryLevel : null,
@@ -218,17 +205,6 @@ export default function ApiPlayerAccountForm({ user }: ApiPlayerAccountFormProps
           required
         />
       </div>
-
-      <InputField
-        control={control}
-        name="documentNumber"
-        label="DNI"
-        inputMode="numeric"
-        autoComplete="off"
-        id="account-documentNumber"
-        required
-        hint="7 u 8 dígitos, sin puntos."
-      />
 
       <SelectField
         control={control}

@@ -88,7 +88,7 @@ export default function ClubFixedReservationsScreen() {
         <Input
           id="fixed-reservations-search"
           type="search"
-          placeholder="Buscar por nombre, apellido o DNI"
+          placeholder="Buscar por nombre, teléfono o email"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           className="h-10 px-3"
@@ -115,7 +115,7 @@ export default function ClubFixedReservationsScreen() {
           title={hasSearch ? "Ningún jugador coincide" : "Todavía no hay turnos fijos"}
           description={
             hasSearch
-              ? "Probá con otro nombre, apellido o DNI."
+              ? "Probá con otro nombre, teléfono o email."
               : "Cuando el club asigne un horario semanal, aparece acá."
           }
         />

@@ -51,7 +51,7 @@ export default function EntryScreen() {
     <div className="flex min-h-svh items-center justify-center bg-background p-6">
       <div className="w-full max-w-lg space-y-8 text-center">
         <div>
-          <p className="mb-2 text-sm text-muted-foreground">Easy padel</p>
+          <p className="mb-2 text-sm text-muted-foreground">Start Point</p>
           <h1 className="text-4xl font-semibold tracking-tight">
             {isAuthenticated ? "¿Cómo querés entrar?" : "Torneos de pádel"}
           </h1>

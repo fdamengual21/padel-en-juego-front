@@ -39,7 +39,7 @@ export default function ClientsFilters({
         <Input
           id="clients-search"
           type="search"
-          placeholder="Buscar por nombre, teléfono o DNI"
+          placeholder="Buscar por nombre, teléfono o email"
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}
           className="h-10 px-3 pl-8"

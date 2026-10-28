@@ -197,9 +197,6 @@ export default function InviteStaffDialog({
                 <div className="min-w-0">
                   <p className="truncate font-medium">{detail.fullName || "Sin nombre"}</p>
                   <p className="truncate text-sm text-muted-foreground">{detail.email}</p>
-                  <p className="text-sm text-muted-foreground">
-                    DNI {detail.documentNumber ?? "sin cargar"}
-                  </p>
                 </div>
               </div>
               <SelectField name="role" label="Rol" required options={options} />

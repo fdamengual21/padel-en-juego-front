@@ -47,12 +47,16 @@ export default function CheckEmailScreen() {
     setError(null);
     try {
       const message = await Api.AuthService().resendConfirmation(values.email);
-      toastSuccess("Correo enviado", message);
+      toastSuccess(message);
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "No se pudo reenviar el correo";
       setError(message);
-      toastError("No se pudo reenviar el correo", message);
+      const alreadyVerified = /ya fue verificado/i.test(message);
+      toastError(
+        alreadyVerified ? message : "No se pudo reenviar el correo",
+        alreadyVerified ? "Ingresá con tu cuenta." : message,
+      );
     }
   });
 
@@ -66,19 +70,20 @@ export default function CheckEmailScreen() {
           <Mail className="size-6" />
         </div>
         <div>
-          <p className="text-sm text-muted-foreground">Easy padel</p>
+          <p className="text-sm text-muted-foreground">Start Point</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">
             Revisá tu correo
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Te enviamos un enlace para verificar la cuenta
+            Te mandamos un enlace desde Start Point
             {presetEmail ? (
               <>
                 {" "}
-                de <span className="font-medium text-foreground">{presetEmail}</span>
+                a <span className="font-medium text-foreground">{presetEmail}</span>
               </>
             ) : null}
-            . Cuando lo abras, vas a quedar con la sesión iniciada.
+            . Si no lo ves, mirá spam. Si ya tenías cuenta, no se creó otra.
+            Cuando abras el enlace, vas a quedar con la sesión iniciada.
           </p>
         </div>
 
@@ -104,7 +109,7 @@ export default function CheckEmailScreen() {
               variant="outline"
               disabled={isSubmitting || !isValid}
             >
-              {isSubmitting ? "Enviando…" : "Reenviar correo"}
+              {isSubmitting ? "Enviando…" : "Reenviar enlace de Start Point"}
             </Button>
           </form>
         </FormProvider>

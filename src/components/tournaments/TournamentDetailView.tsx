@@ -2081,8 +2081,9 @@ export default function TournamentDetailView({
           const player = await Api.TournamentOpsService().createPlayer({
             firstName: draft.firstName,
             lastName: draft.lastName,
+            email: draft.email.trim(),
+            sexId: draft.sexId!,
             phone: draft.phone.trim() || null,
-            email: draft.email.trim() || null,
             age: Number.isFinite(ageNum) && draft.age.trim() ? ageNum : null,
             categoryLevel: draft.categoryLevel,
             sidePreferencePrimary: draft.sidePreferencePrimary,

@@ -84,7 +84,7 @@ export default function RegisteredPlayerPicker({
           id="registered-player-search"
           className="pr-8"
           value={query}
-          placeholder="Nombre, DNI o teléfono…"
+          placeholder="Nombre, teléfono o email…"
           onChange={(event) => setQuery(event.target.value)}
           autoComplete="off"
         />
@@ -142,7 +142,7 @@ export default function RegisteredPlayerPicker({
         </div>
       ) : query.trim().length < 2 ? (
         <p className="text-xs text-muted-foreground">
-          Escribí al menos 2 caracteres. Podés buscar por nombre, DNI o teléfono.
+          Escribí al menos 2 caracteres. Podés buscar por nombre, teléfono o email.
         </p>
       ) : null}
     </div>

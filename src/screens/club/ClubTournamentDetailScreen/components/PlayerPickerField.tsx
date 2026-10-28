@@ -21,6 +21,7 @@ export interface ManualPlayerDraft {
   lastName: string;
   phone: string;
   email: string;
+  sexId: number | null;
   age: string;
   categoryLevel: CategoryLevel;
   sidePreferencePrimary: SidePosition | null;
@@ -50,6 +51,7 @@ function draftToIdentity(draft: ManualPlayerDraft): PlayerIdentityValues {
     lastName: draft.lastName,
     age: draft.age,
     email: draft.email,
+    sexId: draft.sexId,
     categoryLevel: draft.categoryLevel,
     phone: draft.phone,
   };
@@ -64,6 +66,7 @@ function identityToDraft(
     lastName: values.lastName,
     age: values.age,
     email: values.email,
+    sexId: values.sexId,
     categoryLevel: values.categoryLevel,
     phone: values.phone ?? "",
     sidePreferencePrimary: side.primary,
@@ -79,6 +82,7 @@ function emptyManualDraft(
     lastName: "",
     phone: "",
     email: "",
+    sexId: null,
     age: "",
     categoryLevel: 6 as CategoryLevel,
     sidePreferencePrimary: null,
@@ -162,7 +166,7 @@ export default function PlayerPickerField({
         >
           <div className="flex items-start justify-between gap-2">
             <p className="text-xs font-medium">
-              Alta manual — solo nombre y apellido son obligatorios
+              Alta manual — nombre, apellido, email y sexo son obligatorios
             </p>
             <Button
               type="button"

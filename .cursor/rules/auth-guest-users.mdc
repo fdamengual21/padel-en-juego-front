@@ -30,18 +30,18 @@ La **vista de jugador** (`/` inicio, `/torneos`, etc.) es usable **sin sesión**
 
 1. Mostrar gate (`RequirePlayerAuth`) o redirigir a `/ingresar?next=…`. Ver disponibilidad de un club no es acción protegida. Pedir un turno sí: el modal dice que el pedido queda a su nombre y que le avisamos cuando el club lo confirme.
 2. Ofrecer **Ingresar** y **Crear cuenta** (mismo destino `next` al terminar).
-3. El formulario de **registro** (nombre, apellido, DNI, sexo, fecha de nacimiento, email, contraseña, repetir, categoría y **aceptación de privacidad + términos vigentes**) es la fuente de verdad de identidad de la **cuenta app**. El texto legal sale de `GET /api/legal/current`; no se hardcodea en el front. El sexo sale de `GET /api/sexes`.
+3. El formulario de **registro** (nombre, apellido, sexo, email, contraseña, repetir, y **aceptación de privacidad + términos vigentes**) es la fuente de verdad de identidad de la **cuenta app**. El texto legal sale de `GET /api/legal/current`; no se hardcodea en el front. El sexo sale de `GET /api/sexes`.
 4. El alta **manual** de participante/cliente en el club reutiliza los **mismos campos**, con reglas distintas:
-   - Obligatorios: **solo nombre y apellido**.
-   - Opcionales: DNI, sexo, fecha de nacimiento, categoría, email, teléfono.
-   - Si se carga email o teléfono y ya hay cliente / jugador / usuario app → modal para **reutilizar** o **dar de alta nuevo**.
+ - Obligatorios: **nombre, apellido, email y sexo**.
+ - Opcionales: fecha de nacimiento, categoría, teléfono.
+ - Mismo email, misma cuenta o ficha sin email con el mismo nombre y sexo en ese club → no se crea otra. Se vincula la cuenta si existe y se avisa bajo qué nombre buscarla.
 
 ## Fuentes de identidad
 
 1. **Alta club** (manual): `Client` / `Player` sin cuenta (`userId` null), propios del club.
 2. **Registro app**: `User` + `Player` vinculados. El **email de cuenta es único** (no se permiten dos users con el mismo email).
 
-Al registrarse en la app, si existe un cliente de club con el mismo email (o teléfono coincidente), se **asocia** ese cliente al `userId` / `playerId` nuevos.
+Al registrarse en la app, si existen fichas de club con el mismo email, se **asocian** todas al `userId` nuevo. Si el email ya tiene cuenta, el registro responde error (“Ya tenés cuenta creada”), no sigue a verificar correo y no se crea otra.
 
 ## Híbrido
 

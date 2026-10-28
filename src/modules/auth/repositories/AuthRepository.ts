@@ -23,7 +23,6 @@ function compactRegister(input: RegisterInput): RegisterInput {
   return {
     firstName: input.firstName,
     lastName: input.lastName,
-    documentNumber: input.documentNumber,
     sexId: input.sexId,
     email: input.email,
     password: input.password,

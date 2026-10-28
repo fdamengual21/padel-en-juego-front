@@ -29,7 +29,7 @@ import type { ClubClient } from "@/modules/clients";
 interface ClientFormValues {
   firstName: string;
   lastName: string;
-  documentNumber: string;
+  email: string;
   sexId: number | null;
   phoneDialCode: string;
   phoneNational: string;
@@ -50,11 +50,11 @@ interface ClientFormDialogProps {
 const schema: yup.ObjectSchema<ClientFormValues> = yup.object({
   firstName: yup.string().trim().required("Ingresá el nombre"),
   lastName: yup.string().trim().required("Ingresá el apellido"),
-  documentNumber: yup
+  email: yup
     .string()
     .trim()
-    .matches(/^\d{7,8}$/, "El DNI tiene 7 u 8 dígitos")
-    .required("Ingresá el DNI"),
+    .email("Email inválido")
+    .required("Ingresá el email"),
   sexId: yup
     .number()
     .nullable()
@@ -85,7 +85,7 @@ const schema: yup.ObjectSchema<ClientFormValues> = yup.object({
 const emptyValues: ClientFormValues = {
   firstName: "",
   lastName: "",
-  documentNumber: "",
+  email: "",
   sexId: null,
   phoneDialCode: DEFAULT_PHONE_DIAL,
   phoneNational: "",
@@ -132,7 +132,7 @@ export default function ClientFormDialog({
     form.reset({
       firstName: client.firstName,
       lastName: client.lastName,
-      documentNumber: client.documentNumber ?? "",
+      email: client.email ?? "",
       sexId: client.sexId,
       phoneDialCode: phone.dialCode,
       phoneNational: phone.national,
@@ -145,7 +145,7 @@ export default function ClientFormDialog({
     const input = {
       firstName: values.firstName.trim(),
       lastName: values.lastName.trim(),
-      documentNumber: values.documentNumber.trim(),
+      email: values.email.trim(),
       sexId: values.sexId!,
       phone: combinePhone(values.phoneDialCode, values.phoneNational),
       categoryLevel: values.categoryLevel!,
@@ -165,7 +165,11 @@ export default function ClientFormDialog({
       else onOpenChange(false);
     } catch (err) {
       const message = err instanceof Error ? err.message : "No se pudo guardar el cliente";
-      toastError("No se pudo guardar el cliente", message);
+      const alreadyExists = /existe, buscalo con el nombre/i.test(message);
+      toastError(
+        alreadyExists ? message : "No se pudo guardar el cliente",
+        alreadyExists ? undefined : message,
+      );
     }
   });
 
@@ -183,10 +187,10 @@ export default function ClientFormDialog({
         </div>
         <InputField
           control={form.control}
-          name="documentNumber"
-          label="DNI"
+          name="email"
+          label="Email"
+          type="email"
           required
-          inputMode="numeric"
         />
         <SelectField
           control={form.control}
@@ -255,7 +259,7 @@ export default function ClientFormDialog({
         <DialogHeader>
           <DialogTitle>{editing ? "Editar cliente" : "Añadir cliente"}</DialogTitle>
           <DialogDescription>
-            Nombre, apellido, DNI, sexo, teléfono y categoría son obligatorios.
+            Nombre, apellido, email, sexo, teléfono y categoría son obligatorios.
           </DialogDescription>
         </DialogHeader>
         {formBody}

@@ -22,6 +22,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatTournamentDayEs } from "@/lib/dates";
+import { toastError } from "@/lib/toast";
 import PlayerPickerField, {
   emptyPlayerSlot,
   isManualDraftValid,
@@ -565,9 +566,10 @@ export default function PairFormModal({
                   });
                   onOpenChange(false);
                 } catch (err) {
-                  setError(
-                    err instanceof Error ? err.message : "No se pudo guardar",
-                  );
+                  const message =
+                    err instanceof Error ? err.message : "No se pudo guardar";
+                  setError(message);
+                  toastError("No se pudo guardar", message);
                 }
               })();
             }}

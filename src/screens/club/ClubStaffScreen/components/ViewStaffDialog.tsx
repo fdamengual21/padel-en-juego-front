@@ -42,7 +42,6 @@ export default function ViewStaffDialog({ member, onOpenChange }: ViewStaffDialo
                   value: member.phone || "Sin teléfono",
                   phone: member.phone,
                 },
-                { label: "DNI", value: member.documentNumber || "Sin DNI" },
                 { label: "Email", value: member.maskedEmail || "Sin email" },
               ]}
             />

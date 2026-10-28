@@ -69,7 +69,7 @@ function normalizeClient(raw: Record<string, unknown>): ClubClient {
     ...item,
     firstName: asString(raw.firstName),
     lastName: asString(raw.lastName),
-    documentNumber: asNullableString(raw.documentNumber),
+    email: asNullableString(raw.email),
     sexId: item.sexId,
     categoryLevel: item.categoryLevel,
     sidePreference: isPlayerSidePreference(raw.sidePreference) ? raw.sidePreference : null,

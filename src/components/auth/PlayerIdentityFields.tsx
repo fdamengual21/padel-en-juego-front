@@ -1,8 +1,10 @@
+import { useQuery } from "@tanstack/react-query";
 import {
   CATEGORY_LEVELS,
   formatCategoryLevel,
   type CategoryLevel,
 } from "@/domain";
+import Api from "@/api/Api";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -13,13 +15,14 @@ export interface PlayerIdentityValues {
   lastName: string;
   age: string;
   email: string;
+  sexId: number | null;
   categoryLevel: CategoryLevel;
   phone?: string;
 }
 
 /**
  * `registration`: todos obligatorios (cuenta app).
- * `club`: solo nombre y apellido obligatorios; resto opcional.
+ * `club`: nombre, apellido, email y sexo obligatorios; resto opcional.
  */
 export type PlayerIdentityMode = "registration" | "club";
 
@@ -31,17 +34,24 @@ export function emptyPlayerIdentityValues(
     lastName: "",
     age: "",
     email: "",
+    sexId: null,
     categoryLevel: 6,
     phone: "",
     ...partial,
   };
 }
 
-/** Alta manual club: solo nombre + apellido. */
+/** Alta manual club: nombre, apellido, email y sexo. */
 export function isClubManualIdentityValid(
-  values: Pick<PlayerIdentityValues, "firstName" | "lastName">,
+  values: Pick<PlayerIdentityValues, "firstName" | "lastName" | "email" | "sexId">,
 ): boolean {
-  return Boolean(values.firstName.trim() && values.lastName.trim());
+  return Boolean(
+    values.firstName.trim() &&
+      values.lastName.trim() &&
+      values.email.trim().includes("@") &&
+      values.sexId != null &&
+      values.sexId > 0,
+  );
 }
 
 /** Registro app: identidad completa. */
@@ -49,8 +59,7 @@ export function isRegistrationIdentityValid(
   values: PlayerIdentityValues,
 ): boolean {
   const age = Number(values.age);
-  if (!values.firstName.trim() || !values.lastName.trim()) return false;
-  if (!values.email.trim() || !values.email.includes("@")) return false;
+  if (!isClubManualIdentityValid(values)) return false;
   if (!Number.isFinite(age) || age < 12 || age > 99) return false;
   if (!CATEGORY_LEVELS.includes(values.categoryLevel)) return false;
   return true;
@@ -92,6 +101,11 @@ export default function PlayerIdentityFields({
     onChange({ ...values, ...partial });
   const optional = mode === "club";
 
+  const { data: sexes, isLoading: sexesLoading, isError: sexesError } = useQuery({
+    queryKey: ["sexes"],
+    queryFn: () => Api.SexService().list(),
+  });
+
   const labelSuffix = (required: boolean) =>
     required ? "" : optional ? " (opcional)" : "";
 
@@ -114,6 +128,43 @@ export default function PlayerIdentityFields({
           onChange={(e) => patch({ lastName: e.target.value })}
           autoComplete="family-name"
         />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor={`${idPrefix}-email`}>Email</Label>
+        <Input
+          id={`${idPrefix}-email`}
+          type="email"
+          value={values.email}
+          onChange={(e) => patch({ email: e.target.value })}
+          autoComplete="email"
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor={`${idPrefix}-sex`}>Sexo</Label>
+        <select
+          id={`${idPrefix}-sex`}
+          className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm"
+          value={values.sexId ?? ""}
+          disabled={sexesLoading || sexesError || !sexes?.length}
+          onChange={(e) =>
+            patch({
+              sexId: e.target.value ? Number(e.target.value) : null,
+            })
+          }
+        >
+          <option value="">
+            {sexesLoading
+              ? "Cargando…"
+              : sexesError
+                ? "No se pudo cargar"
+                : "Seleccioná…"}
+          </option>
+          {(sexes ?? []).map((sex) => (
+            <option key={sex.id} value={sex.id}>
+              {sex.name}
+            </option>
+          ))}
+        </select>
       </div>
       {showAgeAndCategory ? (
         <>
@@ -153,25 +204,8 @@ export default function PlayerIdentityFields({
           </div>
         </>
       ) : null}
-      <div
-        className={cn(
-          "space-y-1.5",
-          showPhone ? "sm:col-span-1" : "sm:col-span-2",
-        )}
-      >
-        <Label htmlFor={`${idPrefix}-email`}>
-          Email{labelSuffix(mode === "registration")}
-        </Label>
-        <Input
-          id={`${idPrefix}-email`}
-          type="email"
-          value={values.email}
-          onChange={(e) => patch({ email: e.target.value })}
-          autoComplete="email"
-        />
-      </div>
       {showPhone ? (
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 sm:col-span-2">
           <Label htmlFor={`${idPrefix}-phone`}>
             Teléfono{labelSuffix(mode === "registration")}
           </Label>

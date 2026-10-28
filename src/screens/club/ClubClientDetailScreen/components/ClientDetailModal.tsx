@@ -64,7 +64,7 @@ export default function ClientDetailModal({
           <DialogTitle>{editing ? "Editar cliente" : title}</DialogTitle>
           <DialogDescription>
             {editing
-              ? "Nombre, apellido, DNI, sexo, teléfono y categoría."
+              ? "Nombre, apellido, email, sexo, teléfono y categoría."
               : "Ficha del cliente en el club"}
           </DialogDescription>
         </DialogHeader>
@@ -100,7 +100,7 @@ export default function ClientDetailModal({
                     value: data.phone || "Sin teléfono",
                     phone: data.phone,
                   },
-                  { label: "DNI", value: data.documentNumber || "Sin DNI" },
+                  { label: "Email", value: data.email || "Sin email" },
                 ]}
               />
 

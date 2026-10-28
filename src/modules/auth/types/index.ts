@@ -21,7 +21,6 @@ export interface LoginInput {
 export interface RegisterInput {
   firstName: string;
   lastName: string;
-  documentNumber: string;
   sexId: number;
   email: string;
   password: string;

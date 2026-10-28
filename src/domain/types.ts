@@ -378,8 +378,9 @@ export type PairSidePreference = "drive" | "reves" | "any";
 export interface CreatePlayerInput {
   firstName: string;
   lastName: string;
+  email: string;
+  sexId: number;
   phone?: string | null;
-  email?: string | null;
   age?: number | null;
   categoryLevel?: import("./categories").CategoryLevel;
   userId?: string | null;

@@ -1,4 +1,4 @@
-# Easy padel
+# Start Point
 
 App de gestión de torneos y club de pádel (React + Vite + TypeScript).
 

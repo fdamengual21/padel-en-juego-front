@@ -12,7 +12,7 @@ export interface ClubClient {
   firstName: string;
   lastName: string;
   fullName: string;
-  documentNumber: string | null;
+  email: string | null;
   sexId: number | null;
   phone: string | null;
   categoryLevel: number | null;
@@ -33,7 +33,7 @@ export interface ClubClientListQuery {
 export interface SaveClubClientInput {
   firstName: string;
   lastName: string;
-  documentNumber: string;
+  email: string;
   sexId: number;
   phone: string;
   categoryLevel: number;

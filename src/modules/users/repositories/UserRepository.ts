@@ -58,7 +58,6 @@ export function normalizeUserMeDto(raw: Record<string, unknown>): UserMeDto {
     playerId: asNullableString(raw.playerId),
     avatarUrl: asNullableString(raw.avatarUrl),
     coverUrl: asNullableString(raw.coverUrl),
-    documentNumber: asNullableString(raw.documentNumber),
     sexId: asNullableNumber(raw.sexId),
     provinceId: asNullableNumber(raw.provinceId),
     municipalityId: asNullableNumber(raw.municipalityId),

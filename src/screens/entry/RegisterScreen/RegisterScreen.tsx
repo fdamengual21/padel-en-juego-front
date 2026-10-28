@@ -17,10 +17,6 @@ import GeographySelectFields from "@/components/GeographySelectFields";
 import { Button } from "@/components/ui/button";
 import { isValidOptionalDateOfBirth } from "@/lib/dateOfBirth";
 import { toIsoDateOnly } from "@/lib/dates";
-import {
-  isValidArgentineDni,
-  normalizeDocumentNumber,
-} from "@/lib/documentNumber";
 import { toastError, toastSuccess } from "@/lib/toast";
 import { isPlayerHomePath } from "@/modules/auth";
 import { ROUTES } from "@/router/routes";
@@ -29,13 +25,6 @@ import RegisterLegalConsent from "./components/RegisterLegalConsent";
 const schema = yup.object({
   firstName: yup.string().trim().required("Ingresá tu nombre"),
   lastName: yup.string().trim().required("Ingresá tu apellido"),
-  documentNumber: yup
-    .string()
-    .transform((value) => normalizeDocumentNumber(value))
-    .required("Ingresá tu DNI")
-    .test("dni", "Ingresá un DNI de 7 u 8 dígitos", (value) =>
-      isValidArgentineDni(value),
-    ),
   sexId: yup
     .number()
     .nullable()
@@ -131,7 +120,6 @@ export default function RegisterScreen() {
     defaultValues: {
       firstName: "",
       lastName: "",
-      documentNumber: "",
       sexId: undefined,
       dateOfBirth: null,
       email: "",
@@ -179,10 +167,9 @@ export default function RegisterScreen() {
           toastError("No se pudo crear la cuenta", message);
           return;
         }
-        await Api.AuthService().register({
+        const message = await Api.AuthService().register({
           firstName: values.firstName,
           lastName: values.lastName,
-          documentNumber: normalizeDocumentNumber(values.documentNumber),
           sexId: values.sexId,
           email: values.email,
           password: values.password,
@@ -195,7 +182,10 @@ export default function RegisterScreen() {
           acceptedTermsDocumentId: legalDocuments.terms.id,
           captchaToken,
         });
-        toastSuccess("Cuenta creada", "Revisá tu correo para verificarla");
+        toastSuccess(
+          message,
+          "Buscá un correo de Start Point. Si no está, mirá spam o reenvialo.",
+        );
         const params = new URLSearchParams({ email: values.email });
         if (redirectTo) params.set("next", redirectTo);
         navigate(`${ROUTES.auth.checkEmail}?${params.toString()}`, {
@@ -205,7 +195,11 @@ export default function RegisterScreen() {
         const message =
           err instanceof Error ? err.message : "No se pudo registrar";
         setError(message);
-        toastError("No se pudo crear la cuenta", message);
+        const alreadyHasAccount = /ya ten[eé]s cuenta/i.test(message);
+        toastError(
+          alreadyHasAccount ? "Ya tenés cuenta creada" : "No se pudo crear la cuenta",
+          alreadyHasAccount ? "Ingresá con ese email." : message,
+        );
       } finally {
         setCaptchaToken(null);
         setCaptchaReset((value) => value + 1);
@@ -215,7 +209,6 @@ export default function RegisterScreen() {
       const first =
         formErrors.firstName?.message ||
         formErrors.lastName?.message ||
-        formErrors.documentNumber?.message ||
         formErrors.sexId?.message ||
         formErrors.dateOfBirth?.message ||
         formErrors.email?.message ||
@@ -237,13 +230,13 @@ export default function RegisterScreen() {
     >
       <div className="w-full max-w-lg space-y-6">
         <div className="text-center">
-          <p className="text-sm text-muted-foreground">Easy padel</p>
+          <p className="text-sm text-muted-foreground">Start Point</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">
             Crear cuenta
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Nombre, apellido, DNI, sexo, email y contraseña son obligatorios. Te
-            vamos a pedir que verifiques el correo.
+            Nombre, apellido, sexo, email y contraseña son obligatorios. Te
+            vamos a mandar un enlace de Start Point para verificar el correo.
           </p>
         </div>
 
@@ -269,16 +262,6 @@ export default function RegisterScreen() {
                 autoComplete="family-name"
                 id="reg-lastName"
                 required
-              />
-              <InputField
-                control={control}
-                name="documentNumber"
-                label="DNI"
-                inputMode="numeric"
-                autoComplete="off"
-                id="reg-documentNumber"
-                required
-                hint="7 u 8 dígitos, sin puntos."
               />
               <SelectField
                 control={control}

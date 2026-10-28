@@ -8,7 +8,6 @@ export interface ClubStaffMember {
   canEdit: boolean;
   avatarUrl: string | null;
   maskedEmail: string;
-  documentNumber: string | null;
   phone: string | null;
   permissions: string[];
 }
@@ -39,7 +38,6 @@ export interface ClubUserCandidateDetail {
   fullName: string;
   avatarUrl: string | null;
   email: string;
-  documentNumber: string | null;
 }
 
 export interface AssignClubStaffRoleInput {

@@ -26,7 +26,6 @@ export interface UserMeDto {
   playerId: string | null;
   avatarUrl: string | null;
   coverUrl: string | null;
-  documentNumber: string | null;
   sexId: number | null;
   provinceId: number | null;
   municipalityId: number | null;
@@ -43,7 +42,6 @@ export interface UserMeDto {
 export interface UpdateMeInput {
   firstName: string;
   lastName: string;
-  documentNumber: string;
   sexId: number;
   dateOfBirth: string | null;
   categoryLevel: number | null;

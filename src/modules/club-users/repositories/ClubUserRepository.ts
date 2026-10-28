@@ -43,7 +43,6 @@ function normalizeMember(raw: Record<string, unknown>): ClubStaffMember {
     canEdit: raw.canEdit === true,
     avatarUrl: asNullableString(raw.avatarUrl),
     maskedEmail: asString(raw.maskedEmail),
-    documentNumber: asNullableString(raw.documentNumber),
     phone: asNullableString(raw.phone),
     permissions: asStringList(raw.permissions),
   };
@@ -70,7 +69,6 @@ function normalizeCandidateDetail(raw: Record<string, unknown>): ClubUserCandida
     fullName: asString(raw.fullName),
     avatarUrl: asNullableString(raw.avatarUrl),
     email: asString(raw.email),
-    documentNumber: asNullableString(raw.documentNumber),
   };
 }
 function normalizeRole(raw: Record<string, unknown>): ClubRoleOption {
