@@ -18,7 +18,12 @@ import { Button } from "@/components/ui/button";
 import { isValidOptionalDateOfBirth } from "@/lib/dateOfBirth";
 import { toIsoDateOnly } from "@/lib/dates";
 import { toastError, toastSuccess } from "@/lib/toast";
-import { isPlayerHomePath } from "@/modules/auth";
+import {
+  emailFieldSchema,
+  isPlayerHomePath,
+  passwordConfirmFieldSchema,
+  passwordFieldSchema,
+} from "@/modules/auth";
 import { ROUTES } from "@/router/routes";
 import ExploreWithoutAccountLink from "@/screens/entry/components/ExploreWithoutAccountLink";
 import RegisterLegalConsent from "./components/RegisterLegalConsent";
@@ -44,22 +49,9 @@ const schema = yup.object({
       "Ingresá una fecha válida (mínimo 12 años)",
       (value) => isValidOptionalDateOfBirth(value),
     ),
-  email: yup
-    .string()
-    .trim()
-    .email("Email inválido")
-    .required("Ingresá tu email"),
-  password: yup
-    .string()
-    .min(10, "Mínimo 10 caracteres")
-    .matches(/[0-9]/, "Incluí un número")
-    .matches(/[A-Z]/, "Incluí una mayúscula")
-    .matches(/[^A-Za-z0-9]/, "Incluí un carácter especial")
-    .required("Ingresá una contraseña"),
-  passwordConfirm: yup
-    .string()
-    .oneOf([yup.ref("password")], "Las contraseñas no coinciden")
-    .required("Repetí la contraseña"),
+  email: emailFieldSchema,
+  password: passwordFieldSchema,
+  passwordConfirm: passwordConfirmFieldSchema,
   categoryLevel: yup
     .number()
     .nullable()

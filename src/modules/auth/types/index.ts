@@ -48,3 +48,14 @@ export interface AcceptInviteInput {
 export interface AcceptInviteResponse {
   email: string;
 }
+
+export interface ForgotPasswordInput {
+  email: string;
+  captchaToken: string;
+}
+
+export interface ResetPasswordInput {
+  token: string;
+  password: string;
+  confirmPassword: string;
+}

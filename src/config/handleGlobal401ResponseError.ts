@@ -17,6 +17,8 @@ const ANONYMOUS_AUTH_PATHS = [
   "/auth/resend-confirmation",
   "/auth/logout",
   "/auth/accept-invite",
+  "/auth/password/forgot",
+  "/auth/password/reset",
 ] as const;
 
 function endsWithAuthPath(url: string, suffix: string): boolean {

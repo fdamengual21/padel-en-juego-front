@@ -14,6 +14,8 @@ import RegisterScreen from "@/screens/entry/RegisterScreen";
 import CheckEmailScreen from "@/screens/entry/CheckEmailScreen";
 import VerifyEmailScreen from "@/screens/entry/VerifyEmailScreen";
 import SetPasswordScreen from "@/screens/entry/SetPasswordScreen";
+import ForgotPasswordScreen from "@/screens/entry/ForgotPasswordScreen";
+import { ResetPasswordEntry } from "@/screens/entry/ResetPasswordScreen";
 import PrivacyPolicyScreen from "@/screens/entry/PrivacyPolicyScreen";
 import TermsOfServiceScreen from "@/screens/entry/TermsOfServiceScreen";
 import ClubHomeGate from "@/router/guards/ClubHomeGate";
@@ -64,10 +66,12 @@ const router = createBrowserRouter(
       <Route element={<RedirectIfAuthenticated />}>
         <Route path={ROUTES.auth.login} element={<LoginScreen />} />
         <Route path={ROUTES.auth.register} element={<RegisterScreen />} />
+        <Route path={ROUTES.auth.forgotPassword} element={<ForgotPasswordScreen />} />
       </Route>
       <Route path={ROUTES.auth.checkEmail} element={<CheckEmailScreen />} />
       <Route path={ROUTES.auth.verifyEmail} element={<VerifyEmailScreen />} />
       <Route path={ROUTES.auth.setPassword} element={<SetPasswordScreen />} />
+      <Route path={ROUTES.auth.resetPassword} element={<ResetPasswordEntry />} />
       <Route path={ROUTES.legal.privacy} element={<PrivacyPolicyScreen />} />
       <Route path={ROUTES.legal.terms} element={<TermsOfServiceScreen />} />
       <Route path={ROUTES.chooseMode} element={<EntryScreen />} />

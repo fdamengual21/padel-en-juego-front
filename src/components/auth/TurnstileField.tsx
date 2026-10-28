@@ -4,7 +4,7 @@ const SCRIPT_ID = "cf-turnstile-script";
 const SCRIPT_SRC =
   "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
 
-export type TurnstileAction = "login" | "register";
+export type TurnstileAction = "login" | "register" | "forgot-password";
 
 export interface TurnstileFieldProps {
   action: TurnstileAction;

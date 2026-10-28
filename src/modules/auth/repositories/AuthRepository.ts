@@ -5,9 +5,11 @@ import type {
   ConfirmEmailInput,
   AcceptInviteInput,
   AcceptInviteResponse,
+  ForgotPasswordInput,
   LoginInput,
   LoginResponse,
   RegisterInput,
+  ResetPasswordInput,
 } from "../types";
 
 export interface IAuthRepository {
@@ -16,6 +18,8 @@ export interface IAuthRepository {
   confirmEmail(input: ConfirmEmailInput): Promise<LoginResponse>;
   acceptInvite(input: AcceptInviteInput): Promise<AcceptInviteResponse>;
   resendConfirmation(email: string): Promise<string>;
+  forgotPassword(input: ForgotPasswordInput): Promise<string>;
+  resetPassword(input: ResetPasswordInput): Promise<string>;
   logout(refreshToken: string): Promise<string>;
 }
 
@@ -80,6 +84,22 @@ export class AuthRepository implements IAuthRepository {
     const response = await this.axiosInstance.post<ApiEnvelope<string>>(
       "/auth/resend-confirmation",
       { email },
+    );
+    return readData(response);
+  }
+
+  async forgotPassword(input: ForgotPasswordInput) {
+    const response = await this.axiosInstance.post<ApiEnvelope<string>>(
+      "/auth/password/forgot",
+      input,
+    );
+    return readData(response);
+  }
+
+  async resetPassword(input: ResetPasswordInput) {
+    const response = await this.axiosInstance.post<ApiEnvelope<string>>(
+      "/auth/password/reset",
+      input,
     );
     return readData(response);
   }

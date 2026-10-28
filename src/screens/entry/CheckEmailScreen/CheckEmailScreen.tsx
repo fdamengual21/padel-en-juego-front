@@ -8,6 +8,7 @@ import Api from "@/api/Api";
 import { InputField } from "@/components/Form";
 import { Button } from "@/components/ui/button";
 import { toastError, toastSuccess } from "@/lib/toast";
+import { emailFieldSchema } from "@/modules/auth";
 import { ROUTES } from "@/router/routes";
 import ExploreWithoutAccountLink from "@/screens/entry/components/ExploreWithoutAccountLink";
 
@@ -16,11 +17,7 @@ interface ResendFormValues {
 }
 
 const schema: yup.ObjectSchema<ResendFormValues> = yup.object({
-  email: yup
-    .string()
-    .trim()
-    .email("Email inválido")
-    .required("Ingresá tu email"),
+  email: emailFieldSchema,
 });
 
 export default function CheckEmailScreen() {

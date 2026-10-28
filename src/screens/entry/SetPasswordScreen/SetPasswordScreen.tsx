@@ -2,40 +2,24 @@ import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { FormProvider, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
-import * as yup from "yup";
 import Api from "@/api/Api";
 import { InputField } from "@/components/Form";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { toastError, toastSuccess } from "@/lib/toast";
+import {
+  newPasswordFormSchema,
+  type NewPasswordFormValues,
+} from "@/modules/auth";
 import { ROUTES } from "@/router/routes";
 import { cn } from "@/lib/utils";
-
-interface SetPasswordValues {
-  password: string;
-  passwordConfirm: string;
-}
-
-const schema: yup.ObjectSchema<SetPasswordValues> = yup.object({
-  password: yup
-    .string()
-    .min(10, "Mínimo 10 caracteres")
-    .matches(/[0-9]/, "Incluí un número")
-    .matches(/[A-Z]/, "Incluí una mayúscula")
-    .matches(/[^A-Za-z0-9]/, "Incluí un carácter especial")
-    .required("Ingresá una contraseña"),
-  passwordConfirm: yup
-    .string()
-    .oneOf([yup.ref("password")], "Las contraseñas no coinciden")
-    .required("Repetí la contraseña"),
-});
 
 export default function SetPasswordScreen() {
   const [searchParams] = useSearchParams();
   const userId = searchParams.get("userId")?.trim() ?? "";
   const token = searchParams.get("token") ?? "";
   const [done, setDone] = useState(false);
-  const methods = useForm<SetPasswordValues>({
-    resolver: yupResolver(schema),
+  const methods = useForm<NewPasswordFormValues>({
+    resolver: yupResolver(newPasswordFormSchema),
     mode: "onChange",
     defaultValues: { password: "", passwordConfirm: "" },
   });
@@ -83,7 +67,13 @@ export default function SetPasswordScreen() {
                 required
                 autoComplete="new-password"
               />
-              <Button type="submit" className="w-full" disabled={methods.formState.isSubmitting}>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={
+                  methods.formState.isSubmitting || !methods.formState.isValid
+                }
+              >
                 Guardar contraseña
               </Button>
             </form>

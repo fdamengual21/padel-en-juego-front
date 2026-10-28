@@ -8,6 +8,8 @@ export const ROUTES = {
     checkEmail: "/revisar-correo",
     verifyEmail: "/verificar-email",
     setPassword: "/definir-clave",
+    forgotPassword: "/recuperar-clave",
+    resetPassword: "/restablecer-clave",
   },
   legal: {
     privacy: "/privacidad",

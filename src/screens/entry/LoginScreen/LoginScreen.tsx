@@ -9,7 +9,11 @@ import { InputField } from "@/components/Form";
 import { Button } from "@/components/ui/button";
 import { ApiHttpError } from "@/lib/apiClient";
 import { toastError, toastSuccess } from "@/lib/toast";
-import { isPlayerHomePath, resolvePostAuthPath } from "@/modules/auth";
+import {
+  emailFieldSchema,
+  isPlayerHomePath,
+  resolvePostAuthPath,
+} from "@/modules/auth";
 import { ROUTES } from "@/router/routes";
 import ExploreWithoutAccountLink from "@/screens/entry/components/ExploreWithoutAccountLink";
 
@@ -19,11 +23,7 @@ interface LoginFormValues {
 }
 
 const schema: yup.ObjectSchema<LoginFormValues> = yup.object({
-  email: yup
-    .string()
-    .trim()
-    .email("Email inválido")
-    .required("Ingresá tu email"),
+  email: emailFieldSchema,
   password: yup.string().required("Ingresá tu contraseña"),
 });
 
@@ -138,6 +138,14 @@ export default function LoginScreen() {
             >
               {isSubmitting ? "Ingresando…" : "Ingresar"}
             </Button>
+            <p className="text-center text-sm">
+              <Link
+                to={ROUTES.auth.forgotPassword}
+                className="font-medium text-foreground underline-offset-4 hover:underline"
+              >
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </p>
           </form>
         </FormProvider>
 

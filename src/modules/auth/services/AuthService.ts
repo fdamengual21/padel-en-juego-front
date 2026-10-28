@@ -2,9 +2,11 @@ import type { IAuthRepository } from "../repositories/AuthRepository";
 import type {
   ConfirmEmailInput,
   AcceptInviteInput,
+  ForgotPasswordInput,
   LoginInput,
   LoginResponse,
   RegisterInput,
+  ResetPasswordInput,
 } from "../types";
 
 function requireLoginTokens(data: LoginResponse | undefined): LoginResponse {
@@ -50,6 +52,14 @@ export class AuthService {
 
   resendConfirmation(email: string) {
     return this.repository.resendConfirmation(email);
+  }
+
+  forgotPassword(input: ForgotPasswordInput) {
+    return this.repository.forgotPassword(input);
+  }
+
+  resetPassword(input: ResetPasswordInput) {
+    return this.repository.resetPassword(input);
   }
 
   logout(refreshToken: string) {
