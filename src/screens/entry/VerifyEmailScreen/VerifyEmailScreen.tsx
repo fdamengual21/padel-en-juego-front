@@ -78,7 +78,7 @@ export default function VerifyEmailScreen() {
           )}
         </div>
         <div>
-          <p className="text-sm text-muted-foreground">Start point</p>
+          <p className="text-sm text-muted-foreground">Easy padel</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">
             {status === "success" ? "Correo verificado" : "Verificar correo"}
           </h1>

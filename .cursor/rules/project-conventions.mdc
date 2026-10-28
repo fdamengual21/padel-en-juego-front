@@ -3,7 +3,7 @@ description: Stack, idioma, naming y formularios (siempre)
 alwaysApply: true
 ---
 
-# Start point — base
+# Easy padel — base
 
 - Stack: React + Vite + TS + Tailwind + shadcn (Base UI) + Lucide + TanStack Query + RHF + Yup + zustand + axios + `@xyflow/react` + dagre.
 - Codigo en **ingles**. UI / validaciones / errores en **espanol**.

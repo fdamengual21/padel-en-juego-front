@@ -207,7 +207,7 @@ export default function ClubShell() {
       >
         <div className="border-b border-sidebar-border px-4 py-5">
           <p className="text-xs font-medium uppercase tracking-wide text-sidebar-foreground/55">
-            Start point
+            Easy padel
           </p>
           <h1
             className="mt-1 line-clamp-2 text-xl font-semibold leading-snug tracking-tight text-sidebar-foreground"
@@ -250,7 +250,7 @@ export default function ClubShell() {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="border-b border-border bg-card px-4 py-3 md:hidden">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Start point
+            Easy padel
           </p>
           <h1 className="truncate text-lg font-semibold tracking-tight">
             {clubName}

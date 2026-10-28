@@ -147,7 +147,7 @@ export default function UserShell() {
       >
         <div className="border-b border-border px-4 py-5">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Start point
+            Easy padel
           </p>
           <h1 className="mt-1 text-xl font-semibold tracking-tight">Jugador</h1>
         </div>
@@ -205,7 +205,7 @@ export default function UserShell() {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-between gap-3 border-b border-border bg-card px-4 py-3 md:hidden">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Start point
+            Easy padel
           </p>
           {isAuthenticated ? null : (
             <Link
