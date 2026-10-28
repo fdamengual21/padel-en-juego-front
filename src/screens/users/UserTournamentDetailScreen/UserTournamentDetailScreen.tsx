@@ -159,9 +159,7 @@ export default function UserTournamentDetailScreen() {
                   </option>
                 ))}
               </select>
-            ) : (
-              <span className="text-sm text-muted-foreground">{category.name}</span>
-            )}
+            ) : null}
           </div>
           <div className="ml-auto flex w-full max-w-xl items-center sm:w-auto">
             <PlayerRegistrationPanel
@@ -180,7 +178,8 @@ export default function UserTournamentDetailScreen() {
         className="rounded-xl border border-border bg-card p-4"
         data-testid="tournament-summary-card"
       >
-        <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+          <SummaryStat label="Categoría" value={category.name} />
           <SummaryStat label="Fechas" value={dates} />
           <SummaryStat
             label={page.tournamentStarted ? "En cuadro" : "Aceptados"}

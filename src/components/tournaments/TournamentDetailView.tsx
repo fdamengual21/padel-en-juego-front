@@ -1066,7 +1066,6 @@ export default function TournamentDetailView({
               matchRules={matchRules}
               categoryName={category?.name}
             />
-            <span className="text-sm text-muted-foreground">{category?.name}</span>
           </div>
           {tournamentLocked ? (
             <StatusBadge
@@ -1140,7 +1139,11 @@ export default function TournamentDetailView({
         className="rounded-xl border border-border bg-card p-4"
         data-testid="tournament-summary-card"
       >
-        <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+          <SummaryStat
+            label="Categoría"
+            value={category?.name ?? "Sin categoría"}
+          />
           <SummaryStat
             label="Fechas"
             value={
