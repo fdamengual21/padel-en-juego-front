@@ -57,11 +57,12 @@ export default function SexIcon({
 
   const Icon = SEX_ICONS[key];
   return (
-    <Icon
-      aria-hidden={title ? undefined : true}
-      aria-label={title}
-      title={title}
-      className={cn("size-3.5 shrink-0", !inheritColor && SEX_ICON_COLOR[key], className)}
-    />
+    <span title={title} className="inline-flex">
+      <Icon
+        aria-hidden={title ? undefined : true}
+        aria-label={title}
+        className={cn("size-3.5 shrink-0", !inheritColor && SEX_ICON_COLOR[key], className)}
+      />
+    </span>
   );
 }

@@ -109,7 +109,6 @@ function toDateIso(value: string | null | undefined): string {
 
 export default function CourtReservationModal({
   open,
-  clubId,
   courts,
   initialCourtId,
   mode: initialMode,

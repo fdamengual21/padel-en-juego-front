@@ -796,7 +796,7 @@ export default function ClubCourtsScreen() {
               }}
               onEmptySlotClick={
                 canWriteReservations
-                  ? (day, hour) => {
+                  ? (day) => {
                       openCreate(null, day);
                     }
                   : undefined
