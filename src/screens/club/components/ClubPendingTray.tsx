@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
-import { Bell, ChevronRight } from "lucide-react";
+import { Bell, ChevronDown, ChevronRight } from "lucide-react";
 import Api from "@/api/Api";
 import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/ui/button";
@@ -37,9 +37,12 @@ export default function DashboardPendingTray({
   className,
   onChanged,
 }: DashboardPendingTrayProps) {
+  const [open, setOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const pendingCount = !isLoading && !isError ? reservations.length : 0;
+  const toggleOpen = () => setOpen((current) => !current);
 
   const run = async (id: string, action: () => Promise<unknown>, success: string) => {
     setBusyId(id);
@@ -76,16 +79,24 @@ export default function DashboardPendingTray({
       data-testid="pending-reservations-card"
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <DashboardIconWell icon={Bell} />
-          <h3 className="text-sm font-semibold text-foreground">Pendientes de atención</h3>
-          {!isLoading && !isError && reservations.length > 0 ? (
-            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-semibold leading-none text-white tabular-nums">
-              {reservations.length}
-            </span>
-          ) : null}
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
+        <h3 className="min-w-0">
+          <button
+            type="button"
+            className="flex min-w-0 items-center gap-2 text-left"
+            aria-expanded={open}
+            aria-controls="pending-tray-panel"
+            onClick={toggleOpen}
+          >
+            <DashboardIconWell icon={Bell} />
+            <span className="text-sm font-semibold text-foreground">Pendientes de atención</span>
+            {pendingCount > 0 ? (
+              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-semibold leading-none text-white tabular-nums">
+                {pendingCount}
+              </span>
+            ) : null}
+          </button>
+        </h3>
+        <div className="flex flex-wrap items-center gap-2">
           {viewAllTo ? (
             <Link
               to={viewAllTo}
@@ -95,31 +106,44 @@ export default function DashboardPendingTray({
               <ChevronRight className="size-4" aria-hidden />
             </Link>
           ) : null}
-          {canMutate && reservations.length > 0 ? (
+          {canMutate && pendingCount > 0 ? (
             <Button type="button" size="sm" variant="outline" className="bg-card" disabled={busyId != null} onClick={acceptAll}>
-              {`Aceptar todas (${reservations.length})`}
+              Aceptar todas
             </Button>
           ) : null}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-expanded={open}
+            aria-controls="pending-tray-panel"
+            aria-label={open ? "Ocultar pendientes" : "Mostrar pendientes"}
+            onClick={toggleOpen}
+          >
+            <ChevronDown className={cn("size-4 transition-transform", open && "rotate-180")} />
+          </Button>
         </div>
       </div>
-      {isLoading ? (
-        <PendingTraySkeleton />
-      ) : isError ? (
-        <EmptyState
-          className="mt-3 bg-card"
-          icon={Bell}
-          tone="error"
-          title="No se pudieron cargar los pedidos"
-          description="Reintentá en un momento."
-        />
-      ) : reservations.length === 0 ? (
-        <EmptyState
-          className="mt-3 bg-card"
-          icon={Bell}
-          title="No hay pedidos pendientes"
-          description="Cuando alguien pida un turno, aparece acá."
-        />
-      ) : (
+      {open ? (
+        <div id="pending-tray-panel">
+          {isLoading ? (
+            <PendingTraySkeleton />
+          ) : isError ? (
+            <EmptyState
+              className="mt-3 bg-card"
+              icon={Bell}
+              tone="error"
+              title="No se pudieron cargar los pedidos"
+              description="Reintentá en un momento."
+            />
+          ) : reservations.length === 0 ? (
+            <EmptyState
+              className="mt-3 bg-card"
+              icon={Bell}
+              title="No hay pedidos pendientes"
+              description="Cuando alguien pida un turno, aparece acá."
+            />
+          ) : (
         <ul className={cn("mt-2 overflow-y-auto", listClassName)}>
           {reservations.map((reservation) => {
             const rejecting = rejectId === reservation.id;
@@ -139,7 +163,7 @@ export default function DashboardPendingTray({
                     name={name}
                     avatarUrl={reservation.playerAvatarUrl}
                   />
-                  <div className="order-7 mt-1 flex flex-wrap items-center gap-2 sm:order-0 sm:row-span-3 sm:mt-0 sm:justify-end sm:self-center">
+                  <div className="order-7 mt-1 flex flex-wrap items-center gap-2 sm:order-0 sm:row-span-3 sm:mt-0 sm:justify-end sm:self-start">
                     {canMutate && !rejecting ? (
                       <>
                         <Button
@@ -224,6 +248,8 @@ export default function DashboardPendingTray({
           })}
         </ul>
       )}
+        </div>
+      ) : null}
     </section>
   );
 }
