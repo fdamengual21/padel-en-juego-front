@@ -1,7 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
-import Api from "@/api/Api";
 import AutocompleteField from "@/components/AutocompleteField";
 import { Label } from "@/components/ui/label";
+import { useMunicipalities, useProvinces } from "@/modules/geography";
 
 interface GeographySelectFieldsProps {
   provinceId: number | null;
@@ -30,17 +29,10 @@ export default function GeographySelectFields({
   idPrefix = "geo",
   municipalityHint = "Si no aparece tu localidad, dejá estos campos vacíos.",
 }: GeographySelectFieldsProps) {
-  const { data: provinces = [], isLoading: loadingProvinces } = useQuery({
-    queryKey: ["geography", "provinces"],
-    queryFn: () => Api.GeographyService().listProvinces(),
-  });
-
-  const { data: municipalities = [], isLoading: loadingMunicipalities } =
-    useQuery({
-      queryKey: ["geography", "municipalities", provinceId],
-      queryFn: () => Api.GeographyService().listMunicipalities(provinceId!),
-      enabled: provinceId != null,
-    });
+  const { provinces, isLoading: loadingProvinces } = useProvinces();
+  const { municipalities, isLoading: loadingMunicipalities } = useMunicipalities(
+    provinceId,
+  );
 
   const selectedProvince =
     provinces.find((item) => item.id === provinceId) ?? null;
