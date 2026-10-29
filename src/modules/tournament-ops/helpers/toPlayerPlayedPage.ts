@@ -1,7 +1,8 @@
-import type { PaginatedResult, PlayerMatchView } from "@/domain";
+import type { PaginatedResult } from "@/domain";
 import type { PlayerReservation } from "@/modules/reservations";
 import { normalizeMine } from "@/modules/reservations/repositories/ReservationRepository";
 import type { PlayerPlayedItem } from "../types/playerPlayedItem";
+import { toPlayerMatchView } from "./toPlayerMatchView";
 
 export function toPlayerPlayedPage(
   raw: Record<string, unknown> | null | undefined,
@@ -26,7 +27,7 @@ function asPlayedItem(raw: unknown): PlayerPlayedItem | null {
   if (!raw || typeof raw !== "object") return null;
   const row = raw as Record<string, unknown>;
   if (row.kind === "match") {
-    const match = asPlayedMatch(row.match);
+    const match = toPlayerMatchView(row.match);
     return match ? { kind: "match", match } : null;
   }
   if (row.kind === "reservation") {
@@ -36,29 +37,9 @@ function asPlayedItem(raw: unknown): PlayerPlayedItem | null {
   return null;
 }
 
-function asPlayedMatch(raw: unknown): PlayerMatchView | null {
-  if (!raw || typeof raw !== "object") return null;
-  const row = raw as Record<string, unknown>;
-  const match = row.match;
-  if (!match || typeof match !== "object") return null;
-  const id = "id" in match && typeof match.id === "string" ? match.id : "";
-  if (!id) return null;
-  return {
-    match: match as PlayerMatchView["match"],
-    phaseLabel: asText(row.phaseLabel),
-    pairALabel: asText(row.pairALabel),
-    pairBLabel: asText(row.pairBLabel),
-    courtLabel: asText(row.courtLabel) || null,
-  };
-}
-
 function asPlayedReservation(raw: unknown): PlayerReservation | null {
   if (!raw || typeof raw !== "object") return null;
   return normalizeMine(raw as Record<string, unknown>);
-}
-
-function asText(value: unknown): string {
-  return typeof value === "string" ? value : "";
 }
 
 function asPageNumber(value: unknown, fallback: number): number {

@@ -6,11 +6,15 @@ import Api from "@/api/Api";
 import { useMockSession } from "@/app/MockSessionProvider";
 import RequirePlayerAuth from "@/components/auth/RequirePlayerAuth";
 import { EmptyState } from "@/components/EmptyState";
-import MatchCard from "@/components/tournaments/MatchCard";
+import PlayerMatchCard from "@/components/tournaments/PlayerMatchCard";
+import PlayerMatchResultDialog from "@/components/tournaments/PlayerMatchResultDialog";
 import { buttonVariants } from "@/components/ui/button";
+import PublicParticipantDetailModal from "@/screens/users/components/PublicParticipantDetailModal";
+import { usePublicPairDetail } from "@/screens/users/hooks/usePublicPairDetail";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDebounce } from "@/hooks/useDebounce";
+import type { PlayerMatchView } from "@/domain";
 import type { PlayerReservation } from "@/modules/reservations";
 import { ROUTES } from "@/router/routes";
 import { cn } from "@/lib/utils";
@@ -31,6 +35,8 @@ export default function UserHistoryScreen() {
   const [tournamentPage, setTournamentPage] = useState(1);
   const [playedPage, setPlayedPage] = useState(1);
   const [selectedReservation, setSelectedReservation] = useState<PlayerReservation | null>(null);
+  const [resultMatch, setResultMatch] = useState<PlayerMatchView | null>(null);
+  const pairDetail = usePublicPairDetail();
   const debouncedSearch = useDebounce(search, 350);
   const [pagedSearch, setPagedSearch] = useState(debouncedSearch);
   if (pagedSearch !== debouncedSearch) {
@@ -198,13 +204,13 @@ export default function UserHistoryScreen() {
             {playedItems.length > 0
               ? playedItems.map((item) =>
                   item.kind === "match" ? (
-                    <MatchCard
+                    <PlayerMatchCard
                       key={`match-${item.match.match.id}`}
-                      match={item.match.match}
-                      pairALabel={item.match.pairALabel}
-                      pairBLabel={item.match.pairBLabel}
-                      courtLabel={item.match.courtLabel}
-                      phaseLabel={item.match.phaseLabel}
+                      item={item.match}
+                      onOpenResult={setResultMatch}
+                      onOpenPair={(matchItem, pairId) =>
+                        pairDetail.openPair(matchItem.match.tournamentCategoryId, pairId)
+                      }
                     />
                   ) : (
                     <PlayerReservationCard
@@ -228,6 +234,22 @@ export default function UserHistoryScreen() {
             />
           </TabsContent>
         </Tabs>
+
+        <PlayerMatchResultDialog
+          item={resultMatch}
+          onOpenChange={(open) => {
+            if (!open) setResultMatch(null);
+          }}
+        />
+        <PublicParticipantDetailModal
+          open={pairDetail.row !== null}
+          row={pairDetail.row}
+          categoryId={pairDetail.categoryId}
+          categoryName={null}
+          onOpenChange={(open) => {
+            if (!open) pairDetail.close();
+          }}
+        />
 
         <PlayerReservationDetailModal
           reservation={selectedReservation}

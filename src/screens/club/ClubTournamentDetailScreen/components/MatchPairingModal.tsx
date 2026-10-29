@@ -22,9 +22,15 @@ interface MatchPairingModalProps {
   candidateIds: string[];
   pairLabels: Record<string, string>;
   isSubmitting?: boolean;
+  /** Si la siguiente ronda ya se jugó, el modal queda en solo lectura. */
+  lockedReason?: string | null;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (input: { pairAId: string; pairBId: string; note: string | null }) => Promise<void> | void;
-  /** Abre el flujo para marcar Clasificó en este cruce. Si falta, no se muestra. */
+  onSubmit: (input: {
+    pairAId: string | null;
+    pairBId: string | null;
+    note: string | null;
+  }) => Promise<void> | void;
+  /** Abre el modal para elegir quién clasifica o dejarlo pendiente. Si falta, no se muestra. */
   onQualify?: () => void;
 }
 
@@ -40,6 +46,7 @@ export default function MatchPairingModal({
   candidateIds,
   pairLabels,
   isSubmitting = false,
+  lockedReason = null,
   onOpenChange,
   onSubmit,
   onQualify,
@@ -47,6 +54,8 @@ export default function MatchPairingModal({
   const [pairAId, setPairAId] = useState("");
   const [pairBId, setPairBId] = useState("");
   const [note, setNote] = useState("");
+  const locked = Boolean(lockedReason);
+  const readOnly = locked || isSubmitting;
 
   useEffect(() => {
     if (!open || !match) return;
@@ -73,18 +82,24 @@ export default function MatchPairingModal({
     .map((id) => ({ id, other: seatOf(id) }))
     .filter((item): item is { id: string; other: Match } => item.other != null);
 
+  const allowBye = match?.phase !== "GROUP";
   const sameChoice = pairAId !== "" && pairAId === pairBId;
   const unchanged = pairAId === (match?.pairAId ?? "") && pairBId === (match?.pairBId ?? "");
-  const canSave = Boolean(pairAId && pairBId) && !sameChoice && !unchanged && !isSubmitting;
+  const canSave =
+    (allowBye ? Boolean(pairAId || pairBId) : Boolean(pairAId && pairBId)) &&
+    !sameChoice &&
+    !unchanged &&
+    !isSubmitting &&
+    !locked;
   const canQualify =
     Boolean(onQualify) &&
     Boolean(match?.pairAId || match?.pairBId) &&
     match != null &&
     match.status !== "finished" &&
     match.status !== "inProgress" &&
-    match.status !== "walkover" &&
     match.status !== "cancelled" &&
-    !isSubmitting;
+    !isSubmitting &&
+    !locked;
 
   const renderSelect = (id: string, value: string, onChange: (next: string) => void, label: string) => (
     <div className="space-y-1.5">
@@ -92,11 +107,11 @@ export default function MatchPairingModal({
       <select
         id={id}
         value={value}
-        disabled={isSubmitting}
+        disabled={readOnly}
         className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
         onChange={(event) => onChange(event.target.value)}
       >
-        <option value="">Elegí una pareja</option>
+        <option value="">{allowBye ? "Sin rival" : "Elegí una pareja"}</option>
         {options.map((option) => {
           const seat = seatOf(option.id);
           return (
@@ -117,11 +132,19 @@ export default function MatchPairingModal({
           <DialogTitle>Modificar cruce · {roundLabel}</DialogTitle>
           <DialogDescription>
             Solo se pueden cruzar parejas aceptadas que estén dentro del cuadro y sigan en
-            competencia. El partido no tiene que estar jugado.
+            competencia. Un lado vacío queda como sin rival.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
+          {lockedReason ? (
+            <p
+              className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+              data-testid="pairing-locked-reason"
+            >
+              {lockedReason}
+            </p>
+          ) : null}
           {renderSelect("pairing-a", pairAId, setPairAId, "Lado A")}
           {renderSelect("pairing-b", pairBId, setPairBId, "Lado B")}
           {sameChoice ? (
@@ -147,32 +170,33 @@ export default function MatchPairingModal({
               value={note}
               maxLength={300}
               placeholder="Pedido de las parejas, error de carga…"
-              disabled={isSubmitting}
+              disabled={readOnly}
               onChange={(event) => setNote(event.target.value)}
             />
           </div>
           <p className="text-xs text-muted-foreground">
             El cruce queda marcado como manual y el motor deja de recalcularlo con las tablas de zona.
+            Si queda una pareja sin rival, pasa sola como Clasificó.
           </p>
         </div>
 
         <DialogFooter className="sm:justify-between">
-          {onQualify ? (
-            <Button
-              type="button"
-              variant="outline"
-              disabled={!canQualify}
-              data-testid="match-pairing-qualify"
-              onClick={() => {
-                if (!canQualify) return;
-                onQualify();
-              }}
-            >
-              Clasificar a
-            </Button>
-          ) : (
-            <span />
-          )}
+          <div className="flex flex-wrap gap-2">
+            {onQualify ? (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!canQualify}
+                data-testid="match-pairing-qualify"
+                onClick={() => {
+                  if (!canQualify) return;
+                  onQualify();
+                }}
+              >
+                Clasificar
+              </Button>
+            ) : null}
+          </div>
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button
               type="button"
@@ -188,7 +212,11 @@ export default function MatchPairingModal({
               data-testid="match-pairing-submit"
               onClick={() => {
                 if (!canSave) return;
-                void onSubmit({ pairAId, pairBId, note: note.trim() || null });
+                void onSubmit({
+                  pairAId: pairAId || null,
+                  pairBId: pairBId || null,
+                  note: note.trim() || null,
+                });
               }}
             >
               {isSubmitting ? "Guardando…" : "Guardar cruce"}

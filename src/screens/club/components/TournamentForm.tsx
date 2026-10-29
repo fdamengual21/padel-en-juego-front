@@ -56,7 +56,7 @@ export function defaultTournamentFormValues(
   const endDate = partial?.endDate ?? isoPlusDays(startDate, 2);
   const requestedFormat = asTournamentFormat(partial?.format);
   const { phaseDays, ...rest } = partial ?? {};
-  const matchPlayType = rest.matchPlayType ?? "STANDARD";
+  const matchPlayType = rest.matchPlayType ?? "QUALITY";
   const scoring = matchPlayType === "STANDARD";
   const format =
     scoring && !isScoringFormat(requestedFormat) ? "GROUPS_ELIMINATION" : requestedFormat;
@@ -67,14 +67,14 @@ export function defaultTournamentFormValues(
     dailyEndTime: "",
     registrationFee: 0,
     equalsResolution: "goldenPoint",
-    setsToWin: 2,
+    setsToWin: matchPlayType === "QUALITY" ? 1 : 2,
     tiebreakPoints: 7,
     categoryKind: "level",
     categoryLevel: 6,
     categoryGender: "male",
     sumaTarget: null,
     categoryName: `${formatCategoryLevel(6)} Masculino`,
-    maxPairs: scoring ? SCORING_MAX_PAIRS : 16,
+    maxPairs: scoring ? SCORING_MAX_PAIRS : 12,
     circuitType: "NONE",
     ...rest,
     matchPlayType,
@@ -159,7 +159,10 @@ export default function TournamentForm({
         next.categoryName = buildCategoryDisplayName(next);
       }
       if (key === "matchPlayType") {
-        if (value === "QUALITY") next.setsToWin = 1;
+        if (value === "QUALITY") {
+          next.setsToWin = 1;
+          next.maxPairs = 12;
+        }
         if (value === "STANDARD") {
           next.setsToWin = 2;
           next.tiebreakPoints = 7;
@@ -452,45 +455,52 @@ export default function TournamentForm({
                   ["STANDARD", "Torneo puntuable"],
                   ["CUSTOM", "Personalizado"],
                 ] as const
-              ).map(([value, label]) => (
-                <div key={value} className="space-y-2">
-                  <label
-                    className={cn(
-                      "flex items-center gap-2 text-sm",
-                      readOnly && "cursor-not-allowed text-muted-foreground",
-                    )}
-                  >
-                    <input
-                      type="radio"
-                      name="matchPlayType"
-                      checked={values.matchPlayType === value}
-                      disabled={readOnly}
-                      onChange={() => patch("matchPlayType", value as RulesetPreset)}
-                    />
-                    {label}
-                  </label>
-                  {value === "STANDARD" && values.matchPlayType === "STANDARD" ? (
-                    <Alert variant="info">
-                      <Info />
-                      <AlertDescription>
-                        Este torneo suma al ranking. El mínimo y el máximo de
-                        parejas se controlan al inscribir.
-                      </AlertDescription>
-                      <div className="col-start-2">
-                        <Button
-                          type="button"
-                          variant="link"
-                          className="h-auto px-0 text-primary-strong"
-                          disabled={readOnly}
-                          onClick={() => setRulesOpen(true)}
-                        >
-                          Ver reglas
-                        </Button>
-                      </div>
-                    </Alert>
-                  ) : null}
-                </div>
-              ))}
+              ).map(([value, label]) => {
+                const scoringLocked = value === "STANDARD";
+                const optionDisabled = readOnly || scoringLocked;
+                return (
+                  <div key={value} className="space-y-2">
+                    <label
+                      className={cn(
+                        "flex items-center gap-2 text-sm",
+                        optionDisabled && "cursor-not-allowed text-muted-foreground",
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="matchPlayType"
+                        checked={values.matchPlayType === value}
+                        disabled={optionDisabled}
+                        onChange={() => patch("matchPlayType", value as RulesetPreset)}
+                      />
+                      {label}
+                      {scoringLocked ? (
+                        <span className="text-xs text-muted-foreground">Próximamente</span>
+                      ) : null}
+                    </label>
+                    {value === "STANDARD" && values.matchPlayType === "STANDARD" ? (
+                      <Alert variant="info">
+                        <Info />
+                        <AlertDescription>
+                          Este torneo suma al ranking. El mínimo y el máximo de
+                          parejas se controlan al inscribir.
+                        </AlertDescription>
+                        <div className="col-start-2">
+                          <Button
+                            type="button"
+                            variant="link"
+                            className="h-auto px-0 text-primary-strong"
+                            disabled={readOnly}
+                            onClick={() => setRulesOpen(true)}
+                          >
+                            Ver reglas
+                          </Button>
+                        </div>
+                      </Alert>
+                    ) : null}
+                  </div>
+                );
+              })}
             </div>
 
             <Field label="Máximo de parejas" htmlFor="maxPairs">

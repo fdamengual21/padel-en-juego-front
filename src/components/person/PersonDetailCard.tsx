@@ -1,5 +1,5 @@
 import Avatar from "@/components/Avatar";
-import WhatsAppLink from "@/components/WhatsAppLink";
+import PhoneWhatsApp from "@/components/PhoneWhatsApp";
 
 export interface PersonDetailBadge {
   label: string;
@@ -68,8 +68,14 @@ export default function PersonDetailCard({
                     {field.label}
                   </p>
                   <div className="flex min-h-5 items-center gap-1.5">
-                    <p className="text-sm font-medium leading-5 text-foreground">{field.value}</p>
-                    {field.phone ? <WhatsAppLink phone={field.phone} className="size-5" /> : null}
+                    {field.phone ? (
+                      <PhoneWhatsApp
+                        phone={field.phone}
+                        className="text-sm font-medium leading-5 text-foreground"
+                      />
+                    ) : (
+                      <p className="text-sm font-medium leading-5 text-foreground">{field.value}</p>
+                    )}
                   </div>
                 </div>
               ))}

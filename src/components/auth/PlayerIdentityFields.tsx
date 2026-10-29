@@ -109,10 +109,20 @@ export default function PlayerIdentityFields({
   const labelSuffix = (required: boolean) =>
     required ? "" : optional ? " (opcional)" : "";
 
+  const requiredMark = (required: boolean) =>
+    required ? (
+      <span className="text-destructive" aria-hidden>
+        *
+      </span>
+    ) : null;
+
   return (
     <div className={cn("grid gap-3 sm:grid-cols-2", className)}>
       <div className="space-y-1.5">
-        <Label htmlFor={`${idPrefix}-firstName`}>Nombre</Label>
+        <Label htmlFor={`${idPrefix}-firstName`}>
+          Nombre
+          {requiredMark(true)}
+        </Label>
         <Input
           id={`${idPrefix}-firstName`}
           value={values.firstName}
@@ -121,7 +131,10 @@ export default function PlayerIdentityFields({
         />
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor={`${idPrefix}-lastName`}>Apellido</Label>
+        <Label htmlFor={`${idPrefix}-lastName`}>
+          Apellido
+          {requiredMark(true)}
+        </Label>
         <Input
           id={`${idPrefix}-lastName`}
           value={values.lastName}
@@ -130,7 +143,10 @@ export default function PlayerIdentityFields({
         />
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor={`${idPrefix}-email`}>Email</Label>
+        <Label htmlFor={`${idPrefix}-email`}>
+          Email
+          {requiredMark(true)}
+        </Label>
         <Input
           id={`${idPrefix}-email`}
           type="email"
@@ -140,7 +156,10 @@ export default function PlayerIdentityFields({
         />
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor={`${idPrefix}-sex`}>Sexo</Label>
+        <Label htmlFor={`${idPrefix}-sex`}>
+          Sexo
+          {requiredMark(true)}
+        </Label>
         <select
           id={`${idPrefix}-sex`}
           className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm"
@@ -171,6 +190,7 @@ export default function PlayerIdentityFields({
           <div className="space-y-1.5">
             <Label htmlFor={`${idPrefix}-age`}>
               Edad{labelSuffix(mode === "registration")}
+              {requiredMark(mode === "registration")}
             </Label>
             <Input
               id={`${idPrefix}-age`}
@@ -184,6 +204,7 @@ export default function PlayerIdentityFields({
           <div className="space-y-1.5">
             <Label htmlFor={`${idPrefix}-category`}>
               Categoría actual{labelSuffix(mode === "registration")}
+              {requiredMark(mode === "registration")}
             </Label>
             <select
               id={`${idPrefix}-category`}
@@ -208,6 +229,7 @@ export default function PlayerIdentityFields({
         <div className="space-y-1.5 sm:col-span-2">
           <Label htmlFor={`${idPrefix}-phone`}>
             Teléfono{labelSuffix(mode === "registration")}
+            {requiredMark(mode === "registration")}
           </Label>
           <Input
             id={`${idPrefix}-phone`}

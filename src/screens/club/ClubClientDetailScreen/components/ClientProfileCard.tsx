@@ -1,7 +1,7 @@
 import type { CategoryLevel, Client } from "@/domain";
 import { formatCategoryLevel } from "@/domain";
 import Avatar from "@/components/Avatar";
-import WhatsAppLink from "@/components/WhatsAppLink";
+import PhoneWhatsApp from "@/components/PhoneWhatsApp";
 import { formatLocationEs } from "@/lib/dates";
 
 interface ClientProfileCardProps {
@@ -62,10 +62,14 @@ export default function ClientProfileCard({
                 Contacto
               </p>
               <div className="flex min-h-5 items-center gap-1.5">
-                <p className="text-sm font-medium leading-5 text-foreground">
-                  {client.phone || "Sin teléfono"}
-                </p>
-                <WhatsAppLink phone={client.phone} className="size-5" />
+                {client.phone ? (
+                  <PhoneWhatsApp
+                    phone={client.phone}
+                    className="text-sm font-medium leading-5 text-foreground"
+                  />
+                ) : (
+                  <p className="text-sm font-medium leading-5 text-foreground">Sin teléfono</p>
+                )}
               </div>
               {client.email ? (
                 <p className="text-sm text-muted-foreground">{client.email}</p>

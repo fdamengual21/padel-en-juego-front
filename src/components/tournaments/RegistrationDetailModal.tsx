@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { LoaderCircle } from "lucide-react";
 import Avatar from "@/components/Avatar";
+import PhoneWhatsApp from "@/components/PhoneWhatsApp";
 import StatusBadge from "@/components/tournaments/StatusBadge";
 import {
   Dialog,
@@ -107,7 +108,14 @@ export default function RegistrationDetailModal({
                       <dl className="mt-3 space-y-1.5 text-sm">
                         <Detail label="Categoría" value={player.category} />
                         <Detail label="Lado" value={player.side} />
-                        {player.phone ? <Detail label="Teléfono" value={player.phone} /> : null}
+                        {player.phone ? (
+                          <div className="flex items-center justify-between gap-3">
+                            <dt className="text-muted-foreground">Teléfono</dt>
+                            <dd className="min-w-0 text-right">
+                              <PhoneWhatsApp phone={player.phone} />
+                            </dd>
+                          </div>
+                        ) : null}
                       </dl>
                     </section>
                   ))}

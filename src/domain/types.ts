@@ -305,6 +305,8 @@ export interface Tournament {
   updatedAt: string;
   /** Nombre del predio. Lo trae el listado publico. */
   clubName?: string | null;
+  /** Teléfono de contacto del club. Null si el predio no lo cargó. */
+  clubPhone?: string | null;
   /** Avatar publico del club, cuando el listado lo trae. */
   clubAvatarUrl?: string | null;
   /** Portada publica del club, cuando el listado la trae. */
@@ -354,6 +356,8 @@ export interface TournamentCategory {
   /** Circuito de ranking (NONE = sin ranking externo). */
   circuitType: TournamentCircuitType;
   status: EntityStatus;
+  /** El club creo un repechaje para esta categoria. */
+  repechageCreated?: boolean;
 }
 
 export interface TournamentPair {
@@ -461,6 +465,13 @@ export interface UpdatePairPlayersInput {
   sidePreference?: PairSidePreference | null;
   rankingPointsPlayer1?: number | null;
   rankingPointsPlayer2?: number | null;
+}
+
+export interface RegistrationMutationResult {
+  registration: TournamentRegistration;
+  rebuilt: boolean;
+  blocked: boolean;
+  message: string | null;
 }
 
 export interface TournamentRegistration {
@@ -767,7 +778,12 @@ export interface PlayerMatchView {
   phaseLabel: string;
   pairALabel: string;
   pairBLabel: string;
+  pairANames: [string, string];
+  pairAAvatars: [string | null, string | null];
+  pairBNames: [string, string];
+  pairBAvatars: [string | null, string | null];
   courtLabel: string | null;
+  matchRules: MatchRules;
 }
 
 /** Lo que pinta la card de torneo en el catálogo y en el historial. */
@@ -876,6 +892,33 @@ export interface CuadroBoardView {
   /** Solo backoffice: rondas extra y acciones. El tab público no lo manda. */
   knockoutStructure?: KnockoutStructure | null;
   notice: string | null;
+}
+
+/** Tab Repechaje: zonas + cuadro del subdraw, con agenda de club. */
+export interface RepechageBoardView extends CuadroBoardView {
+  standings: GroupStanding[];
+  courts: Court[];
+  allMatches: Match[];
+  finishedGroupIds: string[];
+}
+
+/** Pareja del picker de repechaje. */
+export interface RepechageCandidate {
+  pairId: string;
+  playerNames: [string, string];
+  playerAvatars: [string | null, string | null];
+  outcome: "stillIn" | "eliminated" | "champion";
+  eliminatedPhase: string | null;
+  label: string;
+  alreadyInRepechage: boolean;
+  selectable: boolean;
+  removable: boolean;
+}
+
+/** Altas y bajas del roster de repechaje. */
+export interface RepechageEntriesInput {
+  addPairIds: string[];
+  removePairIds: string[];
 }
 
 /** Tab Zonas: tablas + agenda + standings listos para UI. */
@@ -1008,6 +1051,7 @@ export interface ParticipantsBoardView {
   notice: string | null;
   /** Matches de solos aplicados (y persistidos) al armar este board. */
   autoMatches: SoloPairAutoMatchResult[];
+  repechageCreated?: boolean;
 }
 
 /** Jugador enriquecido para cards del dashboard club. */
@@ -1070,6 +1114,7 @@ export interface ConfigBoardView {
   category: TournamentCategory;
   ruleset: TournamentRuleset | null;
   structureLocked: boolean;
+  repechageCreated?: boolean;
   notice: string | null;
 }
 

@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
+import { Medal } from "lucide-react";
 import Api from "@/api/Api";
+import { EmptyState } from "@/components/EmptyState";
 
 export default function UserRankingScreen() {
   const { data: standings = [] } = useQuery({
@@ -26,25 +28,28 @@ export default function UserRankingScreen() {
   return (
     <div className="p-4 space-y-4" data-testid="player-ranking">
       <h2 className="text-2xl font-semibold tracking-tight">Ranking</h2>
-      <ol className="rounded-xl border border-border bg-card divide-y divide-border">
-        {standings
-          .slice()
-          .sort((a, b) => b.points - a.points || a.position - b.position)
-          .map((row, index) => (
-            <li key={row.id} className="px-4 py-3 flex justify-between text-sm">
-              <span>
-                <strong className="mr-2">{row.position || index + 1}</strong>
-                {label(row.pairId)}
-              </span>
-              <span className="font-semibold tabular-nums">{row.points} pts</span>
-            </li>
-          ))}
-        {standings.length === 0 ? (
-          <li className="px-4 py-6 text-sm text-muted-foreground">
-            Todavía no hay posiciones. Generá zonas y resultados en el club.
-          </li>
-        ) : null}
-      </ol>
+      {standings.length === 0 ? (
+        <EmptyState
+          icon={Medal}
+          title="Todavía no hay posiciones"
+          description="Cuando se jueguen partidos, el ranking se va a completar acá."
+        />
+      ) : (
+        <ol className="divide-y divide-border rounded-xl border border-border bg-card">
+          {standings
+            .slice()
+            .sort((a, b) => b.points - a.points || a.position - b.position)
+            .map((row, index) => (
+              <li key={row.id} className="flex justify-between px-4 py-3 text-sm">
+                <span>
+                  <strong className="mr-2">{row.position || index + 1}</strong>
+                  {label(row.pairId)}
+                </span>
+                <span className="font-semibold tabular-nums">{row.points} pts</span>
+              </li>
+            ))}
+        </ol>
+      )}
     </div>
   );
 }

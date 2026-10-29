@@ -3,6 +3,7 @@ import type {
   ClubDashboardView,
   ConfigBoardView,
   CuadroBoardView,
+  RepechageBoardView,
   CourtsAgendaBoardView,
   CourtsDayOverviewView,
   MatchRules,
@@ -121,6 +122,16 @@ export function emptyCuadroBoard(categoryId: string): CuadroBoardView {
   };
 }
 
+export function emptyRepechageBoard(categoryId: string): RepechageBoardView {
+  return {
+    ...emptyCuadroBoard(categoryId),
+    standings: [],
+    courts: [],
+    allMatches: [],
+    finishedGroupIds: [],
+  };
+}
+
 export function emptyZonesBoard(categoryId: string): ZonesBoardView {
   return {
     categoryId,
@@ -167,6 +178,7 @@ export function emptyParticipantsBoard(): ParticipantsBoardView {
     },
     notice: null,
     autoMatches: [],
+    repechageCreated: false,
   };
 }
 
@@ -222,6 +234,7 @@ export function emptyConfigBoard(
     category,
     ruleset: null,
     structureLocked: false,
+    repechageCreated: false,
     notice: null,
   };
 }

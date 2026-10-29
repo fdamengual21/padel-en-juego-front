@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Search } from "lucide-react";
+import { CircleAlert, Search, Trophy } from "lucide-react";
 import Api from "@/api/Api";
 import { useMockSession } from "@/app/MockSessionProvider";
 import { PERMISSION_CLUB_TOURNAMENTS_WRITE } from "@/authorization/permissionCodes";
+import { EmptyState } from "@/components/EmptyState";
 import { PermissionsGuard } from "@/components/guards";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -116,10 +117,24 @@ export default function ClubTournamentsScreen() {
 
       {isLoading ? <p className="text-sm text-muted-foreground">Cargando…</p> : null}
       {isError ? (
-        <p className="text-sm text-destructive">No se pudieron cargar los torneos.</p>
+        <EmptyState
+          tone="error"
+          icon={CircleAlert}
+          title="No se pudieron cargar los torneos"
+          description="Reintentá en un momento."
+        />
       ) : null}
       {!isLoading && !isError && items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No hay torneos con ese filtro.</p>
+        <EmptyState
+          icon={search.trim() ? Search : Trophy}
+          title={
+            search.trim()
+              ? "No hay torneos que coincidan con la búsqueda."
+              : scope === "open"
+                ? "No hay torneos pendientes ni en juego."
+                : "Todavía no hay torneos."
+          }
+        />
       ) : null}
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">

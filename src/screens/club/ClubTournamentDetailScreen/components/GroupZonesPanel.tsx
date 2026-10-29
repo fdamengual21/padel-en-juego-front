@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { ChevronDown, Info } from "lucide-react";
+import { ChevronDown, Info, Pencil, Users } from "lucide-react";
 import type {
   Court,
   GroupStanding,
@@ -12,6 +12,9 @@ import type {
 } from "@/domain";
 import {
   canOpenMatchResult,
+  knockoutRebuildBlockedReason,
+  matchMoveBlockedReason,
+  matchPairingBlockedReason,
   matchWinnerSide,
   scoreboardSlotCount,
   tieBreakHint,
@@ -21,8 +24,11 @@ import MatchCourtSelect, {
   MatchHorarioButton,
   MatchScheduleTimeModal,
 } from "./MatchScheduleCell";
+import MatchPairingModal from "./MatchPairingModal";
 import MatchStatusModal from "./MatchStatusModal";
+import MovePairPhaseModal from "./MovePairPhaseModal";
 import ResolveTieModal from "./ResolveTieModal";
+import { EmptyState } from "@/components/EmptyState";
 import MatchPlayStatusChip from "@/components/tournaments/MatchPlayStatusChip";
 import MatchScoreBoxes from "@/components/tournaments/MatchScoreBoxes";
 import PairVsBlock from "@/components/tournaments/PairVsBlock";
@@ -75,7 +81,7 @@ function StandingColumnHead({ label, fullName }: StandingColumnHeadProps) {
         >
           {label}
         </TooltipTrigger>
-        <TooltipContent>{fullName}</TooltipContent>
+        <TooltipContent className="max-w-xs">{fullName}</TooltipContent>
       </Tooltip>
     </TableHead>
   );
@@ -96,6 +102,8 @@ interface GroupZonesPanelProps {
   matchDurationMinutes?: number;
   /** Quality: GET de ocupación al elegir fecha y hora. */
   showCourtOccupancy?: boolean;
+  /** Quality: se ve el horario, no se puede cargar fecha/hora a mano. */
+  disableMatchDateTime?: boolean;
   scheduleSavingMatchId?: string | null;
   /** Torneo finalizado/cancelado: sin editar agenda, cancha ni resultado. */
   tournamentLocked?: boolean;
@@ -125,10 +133,24 @@ interface GroupZonesPanelProps {
   tieSavingGroupId?: string | null;
   /** En el cuadro: sin posiciones. Una fila por partido. */
   compact?: boolean;
+  tournamentStarted?: boolean;
+  onSetPairing?: (input: {
+    matchId: string;
+    pairAId: string | null;
+    pairBId: string | null;
+    note: string | null;
+  }) => Promise<void> | void;
+  pairingSavingMatchId?: string | null;
+  onMovePair?: (input: {
+    pairId: string;
+    phase?: MatchPhase;
+    groupId?: string;
+  }) => Promise<void> | void;
+  moveSaving?: boolean;
 }
 
 const STANDINGS_HINT =
-  "Orden: puntos (2 ganado, 1 perdido, 0 W.O.); entre dos empatadas, el partido directo; entre tres o más, sets y games solo entre ellas, luego games de toda la zona. Si todo sigue igual, el club sortea desde acá.";
+  "Se ordena por puntos de zona: 2 si ganó el partido, 1 si lo perdió jugando, 0 si no se presentó (W.O.). Entre dos empatadas, el partido directo; entre tres o más, sets y games solo entre ellas, luego games de toda la zona. Si todo sigue igual, el club sortea desde acá.";
 
 function signed(value: number): string {
   return `${value > 0 ? "+" : ""}${value}`;
@@ -143,7 +165,91 @@ function pairIndexInGroup(group: TournamentGroup, pairId: string | null): number
 function pendingSide(source: string | undefined): string | null {
   if (source === "MATCH_WINNER") return "Ganador";
   if (source === "MATCH_LOSER") return "Perdedor";
+  if (source === "BYE") return "Sin rival";
   return null;
+}
+
+function pairNamesFromLabel(
+  pairId: string,
+  pairLabels: Record<string, string>,
+  pairPlayerNames?: Record<string, [string, string]>,
+): [string, string] {
+  const named = pairPlayerNames?.[pairId];
+  if (named?.[0]) return named;
+  const label = pairLabels[pairId];
+  if (!label) return ["Pareja", ""];
+  const parts = label.split(/\s*\/\s*/).map((part) => part.trim()).filter(Boolean);
+  if (parts.length >= 2) return [parts[0], parts[1]];
+  return [label, ""];
+}
+
+function MatchRowActions({
+  matchId,
+  pairingBlockedReason,
+  moveBlockedReason,
+  onEditPairing,
+  onMovePair,
+}: {
+  matchId: string;
+  pairingBlockedReason?: string | null;
+  moveBlockedReason?: string | null;
+  onEditPairing?: (matchId: string) => void;
+  onMovePair?: (matchId: string) => void;
+}) {
+  if (!onEditPairing && !onMovePair) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      {onEditPairing && pairingBlockedReason !== undefined ? (
+        <TooltipProvider delay={200}>
+          <Tooltip>
+            <TooltipTrigger render={<span className="inline-flex" />}>
+              <button
+                type="button"
+                aria-label="Modificar cruce"
+                data-testid={`edit-pairing-${matchId}`}
+                disabled={pairingBlockedReason != null}
+                className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (pairingBlockedReason != null) return;
+                  onEditPairing(matchId);
+                }}
+              >
+                <Pencil className="h-3 w-3" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">
+              {pairingBlockedReason ?? "Modificar cruce: elegir a mano las dos parejas."}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      ) : null}
+      {onMovePair && moveBlockedReason !== undefined ? (
+        <TooltipProvider delay={200}>
+          <Tooltip>
+            <TooltipTrigger render={<span className="inline-flex" />}>
+              <button
+                type="button"
+                data-testid={`move-pair-${matchId}`}
+                disabled={moveBlockedReason != null}
+                className="whitespace-nowrap rounded px-1 py-px text-[9px] font-medium text-primary-strong hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (moveBlockedReason != null) return;
+                  onMovePair(matchId);
+                }}
+              >
+                Mover
+              </button>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">
+              {moveBlockedReason ?? "Mover una pareja a otra ronda o zona."}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      ) : null}
+    </div>
+  );
 }
 
 function slotSource(slots: MatchSlot[], matchId: string, side: "A" | "B") {
@@ -151,6 +257,7 @@ function slotSource(slots: MatchSlot[], matchId: string, side: "A" | "B") {
 }
 
 function qualifyHeadline(count: number): string | null {
+  if (count === 0) return "El 1° es campeón";
   if (count === 1) return "Pasa el primero";
   if (count === 2) return "Pasan los dos primeros";
   if (count === 3) return "Pasan los tres primeros";
@@ -206,15 +313,21 @@ function sideLabel(
   return pendingSide(slot?.sourceType) ?? "Por definir";
 }
 
+function pairsLabel(count: number): string {
+  return count === 1 ? "1 pareja" : `${count} parejas`;
+}
+
 interface ZoneSectionFrameProps {
   sectionId: string;
   title: string;
   testId: string;
   open: boolean;
   showAgenda: boolean;
+  showActions?: boolean;
   onToggle: () => void;
   children: ReactNode;
   footer?: ReactNode;
+  pairCount?: number;
 }
 
 function ZoneSectionFrame({
@@ -223,9 +336,11 @@ function ZoneSectionFrame({
   testId,
   open,
   showAgenda,
+  showActions = false,
   onToggle,
   children,
   footer,
+  pairCount,
 }: ZoneSectionFrameProps) {
   return (
     <section
@@ -245,7 +360,7 @@ function ZoneSectionFrame({
         />
       </button>
       <div className="overflow-x-auto">
-        <Table className="min-w-[44rem] table-fixed text-xs">
+        <Table className={cn("table-fixed text-xs", showActions ? "min-w-[50rem]" : "min-w-[44rem]")}>
           <colgroup>
             <col className="w-[2.5rem]" />
             <col className="w-[8rem]" />
@@ -253,19 +368,51 @@ function ZoneSectionFrame({
             <col className="w-[6.25rem]" />
             <col className="w-[17rem]" />
             <col className="w-[11rem]" />
+            {showActions ? <col className="w-[5.5rem]" /> : null}
             {showAgenda ? <col className="w-[7.5rem]" /> : null}
           </colgroup>
           <TableHeader>
             <TableRow className="border-0 hover:bg-transparent">
               <TableHead colSpan={2} className={cn(headClass, "whitespace-nowrap")}>
-                {title}
+                <span className="inline-flex items-center gap-1.5">
+                  {title}
+                  {pairCount != null ? (
+                    <TooltipProvider delay={200}>
+                      <Tooltip>
+                        <TooltipTrigger
+                          className="cursor-help"
+                          render={<span />}
+                        >
+                          <span
+                            className="inline-flex h-5 items-center rounded-md bg-primary-foreground/20 px-1.5 text-[10px] font-semibold tabular-nums"
+                            data-testid={`zone-pair-count-${sectionId}`}
+                          >
+                            {pairCount}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>{pairsLabel(pairCount)}</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  ) : null}
+                </span>
               </TableHead>
               <TableHead className={headClass}>Horarios</TableHead>
               <TableHead className={headClass}>Estado</TableHead>
               <TableHead className={headClass}>Partidos</TableHead>
-              <TableHead className={cn(headClass, "text-left", !showAgenda && "pr-8")}>
+              <TableHead
+                className={cn(
+                  headClass,
+                  "text-left",
+                  !showAgenda && !showActions && "pr-8",
+                )}
+              >
                 Resultado
               </TableHead>
+              {showActions ? (
+                <TableHead className={cn(headClass, !showAgenda && "pr-8")}>
+                  Acciones
+                </TableHead>
+              ) : null}
               {showAgenda ? (
                 <TableHead className={cn(headClass, "pr-8")}>Cancha</TableHead>
               ) : null}
@@ -284,6 +431,7 @@ export default function GroupZonesPanel({
   matches,
   standings,
   pairLabels,
+  pairPlayerNames = {},
   matchRules,
   courts = [],
   allMatches,
@@ -291,6 +439,7 @@ export default function GroupZonesPanel({
   reservations = [],
   matchDurationMinutes,
   showCourtOccupancy = false,
+  disableMatchDateTime = false,
   scheduleSavingMatchId = null,
   tournamentLocked = false,
   finishedGroupIds = [],
@@ -303,10 +452,17 @@ export default function GroupZonesPanel({
   onResolveTie,
   tieSavingGroupId = null,
   compact = false,
+  tournamentStarted = false,
+  onSetPairing,
+  pairingSavingMatchId = null,
+  onMovePair,
+  moveSaving = false,
 }: GroupZonesPanelProps) {
   const [scheduleMatchId, setScheduleMatchId] = useState<string | null>(null);
   const [statusMatchId, setStatusMatchId] = useState<string | null>(null);
   const [tieGroupId, setTieGroupId] = useState<string | null>(null);
+  const [pairingMatchId, setPairingMatchId] = useState<string | null>(null);
+  const [movingMatchId, setMovingMatchId] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const tieByGroup = new Map(unresolvedTies.map((tie) => [tie.groupId, tie]));
   const tieGroup = tieGroupId ? (groups.find((g) => g.id === tieGroupId) ?? null) : null;
@@ -314,6 +470,13 @@ export default function GroupZonesPanel({
   const finishedGroupSet = new Set(finishedGroupIds);
   const scheduleMatches = allMatches ?? matches;
   const knockoutPhases = visibleKnockoutPhases(scheduleMatches);
+  const movePhases = KNOCKOUT_PHASES.filter((phase) =>
+    scheduleMatches.some((match) => match.phase === phase),
+  );
+  const canEditPairing = Boolean(onSetPairing) && !tournamentLocked;
+  const canMovePairs = Boolean(onMovePair) && !tournamentLocked && tournamentStarted;
+  const showMatchActions = canEditPairing || canMovePairs;
+  const rebuildBlockedReason = knockoutRebuildBlockedReason(scheduleMatches, slots);
   const groupNames: Record<string, string> = {};
   for (const group of groups) {
     groupNames[group.id] = group.name.replace(/^Grupo\b/i, "Zona");
@@ -321,9 +484,12 @@ export default function GroupZonesPanel({
 
   if (!groups.length && knockoutPhases.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground">
-        Todavía no hay zonas. Se generan solas cuando el cupo de la configuración se completa.
-      </p>
+      <EmptyState
+        icon={Users}
+        title="Todavía no hay parejas inscriptas"
+        description="Cuando los jugadores se inscriban, se generarán las zonas y se completará el cuadro del torneo."
+        className={compact ? "min-h-0 py-8" : undefined}
+      />
     );
   }
 
@@ -331,6 +497,7 @@ export default function GroupZonesPanel({
   const decidingSlotIndex =
     matchRules.superTiebreakEnabled && matchRules.setsToWin >= 2 ? slotCount - 1 : null;
   const showAgenda = Boolean(onSaveSchedule) && !compact;
+  const matchColCount = 6 + (showAgenda ? 1 : 0) + (showMatchActions ? 1 : 0);
   const sectionOpen = (id: string) => collapsed[id] !== true;
   const toggleSection = (id: string) =>
     setCollapsed((current) => ({ ...current, [id]: !current[id] }));
@@ -344,6 +511,36 @@ export default function GroupZonesPanel({
           matches.find((m) => m.id === statusMatchId) ??
           null)
       : null;
+  const pairingMatch =
+    pairingMatchId != null
+      ? (scheduleMatches.find((m) => m.id === pairingMatchId) ?? null)
+      : null;
+  const movingMatch =
+    movingMatchId != null
+      ? (scheduleMatches.find((m) => m.id === movingMatchId) ?? null)
+      : null;
+  const movingPairs = [movingMatch?.pairAId, movingMatch?.pairBId]
+    .filter((id): id is string => Boolean(id))
+    .map((pairId) => ({
+      pairId,
+      names: pairNamesFromLabel(pairId, pairLabels, pairPlayerNames),
+    }));
+  const knockoutPairingCandidates = [
+    ...new Set([
+      ...groups.flatMap((group) => group.pairIds),
+      ...scheduleMatches.flatMap((match) =>
+        [match.pairAId, match.pairBId].filter((id): id is string => Boolean(id)),
+      ),
+    ]),
+  ];
+  const moveGroups = groups.map((group) => ({
+    id: group.id,
+    name: groupNames[group.id] ?? group.name,
+    pairCount: group.pairIds.length,
+  }));
+  const pairGroupIds = Object.fromEntries(
+    groups.flatMap((group) => group.pairIds.map((pairId) => [pairId, group.id])),
+  );
 
   return (
     <div className={cn("space-y-4", compact && "space-y-3")} data-testid="group-zones-panel">
@@ -368,6 +565,8 @@ export default function GroupZonesPanel({
             testId={`group-zone-${group.id}`}
             open={sectionOpen(group.id)}
             showAgenda={showAgenda}
+            showActions={showMatchActions}
+            pairCount={group.pairIds.length}
             onToggle={() => toggleSection(group.id)}
             footer={
               !compact ? (
@@ -427,7 +626,10 @@ export default function GroupZonesPanel({
                         <TableRow>
                           <StandingColumnHead label="Pos" fullName="Posición" />
                           <StandingColumnHead label="Pareja" fullName="Pareja" />
-                          <StandingColumnHead label="Pts" fullName="Puntos (2 ganado, 1 perdido, 0 W.O.)" />
+                          <StandingColumnHead
+                            label="Pts"
+                            fullName="Puntos de zona, por partido: 2 si ganó, 1 si lo perdió jugando, 0 si no se presentó (W.O.). No suman sets, games ni el tie-break."
+                          />
                           <StandingColumnHead label="SG" fullName="Sets ganados" />
                           <StandingColumnHead label="SP" fullName="Sets perdidos" />
                           <StandingColumnHead
@@ -450,10 +652,15 @@ export default function GroupZonesPanel({
                             label="Desempate"
                             fullName="Criterio que definió el puesto"
                           />
-                          {zoneFinished ? (
+                          {zoneFinished && (group.qualifies ?? 0) > 0 ? (
                             <StandingColumnHead
                               label="Avance"
                               fullName="Clasificación al cuadro"
+                            />
+                          ) : zoneFinished ? (
+                            <StandingColumnHead
+                              label="Resultado"
+                              fullName="Campeón de la zona"
                             />
                           ) : null}
                         </TableRow>
@@ -462,13 +669,21 @@ export default function GroupZonesPanel({
                         {groupStandings.map((row) => {
                           const qualifies =
                             zoneFinished &&
+                            (group.qualifies ?? 0) > 0 &&
                             row.position > 0 &&
                             row.position <= (group.qualifies ?? 0);
+                          const champion =
+                            zoneFinished &&
+                            (group.qualifies ?? 0) === 0 &&
+                            row.position === 1;
                           const tied = tiedSet.has(row.pairId);
                           return (
                             <TableRow
                               key={row.id}
-                              className={cn(qualifies && "bg-primary/10", tied && "bg-amber-50")}
+                              className={cn(
+                                (qualifies || champion) && "bg-primary/10",
+                                tied && "bg-amber-50",
+                              )}
                             >
                               <TableCell className="px-2 py-1">
                                 {tied ? "?" : row.position || "—"}
@@ -526,11 +741,26 @@ export default function GroupZonesPanel({
                                   <span className="text-[11px] text-muted-foreground">—</span>
                                 )}
                               </TableCell>
-                              {zoneFinished ? (
+                              {zoneFinished && (group.qualifies ?? 0) > 0 ? (
                                 <TableCell className="px-2 py-1">
                                   {qualifies ? (
                                     <span className="inline-flex rounded-md bg-primary px-2 py-0.5 text-[11px] font-medium text-primary-foreground">
                                       Clasifica
+                                    </span>
+                                  ) : (
+                                    <span className="text-[11px] text-muted-foreground">
+                                      —
+                                    </span>
+                                  )}
+                                </TableCell>
+                              ) : zoneFinished ? (
+                                <TableCell className="px-2 py-1">
+                                  {champion ? (
+                                    <span
+                                      className="inline-flex rounded-md bg-primary px-2 py-0.5 text-[11px] font-medium text-primary-foreground"
+                                      data-testid="standing-champion"
+                                    >
+                                      Campeón
                                     </span>
                                   ) : (
                                     <span className="text-[11px] text-muted-foreground">
@@ -574,6 +804,7 @@ export default function GroupZonesPanel({
                     const canOpenResult = canOpenMatchResult(match, !tournamentLocked);
                     const canEditSchedule =
                       hasPairs && !tournamentLocked && !matchClosed;
+                    const canEditDateTime = canEditSchedule && !disableMatchDateTime;
                     const canEditStatus =
                       hasPairs &&
                       !tournamentLocked &&
@@ -591,7 +822,7 @@ export default function GroupZonesPanel({
                           {showAgenda && onSaveSchedule ? (
                             <MatchHorarioButton
                               scheduledAt={match.scheduledAt}
-                              disabled={!canEditSchedule}
+                              disabled={!canEditDateTime}
                               onClick={() => setScheduleMatchId(match.id)}
                             />
                           ) : (
@@ -604,7 +835,7 @@ export default function GroupZonesPanel({
                           <button
                             type="button"
                             data-testid={`match-status-cell-${match.id}`}
-                            disabled={!canEditStatus}
+                            aria-disabled={!canEditStatus}
                             className={cn(
                               "rounded-md text-left transition-colors",
                               canEditStatus
@@ -662,6 +893,31 @@ export default function GroupZonesPanel({
                             />
                           </button>
                         </TableCell>
+                        {showMatchActions ? (
+                          <TableCell className="px-2 py-1 align-middle">
+                            <MatchRowActions
+                              matchId={match.id}
+                              pairingBlockedReason={
+                                canEditPairing
+                                  ? matchPairingBlockedReason(match, slots, tournamentStarted)
+                                  : undefined
+                              }
+                              moveBlockedReason={
+                                canMovePairs
+                                  ? matchMoveBlockedReason(
+                                      match,
+                                      slots,
+                                      tournamentStarted,
+                                      rebuildBlockedReason,
+                                      scheduleMatches,
+                                    )
+                                  : undefined
+                              }
+                              onEditPairing={canEditPairing ? setPairingMatchId : undefined}
+                              onMovePair={canMovePairs ? setMovingMatchId : undefined}
+                            />
+                          </TableCell>
+                        ) : null}
                         {showAgenda && onSaveSchedule ? (
                           <TableCell className="px-2 py-1 align-middle">
                             <MatchCourtSelect
@@ -684,7 +940,7 @@ export default function GroupZonesPanel({
                   {groupMatches.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={showAgenda ? 7 : 6}
+                        colSpan={matchColCount}
                         className="px-2 py-1 text-xs text-muted-foreground"
                       >
                         {group.pairIds.length === 1
@@ -710,6 +966,7 @@ export default function GroupZonesPanel({
             testId={`knockout-phase-${phase}`}
             open={sectionOpen(phase)}
             showAgenda={showAgenda}
+            showActions={showMatchActions}
             onToggle={() => toggleSection(phase)}
           >
             {phaseMatches.map((match, index) => {
@@ -726,6 +983,7 @@ export default function GroupZonesPanel({
               const winnerSide = matchWinnerSide(match);
               const canOpenResult = canOpenMatchResult(match, !tournamentLocked);
               const canEditSchedule = hasPairs && !tournamentLocked && !rowClosed;
+              const canEditDateTime = canEditSchedule && !disableMatchDateTime;
               const canEditStatus =
                 hasPairs && !tournamentLocked && !rowClosed && Boolean(onSetStatus);
               return (
@@ -740,7 +998,7 @@ export default function GroupZonesPanel({
                     {showAgenda && onSaveSchedule ? (
                       <MatchHorarioButton
                         scheduledAt={match.scheduledAt}
-                        disabled={!canEditSchedule}
+                        disabled={!canEditDateTime}
                         onClick={() => setScheduleMatchId(match.id)}
                       />
                     ) : (
@@ -753,7 +1011,7 @@ export default function GroupZonesPanel({
                     <button
                       type="button"
                       data-testid={`match-status-cell-${match.id}`}
-                      disabled={!canEditStatus}
+                      aria-disabled={!canEditStatus}
                       className={cn(
                         "rounded-md text-left transition-colors",
                         canEditStatus
@@ -807,6 +1065,31 @@ export default function GroupZonesPanel({
                       />
                     </button>
                   </TableCell>
+                  {showMatchActions ? (
+                    <TableCell className="px-2 py-1 align-middle">
+                      <MatchRowActions
+                        matchId={match.id}
+                        pairingBlockedReason={
+                          canEditPairing
+                            ? matchPairingBlockedReason(match, slots, tournamentStarted)
+                            : undefined
+                        }
+                        moveBlockedReason={
+                          canMovePairs
+                            ? matchMoveBlockedReason(
+                                match,
+                                slots,
+                                tournamentStarted,
+                                rebuildBlockedReason,
+                                scheduleMatches,
+                              )
+                            : undefined
+                        }
+                        onEditPairing={canEditPairing ? setPairingMatchId : undefined}
+                        onMovePair={canMovePairs ? setMovingMatchId : undefined}
+                      />
+                    </TableCell>
+                  ) : null}
                   {showAgenda && onSaveSchedule ? (
                     <TableCell className="px-2 py-1 align-middle">
                       <MatchCourtSelect
@@ -830,7 +1113,7 @@ export default function GroupZonesPanel({
         );
       })}
 
-      {onSaveSchedule ? (
+      {onSaveSchedule && !disableMatchDateTime ? (
         <MatchScheduleTimeModal
           open={Boolean(scheduleMatch)}
           match={scheduleMatch}
@@ -873,6 +1156,64 @@ export default function GroupZonesPanel({
           onSubmit={async (status) => {
             if (!statusMatch) return;
             await onSetStatus({ matchId: statusMatch.id, status });
+          }}
+        />
+      ) : null}
+
+      {onSetPairing ? (
+        <MatchPairingModal
+          open={Boolean(pairingMatch)}
+          match={pairingMatch}
+          roundLabel={
+            pairingMatch?.phase === "GROUP" && pairingMatch.groupId
+              ? (groupNames[pairingMatch.groupId] ?? "Zona")
+              : pairingMatch
+                ? roundSectionLabel(pairingMatch.phase)
+                : "Ronda"
+          }
+          roundMatches={
+            pairingMatch?.phase === "GROUP" && pairingMatch.groupId
+              ? scheduleMatches.filter(
+                  (item) => item.groupId === pairingMatch.groupId && item.phase === "GROUP",
+                )
+              : pairingMatch
+                ? scheduleMatches.filter((item) => item.phase === pairingMatch.phase)
+                : []
+          }
+          candidateIds={
+            pairingMatch?.phase === "GROUP" && pairingMatch.groupId
+              ? (groups.find((group) => group.id === pairingMatch.groupId)?.pairIds ?? [])
+              : knockoutPairingCandidates
+          }
+          pairLabels={pairLabels}
+          isSubmitting={pairingMatch != null && pairingSavingMatchId === pairingMatch.id}
+          onOpenChange={(open) => {
+            if (!open) setPairingMatchId(null);
+          }}
+          onSubmit={async ({ pairAId, pairBId, note }) => {
+            if (!pairingMatch) return;
+            await onSetPairing({ matchId: pairingMatch.id, pairAId, pairBId, note });
+            setPairingMatchId(null);
+          }}
+        />
+      ) : null}
+
+      {onMovePair ? (
+        <MovePairPhaseModal
+          open={Boolean(movingMatch)}
+          pairs={movingPairs}
+          currentPhase={movingMatch?.phase ?? null}
+          phases={movePhases}
+          groups={moveGroups}
+          currentGroupId={movingMatch?.groupId ?? null}
+          pairGroupIds={pairGroupIds}
+          isSubmitting={moveSaving}
+          onOpenChange={(open) => {
+            if (!open) setMovingMatchId(null);
+          }}
+          onSubmit={async ({ pairId, phase, groupId }) => {
+            await onMovePair({ pairId, phase, groupId });
+            setMovingMatchId(null);
           }}
         />
       ) : null}

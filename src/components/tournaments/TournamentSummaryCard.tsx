@@ -3,6 +3,7 @@ import {
   CalendarDays,
   CircleDollarSign,
   MapPin,
+  Phone,
   Repeat2,
   Tag,
   Trophy,
@@ -10,6 +11,14 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import ImageViewerDialog from "@/components/ImageViewerDialog";
+import PhoneWhatsApp from "@/components/PhoneWhatsApp";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export type TournamentSummaryStatKind =
   | "category"
@@ -30,8 +39,12 @@ export interface TournamentSummaryStat {
 interface TournamentSummaryCardProps {
   bannerUrl?: string | null;
   fallbackName: string;
+  description?: string | null;
+  contactPhone?: string | null;
   stats: TournamentSummaryStat[];
 }
+
+const DESCRIPTION_PREVIEW_LENGTH = 100;
 
 const STAT_ICONS: Record<TournamentSummaryStatKind, LucideIcon> = {
   category: Tag,
@@ -46,11 +59,20 @@ const STAT_ICONS: Record<TournamentSummaryStatKind, LucideIcon> = {
 export default function TournamentSummaryCard({
   bannerUrl,
   fallbackName,
+  description,
+  contactPhone,
   stats,
 }: TournamentSummaryCardProps) {
   const [flyerOpen, setFlyerOpen] = useState(false);
+  const [descriptionOpen, setDescriptionOpen] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
   const showFlyer = Boolean(bannerUrl) && !imageFailed;
+  const trimmedContactPhone = contactPhone?.trim() ?? "";
+  const trimmedDescription = description?.trim() ?? "";
+  const isDescriptionTruncated = trimmedDescription.length > DESCRIPTION_PREVIEW_LENGTH;
+  const descriptionPreview = isDescriptionTruncated
+    ? `${trimmedDescription.slice(0, DESCRIPTION_PREVIEW_LENGTH)}...`
+    : trimmedDescription;
 
   return (
     <>
@@ -58,6 +80,23 @@ export default function TournamentSummaryCard({
         className="overflow-hidden rounded-xl border border-border bg-card"
         data-testid="tournament-summary-card"
       >
+        {trimmedDescription ? (
+          isDescriptionTruncated ? (
+            <button
+              type="button"
+              className="block w-full cursor-pointer border-b border-border px-4 py-3 text-left text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground sm:px-5"
+              aria-label="Ver descripción del torneo"
+              onClick={() => setDescriptionOpen(true)}
+              data-testid="tournament-description-preview"
+            >
+              {descriptionPreview}
+            </button>
+          ) : (
+            <p className="border-b border-border px-4 py-3 text-sm text-muted-foreground sm:px-5">
+              {descriptionPreview}
+            </p>
+          )
+        ) : null}
         <div
           className={
             showFlyer ? "grid lg:grid-cols-[minmax(220px,32%)_minmax(0,1fr)]" : undefined
@@ -98,6 +137,17 @@ export default function TournamentSummaryCard({
                   </div>
                 );
               })}
+              {trimmedContactPhone ? (
+                <div className="space-y-1" data-testid="tournament-contact">
+                  <dt className="flex items-center gap-1.5 text-muted-foreground">
+                    <Phone className="size-3.5 shrink-0" />
+                    <span className="text-sm">Contacto</span>
+                  </dt>
+                  <dd className="text-base font-semibold text-foreground">
+                    <PhoneWhatsApp phone={trimmedContactPhone} />
+                  </dd>
+                </div>
+              ) : null}
             </dl>
           </div>
         </div>
@@ -111,6 +161,21 @@ export default function TournamentSummaryCard({
           imageUrl={bannerUrl ?? null}
           fallbackName={fallbackName}
         />
+      ) : null}
+      {isDescriptionTruncated ? (
+        <Dialog open={descriptionOpen} onOpenChange={setDescriptionOpen}>
+          <DialogContent
+            className="max-h-[85vh] max-w-lg overflow-y-auto"
+            data-testid="tournament-description-dialog"
+          >
+            <DialogHeader>
+              <DialogTitle>Descripción</DialogTitle>
+              <DialogDescription className="whitespace-pre-wrap text-foreground">
+                {trimmedDescription}
+              </DialogDescription>
+            </DialogHeader>
+          </DialogContent>
+        </Dialog>
       ) : null}
     </>
   );

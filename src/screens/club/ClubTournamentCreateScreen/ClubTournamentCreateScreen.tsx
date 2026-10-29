@@ -9,7 +9,6 @@ import {
   type TournamentBannerDraft,
   type TournamentFormValues,
 } from "@/modules/tournaments/types";
-import { createId } from "@/domain";
 import { ROUTES } from "@/router/routes";
 import { toastError, toastSuccess } from "@/lib/toast";
 
@@ -57,7 +56,6 @@ export default function ClubTournamentCreateScreen() {
         status: "active",
       });
       await Api.TournamentOpsService().upsertRuleset({
-        id: createId("rules"),
         tournamentCategoryId: category.id,
         preset: values.matchPlayType,
         matchRules: buildMatchRulesFromForm(values),

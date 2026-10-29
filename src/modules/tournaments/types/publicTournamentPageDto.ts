@@ -11,12 +11,14 @@ export interface PublicTournamentPageDto {
   summary: PublicTournamentSummaryDto;
   quotaFull: boolean;
   canRegister: boolean;
+  repechageCreated?: boolean;
 }
 
 export interface PublicTournamentDto {
   id: string;
   clubId: string;
   clubName: string | null;
+  clubPhone: string | null;
   name: string;
   description: string | null;
   startDate: string;

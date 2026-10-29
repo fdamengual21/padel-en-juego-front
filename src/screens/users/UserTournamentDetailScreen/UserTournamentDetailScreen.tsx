@@ -1,17 +1,24 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { CircleAlert, Trophy } from "lucide-react";
+import { CircleAlert, GitBranch, Trophy, Users } from "lucide-react";
 import Api from "@/api/Api";
 import { EmptyState } from "@/components/EmptyState";
 import Avatar from "@/components/Avatar";
 import MatchCard from "@/components/tournaments/MatchCard";
+import TournamentChampionBanner from "@/components/tournaments/TournamentChampionBanner";
 import TournamentSummaryCard from "@/components/tournaments/TournamentSummaryCard";
 import PlayerRegistrationPanel from "@/components/tournaments/PlayerRegistrationPanel";
 import StatusBadge from "@/components/tournaments/StatusBadge";
 import TournamentRulesDialog from "@/components/tournaments/TournamentRulesDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { canOpenMatchResult, isQualityPreset, type Match } from "@/domain";
+import {
+  canOpenMatchResult,
+  championPairNames,
+  isQualityPreset,
+  resolveTournamentChampionPairId,
+  type Match,
+} from "@/domain";
 import { formatRegisteredAtEs, formatTournamentDayEs } from "@/lib/dates";
 import { sidePreferenceLabel } from "@/lib/tournamentLabels";
 import { toastError } from "@/lib/toast";
@@ -19,7 +26,7 @@ import { ROUTES } from "@/router/routes";
 import CuadroBoard from "@/screens/club/ClubTournamentDetailScreen/components/CuadroBoard";
 import GroupZonesPanel from "@/screens/club/ClubTournamentDetailScreen/components/GroupZonesPanel";
 import MatchResultModal from "@/screens/club/ClubTournamentDetailScreen/components/MatchResultModal";
-import PublicParticipantDetailModal from "./components/PublicParticipantDetailModal";
+import PublicParticipantDetailModal from "@/screens/users/components/PublicParticipantDetailModal";
 import { toCuadroBoardView } from "./helpers/toCuadroBoardView";
 import type { PublicParticipantRow } from "@/modules/tournament-ops/types";
 
@@ -45,7 +52,9 @@ export default function UserTournamentDetailScreen() {
   const zonesQuery = useQuery({
     queryKey: ["public-zones-board", categoryId],
     queryFn: () => Api.TournamentOpsService().getPublicZonesBoard(categoryId),
-    enabled: Boolean(categoryId) && activeTab === "grupos",
+    enabled:
+      Boolean(categoryId) &&
+      (activeTab === "grupos" || page?.tournament.status === "finished"),
   });
   const participantsQuery = useQuery({
     queryKey: ["public-participants-board", categoryId],
@@ -55,12 +64,19 @@ export default function UserTournamentDetailScreen() {
   const cuadroQuery = useQuery({
     queryKey: ["public-cuadro-board", categoryId],
     queryFn: () => Api.TournamentOpsService().getPublicCuadroBoard(categoryId),
-    enabled: Boolean(categoryId) && activeTab === "cuadro",
+    enabled:
+      Boolean(categoryId) &&
+      (activeTab === "cuadro" || page?.tournament.status === "finished"),
   });
   const matchesQuery = useQuery({
     queryKey: ["public-matches-board", categoryId],
     queryFn: () => Api.TournamentOpsService().getPublicMatchesBoard(categoryId),
     enabled: Boolean(categoryId) && activeTab === "partidos",
+  });
+  const repechageQuery = useQuery({
+    queryKey: ["public-repechage-board", categoryId],
+    queryFn: () => Api.TournamentOpsService().getPublicRepechageBoard(categoryId),
+    enabled: Boolean(categoryId) && page?.repechageCreated === true && activeTab === "repechaje",
   });
 
   useEffect(() => {
@@ -104,6 +120,7 @@ export default function UserTournamentDetailScreen() {
   const pairPlayerNames =
     zonesQuery.data?.pairPlayerNames ??
     cuadroQuery.data?.pairPlayerNames ??
+    repechageQuery.data?.pairPlayerNames ??
     {};
 
   if (pageQuery.isLoading) {
@@ -127,6 +144,25 @@ export default function UserTournamentDetailScreen() {
   }
 
   const { tournament, summary, category } = page;
+  const championPairId =
+    tournament.status === "finished"
+      ? resolveTournamentChampionPairId({
+          elimMatches: cuadroQuery.data?.elimMatches ?? [],
+          groups: zonesQuery.data?.groups ?? cuadroQuery.data?.groups ?? [],
+          standings: zonesQuery.data?.standings ?? [],
+          finishedGroupIds: zonesQuery.data?.finishedGroupIds,
+        })
+      : null;
+  const championNames = championPairId
+    ? championPairNames(
+        championPairId,
+        pairPlayerNames,
+        zonesQuery.data?.pairLabels ?? cuadroQuery.data?.pairLabels ?? {},
+      )
+    : null;
+  const championAvatars = participantsQuery.data?.rows.find(
+    (row) => row.pairId === championPairId,
+  )?.playerAvatars;
   const dates =
     tournament.endDate && tournament.endDate !== tournament.startDate
       ? `${formatTournamentDayEs(tournament.startDate)} → ${formatTournamentDayEs(tournament.endDate)}`
@@ -175,9 +211,19 @@ export default function UserTournamentDetailScreen() {
         </div>
       </div>
 
+      {championPairId && championNames ? (
+        <TournamentChampionBanner
+          names={championNames}
+          avatars={championAvatars}
+          onOpen={() => openPairDetail(championPairId)}
+        />
+      ) : null}
+
       <TournamentSummaryCard
         bannerUrl={tournament.bannerUrl}
         fallbackName={tournament.name}
+        description={tournament.description}
+        contactPhone={tournament.clubPhone}
         stats={[
           { kind: "category", label: "Categoría", value: category.name },
           {
@@ -221,6 +267,7 @@ export default function UserTournamentDetailScreen() {
           <TabsTrigger value="grupos">Zonas</TabsTrigger>
           <TabsTrigger value="participantes">Participantes</TabsTrigger>
           <TabsTrigger value="cuadro">Cuadro</TabsTrigger>
+          {page.repechageCreated ? <TabsTrigger value="repechaje">Repechaje</TabsTrigger> : null}
           <TabsTrigger value="partidos">Partidos</TabsTrigger>
         </TabsList>
 
@@ -305,7 +352,7 @@ export default function UserTournamentDetailScreen() {
               </ul>
             ) : (
               <EmptyState
-                icon={Trophy}
+                icon={Users}
                 title="Todavía no hay parejas inscriptas"
                 description="Cuando el club acepte inscripciones, van a aparecer acá."
               />
@@ -326,12 +373,61 @@ export default function UserTournamentDetailScreen() {
               tournamentStarted={page.tournamentStarted}
               tournamentLocked={tournamentLocked}
             />
+          ) : cuadroQuery.isFetching ? (
+            <p className="text-sm text-muted-foreground">Cargando cuadro…</p>
           ) : (
-            <p className="text-sm text-muted-foreground">
-              {cuadroQuery.isFetching ? "Cargando cuadro…" : "Sin datos de cuadro."}
-            </p>
+            <EmptyState
+              icon={GitBranch}
+              title="Todavía no hay cuadro"
+              description="Se completa cuando haya parejas inscriptas y zonas armadas."
+            />
           )}
         </TabsContent>
+
+        {page.repechageCreated ? (
+          <TabsContent value="repechaje" className="space-y-4 pt-4">
+            {repechageQuery.data?.notice ? (
+              <p className="text-sm text-muted-foreground">{repechageQuery.data.notice}</p>
+            ) : null}
+            {repechageQuery.data &&
+            (repechageQuery.data.groups.length > 0 || repechageQuery.data.elimMatches.length > 0) ? (
+              <>
+                <GroupZonesPanel
+                  groups={repechageQuery.data.groups}
+                  matches={repechageQuery.data.groupMatches}
+                  standings={repechageQuery.data.standings}
+                  pairLabels={repechageQuery.data.pairLabels}
+                  pairPlayerNames={repechageQuery.data.pairPlayerNames}
+                  matchRules={repechageQuery.data.matchRules}
+                  allMatches={repechageQuery.data.allMatches}
+                  slots={repechageQuery.data.slots}
+                  finishedGroupIds={repechageQuery.data.finishedGroupIds}
+                  tournamentLocked
+                  onOpenResult={openResult}
+                  onOpenPair={openPairDetail}
+                  unresolvedTies={repechageQuery.data.unresolvedTies}
+                />
+                <CuadroBoard
+                  board={toCuadroBoardView(repechageQuery.data)}
+                  isLoading={repechageQuery.isFetching}
+                  onOpenResult={openResult}
+                  onOpenPair={openPairDetail}
+                  readOnly
+                  tournamentStarted={page.tournamentStarted}
+                  tournamentLocked={tournamentLocked}
+                />
+              </>
+            ) : repechageQuery.isFetching ? (
+              <p className="text-sm text-muted-foreground">Cargando repechaje…</p>
+            ) : (
+              <EmptyState
+                icon={Trophy}
+                title="Todavía no hay parejas en el repechaje"
+                description="Cuando el club arme este subcuadro, vas a verlo acá."
+              />
+            )}
+          </TabsContent>
+        ) : null}
 
         <TabsContent value="partidos" className="space-y-3 pt-4">
           {matchesQuery.data?.notice ? (
@@ -340,26 +436,22 @@ export default function UserTournamentDetailScreen() {
           <div className="grid gap-3 md:grid-cols-2">
             {(matchesQuery.data?.groupMatches ?? []).map((match) => {
               const canOpen = canOpenMatchResult(match, false);
-              const card = (
-                <MatchCard
-                  match={match}
-                  pairALabel={(matchesQuery.data?.pairLabels ?? {})[match.pairAId ?? ""] ?? "A"}
-                  pairBLabel={(matchesQuery.data?.pairLabels ?? {})[match.pairBId ?? ""] ?? "B"}
-                  phaseLabel="Zonas"
-                  courtLabel={
-                    match.courtId ? (matchesQuery.data?.courtLabels[match.courtId] ?? null) : null
-                  }
-                />
-              );
               return (
                 <div key={match.id}>
-                  {canOpen ? (
-                    <button type="button" className="w-full text-left" onClick={() => openResult(match)}>
-                      {card}
-                    </button>
-                  ) : (
-                    card
-                  )}
+                  <MatchCard
+                    match={match}
+                    pairALabel={(matchesQuery.data?.pairLabels ?? {})[match.pairAId ?? ""] ?? "A"}
+                    pairBLabel={(matchesQuery.data?.pairLabels ?? {})[match.pairBId ?? ""] ?? "B"}
+                    phaseLabel="Zonas"
+                    courtLabel={
+                      match.courtId ? (matchesQuery.data?.courtLabels[match.courtId] ?? null) : null
+                    }
+                    onOpenResult={canOpen ? () => openResult(match) : undefined}
+                    onOpenPair={(side) => {
+                      const pairId = side === "A" ? match.pairAId : match.pairBId;
+                      if (pairId) openPairDetail(pairId);
+                    }}
+                  />
                 </div>
               );
             })}
@@ -367,7 +459,11 @@ export default function UserTournamentDetailScreen() {
           {!matchesQuery.data ? (
             <p className="text-sm text-muted-foreground">Cargando partidos…</p>
           ) : matchesQuery.data.groupMatches.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Sin partidos de zonas todavía.</p>
+            <EmptyState
+              icon={Trophy}
+              title="Sin partidos de zonas todavía"
+              description="Cuando se armen las zonas, los partidos van a aparecer acá."
+            />
           ) : null}
         </TabsContent>
       </Tabs>

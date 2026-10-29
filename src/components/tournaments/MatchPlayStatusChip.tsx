@@ -52,7 +52,7 @@ export default function MatchPlayStatusChip({
   return (
     <TooltipProvider delay={200}>
       <Tooltip>
-        <TooltipTrigger render={<span className="inline-flex" />}>
+        <TooltipTrigger render={<span className="inline-flex pointer-events-auto" />}>
           {badge}
         </TooltipTrigger>
         <TooltipContent className="max-w-xs">{hint}</TooltipContent>

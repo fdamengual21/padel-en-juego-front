@@ -377,6 +377,7 @@ export default function PairFormModal({
           ) : null}
           <PlayerPickerField
             label="Jugador 1"
+            required
             value={slot1}
             excludeIds={exclude1}
             onChange={setSlot1}
@@ -430,7 +431,12 @@ export default function PairFormModal({
           {requireAvailability && mode === "create" ? (
             <div className="space-y-3 rounded-lg border border-border p-3">
               <div>
-                <p className="text-sm font-medium">Disponibilidad</p>
+                <p className="flex items-center gap-2 text-sm font-medium">
+                  Disponibilidad
+                  <span className="text-destructive" aria-hidden>
+                    *
+                  </span>
+                </p>
                 <p className="text-xs text-muted-foreground">
                   Una franja por cada día del torneo. Solo se ajusta el horario.
                 </p>

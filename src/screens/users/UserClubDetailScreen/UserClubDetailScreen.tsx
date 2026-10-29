@@ -6,15 +6,28 @@ import { EmptyState } from "@/components/EmptyState";
 import { buttonVariants } from "@/components/ui/button";
 import { ROUTES } from "@/router/routes";
 import { cn } from "@/lib/utils";
+import HomeTournamentCard from "../components/HomeTournamentCard";
 import PublicClubFacts from "./components/PublicClubFacts";
 import PublicClubHero from "./components/PublicClubHero";
 import TodayFreeSlots from "./components/TodayFreeSlots";
+
+const UPCOMING_PAGE_SIZE = 6;
 
 export default function UserClubDetailScreen() {
   const { clubId = "" } = useParams();
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["public-club", clubId],
     queryFn: () => Api.ClubService().getPublic(clubId),
+    enabled: Boolean(clubId),
+  });
+  const tournamentsQuery = useQuery({
+    queryKey: ["public-club-tournaments", clubId],
+    queryFn: () =>
+      Api.TournamentService().listPublic({
+        clubId,
+        page: 1,
+        pageSize: UPCOMING_PAGE_SIZE,
+      }),
     enabled: Boolean(clubId),
   });
 
@@ -52,12 +65,37 @@ export default function UserClubDetailScreen() {
           </Link>
           <section className="space-y-3" data-testid="public-club-tournaments">
             <h3 className="text-lg font-semibold tracking-tight">Próximos torneos</h3>
-            <EmptyState
-              icon={Trophy}
-              title="Todavía no hay torneos próximos."
-              description="Cuando el club publique un torneo, va a aparecer acá."
-              className="min-h-40"
-            />
+            {tournamentsQuery.isError && !tournamentsQuery.data ? (
+              <EmptyState
+                tone="error"
+                icon={CircleAlert}
+                title={
+                  tournamentsQuery.error instanceof Error
+                    ? tournamentsQuery.error.message
+                    : "No se pudieron cargar los torneos."
+                }
+                className="min-h-0 py-8"
+              />
+            ) : tournamentsQuery.isLoading || !tournamentsQuery.data ? (
+              <p className="text-sm text-muted-foreground">Cargando torneos…</p>
+            ) : tournamentsQuery.data.items.length === 0 ? (
+              <EmptyState
+                icon={Trophy}
+                title="Todavía no hay torneos próximos."
+                description="Cuando el club publique un torneo, va a aparecer acá."
+                className="min-h-0 py-8"
+              />
+            ) : (
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {tournamentsQuery.data.items.map((tournament) => (
+                  <HomeTournamentCard
+                    key={tournament.id}
+                    tournament={tournament}
+                    to={ROUTES.player.tournamentDetail(tournament.id)}
+                  />
+                ))}
+              </div>
+            )}
           </section>
         </>
       ) : null}

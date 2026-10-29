@@ -12,6 +12,7 @@ export interface PublicTournamentPage {
     id: string;
     clubId: string;
     clubName: string | null;
+    clubPhone: string | null;
     name: string;
     description: string | null;
     startDate: string;
@@ -37,6 +38,7 @@ export interface PublicTournamentPage {
   };
   quotaFull: boolean;
   canRegister: boolean;
+  repechageCreated: boolean;
 }
 
 export interface PublicTournamentCategoryRef {

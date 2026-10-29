@@ -1,6 +1,11 @@
 import { useState } from "react";
 import type { CuadroBoardView, Match, MatchPhase } from "@/domain";
-import { knockoutRebuildBlockedReason, matchPairingBlockedReason } from "@/domain";
+import {
+  knockoutRebuildBlockedReason,
+  matchMoveBlockedReason,
+  matchPairingBlockedReason,
+  qualifyChangeBlockedReason,
+} from "@/domain";
 import BracketView, { displayZoneName } from "@/components/tournaments/BracketView";
 import { roundSectionLabel } from "@/lib/tournamentLabels";
 import MatchPairingModal from "./MatchPairingModal";
@@ -20,14 +25,18 @@ interface CuadroBoardProps {
   tournamentLocked?: boolean;
   onSetPairing?: (input: {
     matchId: string;
-    pairAId: string;
-    pairBId: string;
+    pairAId: string | null;
+    pairBId: string | null;
     note: string | null;
   }) => Promise<void> | void;
   pairingSavingMatchId?: string | null;
-  onMovePair?: (input: { pairId: string; phase: MatchPhase }) => Promise<void> | void;
+  onMovePair?: (input: {
+    pairId: string;
+    phase?: MatchPhase;
+    groupId?: string;
+  }) => Promise<void> | void;
   moveSaving?: boolean;
-  onQualifyPair?: (input: { matchId: string; pairId: string }) => Promise<void> | void;
+  onQualifyPair?: (input: { matchId: string; pairId: string | null }) => Promise<void> | void;
   qualifySaving?: boolean;
 }
 
@@ -60,14 +69,8 @@ export default function CuadroBoard({
   const knockoutPhases = sortedRounds
     .map((round) => round.type)
     .filter((phase): phase is MatchPhase => phase !== "GROUP");
-  const pairingMatch =
-    pairingMatchId != null
-      ? (board.elimMatches.find((m) => m.id === pairingMatchId) ?? null)
-      : null;
-  const movingMatch =
-    movingMatchId != null
-      ? (board.elimMatches.find((m) => m.id === movingMatchId) ?? null)
-      : null;
+  const pairingMatch = findBoardMatch(board, pairingMatchId);
+  const movingMatch = findBoardMatch(board, movingMatchId);
   const movingPairs = [movingMatch?.pairAId, movingMatch?.pairBId]
     .filter((id): id is string => Boolean(id))
     .map((pairId) => ({ pairId, names: pairMoveNames(pairId, board) }));
@@ -78,6 +81,12 @@ export default function CuadroBoard({
   const qualifyingPairs = [qualifyingMatch?.pairAId, qualifyingMatch?.pairBId]
     .filter((id): id is string => Boolean(id))
     .map((pairId) => ({ pairId, names: pairMoveNames(pairId, board) }));
+  const pairingLockedReason = pairingMatch
+    ? qualifyChangeBlockedReason(pairingMatch, board.elimMatches, board.slots)
+    : null;
+  const qualifyingLockedReason = qualifyingMatch
+    ? qualifyChangeBlockedReason(qualifyingMatch, board.elimMatches, board.slots)
+    : null;
   const qualifyingRound = qualifyingMatch
     ? (board.rounds.find((r) => r.id === qualifyingMatch.roundId) ?? null)
     : null;
@@ -157,11 +166,13 @@ export default function CuadroBoard({
         }
         onMovePair={canMovePairs ? (match) => setMovingMatchId(match.id) : undefined}
         moveBlockedReason={(match) =>
-          pairMoveBlockedReason(
+          matchMoveBlockedReason(
             match,
             board.slots,
+            tournamentStarted,
             board.knockoutStructure?.rebuildBlockedReason ??
               knockoutRebuildBlockedReason(board.elimMatches, board.slots),
+            board.groupMatches,
           )
         }
         heightClassName="h-[720px]"
@@ -172,16 +183,29 @@ export default function CuadroBoard({
           open={Boolean(pairingMatch)}
           match={pairingMatch}
           roundLabel={
-            pairingRound ? roundSectionLabel(pairingRound.type, pairingRound.name) : "Ronda"
+            pairingMatch?.phase === "GROUP" && pairingMatch.groupId
+              ? displayZoneName(
+                  board.groups.find((group) => group.id === pairingMatch.groupId)?.name ?? "Zona",
+                )
+              : pairingRound
+                ? roundSectionLabel(pairingRound.type, pairingRound.name)
+                : "Ronda"
           }
           roundMatches={
-            pairingMatch
-              ? board.elimMatches.filter((m) => m.roundId === pairingMatch.roundId)
-              : []
+            pairingMatch?.phase === "GROUP" && pairingMatch.groupId
+              ? board.groupMatches.filter((item) => item.groupId === pairingMatch.groupId)
+              : pairingMatch
+                ? board.elimMatches.filter((item) => item.roundId === pairingMatch.roundId)
+                : []
           }
-          candidateIds={board.pairingCandidates}
+          candidateIds={
+            pairingMatch?.phase === "GROUP" && pairingMatch.groupId
+              ? (board.groups.find((group) => group.id === pairingMatch.groupId)?.pairIds ?? [])
+              : (board.pairingCandidates ?? [])
+          }
           pairLabels={board.pairLabels}
           isSubmitting={pairingMatch != null && pairingSavingMatchId === pairingMatch.id}
+          lockedReason={pairingLockedReason}
           onOpenChange={(open) => {
             if (!open) setPairingMatchId(null);
           }}
@@ -191,7 +215,7 @@ export default function CuadroBoard({
             setPairingMatchId(null);
           }}
           onQualify={
-            onQualifyPair && pairingMatch
+            onQualifyPair && pairingMatch?.roundId
               ? () => {
                   setQualifyingMatchId(pairingMatch.id);
                   setPairingMatchId(null);
@@ -212,11 +236,18 @@ export default function CuadroBoard({
           nextRoundLabel={nextQualifyPhase ? roundSectionLabel(nextQualifyPhase) : null}
           pairs={qualifyingPairs}
           isSubmitting={qualifySaving}
+          lockedReason={qualifyingLockedReason}
+          alreadyClassified={qualifyingMatch?.status === "walkover"}
+          initialPairId={qualifyingMatch?.winnerPairId ?? qualifyingMatch?.pairAId ?? qualifyingMatch?.pairBId}
           onOpenChange={(open) => {
             if (!open) setQualifyingMatchId(null);
           }}
           onSubmit={async (pairId) => {
             if (!qualifyingMatch) return;
+            if (pairId == null && qualifyingMatch.status !== "walkover") {
+              setQualifyingMatchId(null);
+              return;
+            }
             await onQualifyPair({ matchId: qualifyingMatch.id, pairId });
             setQualifyingMatchId(null);
           }}
@@ -229,17 +260,35 @@ export default function CuadroBoard({
           pairs={movingPairs}
           currentPhase={movingMatch?.phase ?? null}
           phases={knockoutPhases}
+          groups={board.groups.map((group) => ({
+            id: group.id,
+            name: displayZoneName(group.name),
+            pairCount: group.pairIds.length,
+          }))}
+          currentGroupId={movingMatch?.groupId ?? null}
+          pairGroupIds={Object.fromEntries(
+            board.groups.flatMap((group) => group.pairIds.map((pairId) => [pairId, group.id])),
+          )}
           isSubmitting={moveSaving}
           onOpenChange={(open) => {
             if (!open) setMovingMatchId(null);
           }}
-          onSubmit={async ({ pairId, phase }) => {
-            await onMovePair({ pairId, phase });
+          onSubmit={async ({ pairId, phase, groupId }) => {
+            await onMovePair({ pairId, phase, groupId });
             setMovingMatchId(null);
           }}
         />
       ) : null}
     </div>
+  );
+}
+
+function findBoardMatch(board: CuadroBoardView, matchId: string | null): Match | null {
+  if (!matchId) return null;
+  return (
+    board.elimMatches.find((match) => match.id === matchId) ??
+    board.groupMatches.find((match) => match.id === matchId) ??
+    null
   );
 }
 
@@ -251,22 +300,4 @@ function pairMoveNames(pairId: string, board: CuadroBoardView): [string, string]
   const parts = label.split(/\s*\/\s*/).map((part) => part.trim()).filter(Boolean);
   if (parts.length >= 2) return [parts[0], parts[1]];
   return [label, ""];
-}
-
-function pairMoveBlockedReason(
-  match: Match,
-  slots: CuadroBoardView["slots"],
-  rebuildBlockedReason: string | null,
-): string | null {
-  if (rebuildBlockedReason) return rebuildBlockedReason;
-  if (match.status === "finished" || match.status === "inProgress") {
-    return "Esa pareja ya jugó en esta ronda.";
-  }
-  if (match.status === "walkover") {
-    const bye = slots.some((slot) => slot.matchId === match.id && slot.sourceType === "BYE");
-    if (!bye) return "Esa pareja ya jugó en esta ronda.";
-  }
-  if (match.status === "cancelled") return "Ese partido no está en el cuadro.";
-  if (!match.pairAId && !match.pairBId) return "Todavía no hay una pareja en este cruce.";
-  return null;
 }

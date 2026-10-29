@@ -1,8 +1,10 @@
 import { toPublicCuadroBoard } from "../helpers/toPublicCuadroBoard";
 import { toPublicMatchesBoard } from "../helpers/toPublicMatchesBoard";
 import { toPublicParticipantsBoard } from "../helpers/toPublicParticipantsBoard";
+import { toPublicRepechageBoard } from "../helpers/toPublicRepechageBoard";
 import { toPublicZonesBoard } from "../helpers/toPublicZonesBoard";
 import type { ITournamentOpsRepository } from "../repositories/TournamentOpsRepository";
+import type { RepechageEntriesInput } from "@/domain";
 import type { GenerateGroupsConfig, MatchResultInput } from "../types";
 
 export class TournamentOpsService {
@@ -70,6 +72,22 @@ export class TournamentOpsService {
 
   getConfigBoard(categoryId: string) {
     return this.repository.getConfigBoard(categoryId);
+  }
+
+  getRepechageBoard(categoryId: string) {
+    return this.repository.getRepechageBoard(categoryId);
+  }
+
+  listRepechageCandidates(categoryId: string) {
+    return this.repository.listRepechageCandidates(categoryId);
+  }
+
+  createRepechage(categoryId: string) {
+    return this.repository.createRepechage(categoryId);
+  }
+
+  saveRepechageEntries(categoryId: string, input: RepechageEntriesInput) {
+    return this.repository.saveRepechageEntries(categoryId, input);
   }
 
   generateGroups(categoryId: string, config: GenerateGroupsConfig) {
@@ -340,6 +358,10 @@ export class TournamentOpsService {
     return toPublicCuadroBoard(await this.repository.getPublicCuadroBoard(categoryId));
   }
 
+  async getPublicRepechageBoard(categoryId: string) {
+    return toPublicRepechageBoard(await this.repository.getPublicRepechageBoard(categoryId));
+  }
+
   async getPublicZonesBoard(categoryId: string) {
     return toPublicZonesBoard(await this.repository.getPublicZonesBoard(categoryId));
   }
@@ -413,13 +435,13 @@ export class TournamentOpsService {
   /** Fija a mano las parejas de un cruce de eliminación sin jugar. */
   setMatchPairing(
     matchId: string,
-    input: { pairAId: string; pairBId: string; note: string | null },
+    input: { pairAId: string | null; pairBId: string | null; note: string | null },
   ) {
     return this.repository.setMatchPairing(matchId, input);
   }
 
-  /** Marca que una pareja pasa este cruce sin jugar. */
-  qualifyMatchPair(matchId: string, pairId: string) {
+  /** Marca que una pareja pasa este cruce sin jugar, o saca esa marca si pairId va null. */
+  qualifyMatchPair(matchId: string, pairId: string | null) {
     return this.repository.qualifyMatchPair(matchId, pairId);
   }
 
@@ -433,7 +455,7 @@ export class TournamentOpsService {
 
   movePairToKnockoutPhase(
     categoryId: string,
-    input: { pairId: string; phase: import("@/domain").MatchPhase },
+    input: { pairId: string; phase?: import("@/domain").MatchPhase; groupId?: string },
   ) {
     return this.repository.movePairToKnockoutPhase(categoryId, input);
   }
@@ -445,7 +467,7 @@ export class TournamentOpsService {
     return this.repository.updateCategory(id, patch);
   }
 
-  upsertRuleset(ruleset: import("@/domain").TournamentRuleset) {
+  upsertRuleset(ruleset: Omit<import("@/domain").TournamentRuleset, "id">) {
     return this.repository.upsertRuleset(ruleset);
   }
 }

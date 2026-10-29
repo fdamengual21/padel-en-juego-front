@@ -47,9 +47,9 @@ interface RoundMatchesTableProps {
   emptyLabel?: string;
   onOpenMatch?: (matchId: string) => void;
   onOpenPair?: (pairId: string) => void;
-  /** Cruce manual (eliminación). Si falta, no se muestra el lápiz. */
+  /** Cruce manual. Si falta, no se muestra el lápiz. */
   onEditPairing?: (matchId: string) => void;
-  /** Abrir el modal para mover una pareja de este cruce. No se usa en zonas. */
+  /** Abrir el modal para mover una pareja de este cruce. */
   onMovePair?: (matchId: string) => void;
 }
 
@@ -65,7 +65,8 @@ export default function RoundMatchesTable({
   onEditPairing,
   onMovePair,
 }: RoundMatchesTableProps) {
-  const colCount = showIndexColumn ? 5 : 4;
+  const showActions = Boolean(onEditPairing || onMovePair);
+  const colCount = (showIndexColumn ? 5 : 4) + (showActions ? 1 : 0);
 
   return (
     <table className="w-full border-collapse text-[10px]">
@@ -88,6 +89,11 @@ export default function RoundMatchesTable({
           <th className="px-1.5 py-2 text-right font-bold uppercase tracking-wide whitespace-nowrap">
             Resultado
           </th>
+          {showActions ? (
+            <th className="px-1.5 py-2 text-left font-bold uppercase tracking-wide whitespace-nowrap">
+              Acciones
+            </th>
+          ) : null}
         </tr>
       </thead>
       <tbody>
@@ -156,38 +162,6 @@ export default function RoundMatchesTable({
                       </Tooltip>
                     </TooltipProvider>
                   ) : null}
-                  {onEditPairing && row.pairingBlockedReason !== undefined ? (
-                    <TooltipProvider delay={200}>
-                      <Tooltip>
-                        <TooltipTrigger render={<span className="ml-auto inline-flex" />}>
-                          <button
-                            type="button"
-                            aria-label="Modificar cruce"
-                            data-testid={`edit-pairing-${row.matchId}`}
-                            disabled={row.pairingBlockedReason != null}
-                            className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              if (row.pairingBlockedReason != null) return;
-                              onEditPairing(row.matchId);
-                            }}
-                          >
-                            <Pencil className="h-3 w-3" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-xs">
-                          {row.pairingBlockedReason ?? "Modificar cruce: elegir a mano las dos parejas."}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  ) : null}
-                  {onMovePair && row.moveBlockedReason !== undefined ? (
-                    <MovePairButton
-                      matchId={row.matchId}
-                      blockedReason={row.moveBlockedReason}
-                      onMovePair={onMovePair}
-                    />
-                  ) : null}
                 </div>
               </td>
               <td className="px-1.5 py-1 align-middle text-right">
@@ -200,6 +174,44 @@ export default function RoundMatchesTable({
                   />
                 </div>
               </td>
+              {showActions ? (
+                <td className="px-1.5 py-1 align-middle">
+                  <div className="flex items-center gap-1">
+                    {onEditPairing && row.pairingBlockedReason !== undefined ? (
+                      <TooltipProvider delay={200}>
+                        <Tooltip>
+                          <TooltipTrigger render={<span className="inline-flex" />}>
+                            <button
+                              type="button"
+                              aria-label="Modificar cruce"
+                              data-testid={`edit-pairing-${row.matchId}`}
+                              disabled={row.pairingBlockedReason != null}
+                              className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                if (row.pairingBlockedReason != null) return;
+                                onEditPairing(row.matchId);
+                              }}
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            {row.pairingBlockedReason ?? "Modificar cruce: elegir a mano las dos parejas."}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    ) : null}
+                    {onMovePair && row.moveBlockedReason !== undefined ? (
+                      <MovePairButton
+                        matchId={row.matchId}
+                        blockedReason={row.moveBlockedReason}
+                        onMovePair={onMovePair}
+                      />
+                    ) : null}
+                  </div>
+                </td>
+              ) : null}
             </tr>
           ))
         )}
@@ -236,7 +248,7 @@ function MovePairButton({
           </button>
         </TooltipTrigger>
         <TooltipContent className="max-w-xs">
-          {blockedReason ?? "Mover una pareja a otra ronda de eliminación."}
+          {blockedReason ?? "Mover una pareja a otra ronda o zona."}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

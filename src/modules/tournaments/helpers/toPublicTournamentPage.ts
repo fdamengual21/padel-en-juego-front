@@ -38,6 +38,7 @@ export function toPublicTournamentPage(dto: PublicTournamentPageDto): PublicTour
       id: dto.tournament.id,
       clubId: dto.tournament.clubId,
       clubName: dto.tournament.clubName ?? null,
+      clubPhone: dto.tournament.clubPhone ?? null,
       name: dto.tournament.name,
       description: dto.tournament.description ?? null,
       startDate: dto.tournament.startDate,
@@ -63,6 +64,7 @@ export function toPublicTournamentPage(dto: PublicTournamentPageDto): PublicTour
     },
     quotaFull: Boolean(dto.quotaFull),
     canRegister: Boolean(dto.canRegister),
+    repechageCreated: Boolean(dto.repechageCreated),
   };
 }
 

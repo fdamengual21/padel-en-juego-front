@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CircleAlert } from "lucide-react";
+import { ChevronRight, CircleAlert, Trophy } from "lucide-react";
 import Api from "@/api/Api";
 import { useMockSession } from "@/app/MockSessionProvider";
 import { useUser } from "@/app/UserProvider";
@@ -55,19 +55,39 @@ export default function UserHomeScreen() {
       </div>
 
       <section className="space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="text-sm font-medium text-foreground">Próximos torneos</h3>
-          <Link
-            to={ROUTES.player.tournaments}
-            className="text-xs font-medium text-muted-foreground underline-offset-4 hover:underline"
-          >
-            Ver todos
-          </Link>
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+            <Trophy className="size-4" aria-hidden />
+          </span>
+          <h3 className="text-lg font-semibold tracking-tight text-foreground">
+            Próximos torneos
+          </h3>
+          {data && data.upcomingTournaments.length > 0 ? (
+            <Link
+              to={ROUTES.player.tournaments}
+              className="inline-flex items-center text-sm font-medium text-primary-strong underline-offset-4 hover:underline"
+            >
+              Ver todos
+              <ChevronRight className="size-4" aria-hidden />
+            </Link>
+          ) : null}
         </div>
         {isLoading || !data ? (
           <p className="text-sm text-muted-foreground">Cargando torneos…</p>
         ) : data.upcomingTournaments.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No hay torneos próximos.</p>
+          <EmptyState
+            icon={Trophy}
+            title="No hay torneos próximos"
+            description="Cuando haya torneos cerca, van a aparecer acá."
+            className="min-h-0 py-8"
+          >
+            <Link
+              to={ROUTES.player.tournaments}
+              className={cn(buttonVariants({ variant: "outline" }), "h-9")}
+            >
+              Ver torneos
+            </Link>
+          </EmptyState>
         ) : (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {data.upcomingTournaments.map((tournament) => (

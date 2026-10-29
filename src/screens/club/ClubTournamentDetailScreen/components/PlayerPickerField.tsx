@@ -95,6 +95,7 @@ interface PlayerPickerFieldProps {
   label: string;
   value: PlayerSlotValue;
   excludeIds?: string[];
+  required?: boolean;
   onChange: (value: PlayerSlotValue) => void;
 }
 
@@ -102,6 +103,7 @@ export default function PlayerPickerField({
   label,
   value,
   excludeIds = [],
+  required = false,
   onChange,
 }: PlayerPickerFieldProps) {
   const [query, setQuery] = useState("");
@@ -129,11 +131,19 @@ export default function PlayerPickerField({
   const pendingSearch =
     query.trim().length >= 2 &&
     (isSearching || query.trim() !== debouncedQuery.trim());
+  const requiredMark = required ? (
+    <span className="text-destructive" aria-hidden>
+      *
+    </span>
+  ) : null;
 
   if (selected) {
     return (
       <div className="space-y-1.5">
-        <Label>{label}</Label>
+        <Label>
+          {label}
+          {requiredMark}
+        </Label>
         <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
           <div className="min-w-0">
             <p className="truncate text-sm font-medium">{selected.displayName}</p>
@@ -158,7 +168,10 @@ export default function PlayerPickerField({
   if (manualOpen) {
     return (
       <div className="space-y-2">
-        <Label>{label}</Label>
+        <Label>
+          {label}
+          {requiredMark}
+        </Label>
         <div
           className={cn(
             "space-y-2 rounded-lg border border-dashed border-border p-3",
@@ -225,7 +238,10 @@ export default function PlayerPickerField({
 
   return (
     <div className="space-y-2">
-      <Label htmlFor={`player-search-${label}`}>{label}</Label>
+      <Label htmlFor={`player-search-${label}`}>
+        {label}
+        {requiredMark}
+      </Label>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <div className="relative min-w-0 flex-1">
           <Input

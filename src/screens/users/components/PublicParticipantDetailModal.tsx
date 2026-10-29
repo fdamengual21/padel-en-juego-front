@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { LoaderCircle } from "lucide-react";
 import Avatar from "@/components/Avatar";
+import PhoneWhatsApp from "@/components/PhoneWhatsApp";
 import {
   Dialog,
   DialogContent,
@@ -96,9 +97,11 @@ export default function PublicParticipantDetailModal({
                         <dd className="text-right">{player.side}</dd>
                       </div>
                       {player.phone ? (
-                        <div className="flex items-baseline justify-between gap-3">
+                        <div className="flex items-center justify-between gap-3">
                           <dt className="text-muted-foreground">Teléfono</dt>
-                          <dd className="text-right">{player.phone}</dd>
+                          <dd className="min-w-0 text-right">
+                            <PhoneWhatsApp phone={player.phone} />
+                          </dd>
                         </div>
                       ) : null}
                     </dl>

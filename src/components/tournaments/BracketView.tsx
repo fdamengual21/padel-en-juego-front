@@ -26,8 +26,8 @@ import { matchPlayStatusHint, resolveMatchPlayStatus } from "@/lib/matchPlayStat
 import { roundSectionLabel } from "@/lib/tournamentLabels";
 import { cn } from "@/lib/utils";
 
-const ZONE_W = 680;
-const ROUND_W = 680;
+const ZONE_W = 760;
+const ROUND_W = 760;
 const COL_GAP = 64;
 const ROW_GAP = 28;
 const HEADER_H = 44;
@@ -48,11 +48,11 @@ interface BracketViewProps {
   /** Si es false, la fila solo abre cuando el partido ya tiene resultado. */
   canEditResult?: boolean;
   onOpenPair?: (pairId: string) => void;
-  /** Cruce manual en partidos de eliminación. Si falta, no se muestra la opción. */
+  /** Cruce manual. Si falta, no se muestra la opción. */
   onEditPairing?: (match: Match) => void;
   /** Motivo por el que un cruce no se puede modificar; null si se puede. */
   pairingBlockedReason?: (match: Match) => string | null;
-  /** Mover pareja entre rondas de eliminación. Si falta, no se muestra. */
+  /** Mover pareja a otra ronda o zona. Si falta, no se muestra. */
   onMovePair?: (match: Match) => void;
   /** Motivo por el que no se puede mover; null si se puede. */
   moveBlockedReason?: (match: Match) => string | null;
@@ -160,6 +160,7 @@ function resolvePairLabel(
   }
   if (slot.sourceType === "MATCH_WINNER") return "Ganador";
   if (slot.sourceType === "MATCH_LOSER") return "Perdedor";
+  if (slot.sourceType === "BYE") return "Sin rival";
   return "Por definir";
 }
 
@@ -285,6 +286,14 @@ export default function BracketView({
             playStatus: resolveMatchPlayStatus(match, matchRules),
             statusHint: matchPlayStatusHint(match, slots, pairLabels),
             canOpen: Boolean(onMatchClick && canOpenMatchResult(match, canEditResult)),
+            pairingManual: match.pairingManual,
+            pairingNote: match.pairingNote,
+            pairingBlockedReason: onEditPairing
+              ? (pairingBlockedReason?.(match) ?? null)
+              : undefined,
+            moveBlockedReason: onMovePair
+              ? (moveBlockedReason?.(match) ?? null)
+              : undefined,
           };
         });
         const h = tableNodeHeight(rows.length);
@@ -305,6 +314,8 @@ export default function BracketView({
             testId: `zone-table-node-${displayZoneName(group.name)}`,
             onOpenMatch: openMatchHandler(zoneMatches, onMatchClick),
             onOpenPair,
+            onEditPairing: openMatchHandler(zoneMatches, onEditPairing),
+            onMovePair: openMatchHandler(zoneMatches, onMovePair),
           } satisfies MatchesTableNodeData,
           sourcePosition: Position.Right,
           draggable: false,

@@ -1,12 +1,17 @@
+import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import Api from "@/api/Api";
 import { useMockSession } from "@/app/MockSessionProvider";
 import { emptyPlayerDashboard } from "@/modules/auth";
 import RequirePlayerAuth from "@/components/auth/RequirePlayerAuth";
-import MatchCard from "@/components/tournaments/MatchCard";
+import PlayerMatchCard from "@/components/tournaments/PlayerMatchCard";
+import PlayerMatchResultDialog from "@/components/tournaments/PlayerMatchResultDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { PlayerMatchView } from "@/domain";
 import { ROUTES } from "@/router/routes";
+import PublicParticipantDetailModal from "@/screens/users/components/PublicParticipantDetailModal";
+import { usePublicPairDetail } from "@/screens/users/hooks/usePublicPairDetail";
 import PlayerAccountPanel from "./components/PlayerAccountPanel";
 import PlayerHomeHeader from "./components/PlayerHomeHeader";
 import PlayerHomeStats from "./components/PlayerHomeStats";
@@ -19,6 +24,8 @@ function parseTab(value: string | null): ProfileTab {
 
 export default function UserProfileScreen() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const [resultMatch, setResultMatch] = useState<PlayerMatchView | null>(null);
+  const pairDetail = usePublicPairDetail();
   const activeTab = parseTab(searchParams.get("tab"));
   const { playerId, player, hasApiSession } = useMockSession();
   const { data, isLoading, isError } = useQuery({
@@ -98,12 +105,12 @@ export default function UserProfileScreen() {
                     </Link>
                   </div>
                   {dashboard.nextMatch ? (
-                    <MatchCard
-                      match={dashboard.nextMatch.match}
-                      pairALabel={dashboard.nextMatch.pairALabel}
-                      pairBLabel={dashboard.nextMatch.pairBLabel}
-                      courtLabel={dashboard.nextMatch.courtLabel}
-                      phaseLabel={dashboard.nextMatch.phaseLabel}
+                    <PlayerMatchCard
+                      item={dashboard.nextMatch}
+                      onOpenResult={setResultMatch}
+                      onOpenPair={(item, pairId) =>
+                        pairDetail.openPair(item.match.tournamentCategoryId, pairId)
+                      }
                     />
                   ) : (
                     <p className="text-sm text-muted-foreground">
@@ -130,13 +137,13 @@ export default function UserProfileScreen() {
                     </p>
                   ) : (
                     dashboard.recentMatches.map((item) => (
-                      <MatchCard
+                      <PlayerMatchCard
                         key={item.match.id}
-                        match={item.match}
-                        pairALabel={item.pairALabel}
-                        pairBLabel={item.pairBLabel}
-                        courtLabel={item.courtLabel}
-                        phaseLabel={item.phaseLabel}
+                        item={item}
+                        onOpenResult={setResultMatch}
+                        onOpenPair={(matchItem, pairId) =>
+                          pairDetail.openPair(matchItem.match.tournamentCategoryId, pairId)
+                        }
                       />
                     ))
                   )}
@@ -147,6 +154,22 @@ export default function UserProfileScreen() {
                 <PlayerAccountPanel player={dashboard.player} />
               </TabsContent>
             </Tabs>
+
+            <PlayerMatchResultDialog
+              item={resultMatch}
+              onOpenChange={(open) => {
+                if (!open) setResultMatch(null);
+              }}
+            />
+            <PublicParticipantDetailModal
+              open={pairDetail.row !== null}
+              row={pairDetail.row}
+              categoryId={pairDetail.categoryId}
+              categoryName={null}
+              onOpenChange={(open) => {
+                if (!open) pairDetail.close();
+              }}
+            />
           </>
         )}
       </RequirePlayerAuth>

@@ -12,6 +12,7 @@ export interface PublicTournamentListQuery {
   q?: string | null;
   provinceId?: number | null;
   municipalityId?: number | null;
+  clubId?: string | null;
   page?: number;
   pageSize?: number;
 }
@@ -49,6 +50,7 @@ function asTournament(raw: Tournament): Tournament {
     format: asTournamentFormat(raw.format),
     registrationFee: Number(raw.registrationFee ?? 0),
     clubName: raw.clubName ?? null,
+    clubPhone: raw.clubPhone ?? null,
     clubAvatarUrl: raw.clubAvatarUrl ?? null,
     clubCoverUrl: raw.clubCoverUrl ?? null,
     bannerUrl: raw.bannerUrl ?? null,
@@ -104,6 +106,7 @@ export class TournamentRepository implements ITournamentRepository {
           q: query.q?.trim() || undefined,
           provinceId: query.provinceId ?? undefined,
           municipalityId: query.municipalityId ?? undefined,
+          clubId: query.clubId?.trim() || undefined,
           page,
           pageSize,
         },

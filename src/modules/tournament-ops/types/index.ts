@@ -32,6 +32,8 @@ export type { PublicParticipantsBoard, PublicParticipantRow } from './publicPart
 export type { PublicParticipantsBoardDto } from './publicParticipantsBoardDto'
 export type { PublicCuadroBoard } from './publicCuadroBoard'
 export type { PublicCuadroBoardDto } from './publicCuadroBoardDto'
+export type { PublicRepechageBoard } from './publicRepechageBoard'
+export type { PublicRepechageBoardDto } from './publicRepechageBoardDto'
 export type { PublicMatchesBoard } from './publicMatchesBoard'
 export type { PublicMatchesBoardDto } from './publicMatchesBoardDto'
 export type { PlayerPlayedItem } from './playerPlayedItem'
