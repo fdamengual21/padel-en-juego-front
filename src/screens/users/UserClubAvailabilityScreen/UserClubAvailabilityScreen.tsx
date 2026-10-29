@@ -32,6 +32,7 @@ import {
   toFreeSlotBlock,
   toFreeSlotListItem,
   slotEventId,
+  slotsAtSameStart,
 } from "./publicDayAvailability";
 
 dayjs.locale("es");
@@ -47,7 +48,10 @@ export default function UserClubAvailabilityScreen() {
     return parsed.isValid() ? parsed : dayjs();
   });
   const [intent, setIntent] = useState<PublicClubSlot | "browse" | null>(null);
-  const [listDate, setListDate] = useState<string | null>(null);
+  const [slotList, setSlotList] = useState<{
+    dateKey: string;
+    startsAt: string | null;
+  } | null>(null);
 
   const detailQuery = useQuery({
     queryKey: ["public-club", clubId],
@@ -93,7 +97,7 @@ export default function UserClubAvailabilityScreen() {
 
   useEffect(() => {
     setIntent(null);
-    setListDate(null);
+    setSlotList(null);
   }, [cursorDate, mode, courtFilter]);
 
   const openHours = useMemo(() => openHoursOf(club?.openTime, club?.closeTime, club?.openDays ?? []), [club]);
@@ -153,19 +157,34 @@ export default function UserClubAvailabilityScreen() {
     if (slot) setIntent(slot);
   };
 
-  const listedDay = daySummaries.find((summary) => summary.dateKey === listDate) ?? null;
+  const listedDay =
+    daySummaries.find((summary) => summary.dateKey === slotList?.dateKey) ?? null;
+  const listedSlots = listedDay
+    ? slotList?.startsAt
+      ? slotsAtSameStart(listedDay.freeSlots, slotList.startsAt)
+      : listedDay.freeSlots
+    : [];
 
   const openDayList = (dateKey: string) => {
     const summary = daySummaries.find((item) => item.dateKey === dateKey);
     if (!summary || summary.freeSlots.length === 0) return;
-    setListDate(dateKey);
+    setSlotList({ dateKey, startsAt: null });
   };
 
-  const openEventDayList = (eventId: string) => {
+  const openEventSlotList = (eventId: string) => {
+    const slot = slotsById.get(eventId);
+    if (!slot) return;
     const summary = daySummaries.find((item) =>
-      item.freeSlots.some((slot) => slotEventId(slot) === eventId),
+      item.freeSlots.some((itemSlot) => slotEventId(itemSlot) === eventId),
     );
-    if (summary) openDayList(summary.dateKey);
+    if (!summary) return;
+    const atHour = slotsAtSameStart(summary.freeSlots, slot.startsAt);
+    if (atHour.length === 1) {
+      setIntent(atHour[0]);
+      return;
+    }
+    if (atHour.length === 0) return;
+    setSlotList({ dateKey: summary.dateKey, startsAt: slot.startsAt });
   };
 
   const bookableSlots = useMemo(
@@ -297,16 +316,17 @@ export default function UserClubAvailabilityScreen() {
                   closeHour={openHours.closeHour}
                   jornada={openHours.jornada}
                   dayNotes={dayNotes}
-                  onSelectEvent={openEventDayList}
+                  onSelectEvent={openEventSlotList}
                   onDayNoteClick={(day) => openDayList(day.format("YYYY-MM-DD"))}
                 />
               )}
               <DayFreeSlotsDialog
-                dateKey={listDate}
-                slots={listedDay?.freeSlots ?? []}
-                onClose={() => setListDate(null)}
+                dateKey={slotList?.dateKey ?? null}
+                startsAt={slotList?.startsAt ?? null}
+                slots={listedSlots}
+                onClose={() => setSlotList(null)}
                 onSelect={(slot) => {
-                  setListDate(null);
+                  setSlotList(null);
                   setIntent(slot);
                 }}
               />

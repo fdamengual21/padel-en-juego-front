@@ -11,6 +11,8 @@ import type { PublicClubSlot } from "@/modules/clubs";
 
 interface DayFreeSlotsDialogProps {
   dateKey: string | null;
+  /** Si viene, el listado es de esa hora (mismas canchas), no de todo el día. */
+  startsAt?: string | null;
   slots: PublicClubSlot[];
   onClose: () => void;
   onSelect: (slot: PublicClubSlot) => void;
@@ -18,6 +20,7 @@ interface DayFreeSlotsDialogProps {
 
 export default function DayFreeSlotsDialog({
   dateKey,
+  startsAt,
   slots,
   onClose,
   onSelect,
@@ -26,7 +29,9 @@ export default function DayFreeSlotsDialog({
   if (!day?.isValid()) return null;
 
   const label = `${day.format("dddd")} ${day.format("D [de] MMMM")}`;
-  const title = label.charAt(0).toUpperCase() + label.slice(1);
+  const dayTitle = label.charAt(0).toUpperCase() + label.slice(1);
+  const clock = startsAt ? dayjs(startsAt) : null;
+  const hourLabel = clock?.isValid() ? clock.format("HH:mm") : null;
 
   return (
     <Dialog
@@ -37,11 +42,21 @@ export default function DayFreeSlotsDialog({
     >
       <DialogContent className="sm:max-w-md" data-testid="public-day-slot-list">
         <DialogHeader>
-          <DialogTitle>Turnos del {title}</DialogTitle>
-          <DialogDescription>Elegí un horario libre para pedirlo.</DialogDescription>
+          <DialogTitle>
+            {hourLabel ? `Turnos a las ${hourLabel}` : `Turnos del ${dayTitle}`}
+          </DialogTitle>
+          <DialogDescription>
+            {hourLabel
+              ? `${dayTitle}. Elegí una cancha libre para pedirla.`
+              : "Elegí un horario libre para pedirlo."}
+          </DialogDescription>
         </DialogHeader>
         {slots.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No quedan turnos libres ese día.</p>
+          <p className="text-sm text-muted-foreground">
+            {hourLabel
+              ? "No quedan turnos libres a esa hora."
+              : "No quedan turnos libres ese día."}
+          </p>
         ) : (
           <ul className="max-h-80 space-y-1 overflow-auto">
             {slots.map((slot) => (

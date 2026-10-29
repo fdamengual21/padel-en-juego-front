@@ -19,6 +19,17 @@ export function slotEventId(slot: PublicClubSlot): string {
   return `${slot.courtId}|${slot.startsAt}`;
 }
 
+/** Turnos libres que arrancan el mismo minuto. */
+export function slotsAtSameStart(
+  slots: readonly PublicClubSlot[],
+  startsAt: string,
+): PublicClubSlot[] {
+  const start = dayjs(startsAt);
+  if (!start.isValid()) return [];
+  const key = start.format("YYYY-MM-DDTHH:mm");
+  return slots.filter((slot) => dayjs(slot.startsAt).format("YYYY-MM-DDTHH:mm") === key);
+}
+
 /** Un resumen por día de apertura. Los días cerrados del predio no entran. */
 export function summarizeOpenDays(
   days: readonly Dayjs[],
