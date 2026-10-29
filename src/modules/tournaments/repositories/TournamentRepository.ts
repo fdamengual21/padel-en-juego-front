@@ -3,6 +3,8 @@ import { readData } from "@/config/axiosInstance";
 import type { PaginatedResult, TournamentCard } from "@/domain";
 import { asTournamentFormat } from "@/domain";
 import type { ApiEnvelope } from "@/lib/apiClient";
+import { resolveClubHeaderId } from "@/modules/auth/clubContext";
+import { useAuthStore } from "@/stores/authStore";
 import { normalizeTournamentCardPage } from "../mapTournamentCard";
 import type { CreateTournamentRequest, PublicTournamentPageDto, Tournament } from "../types";
 
@@ -33,6 +35,8 @@ export interface ITournamentRepository {
     id: string,
     patch: Partial<Omit<Tournament, "id" | "createdAt" | "clubId">>,
   ): Promise<Tournament>;
+  uploadBanner(id: string, file: File): Promise<Tournament>;
+  deleteBanner(id: string): Promise<Tournament>;
 }
 
 function asTournament(raw: Tournament): Tournament {
@@ -47,6 +51,7 @@ function asTournament(raw: Tournament): Tournament {
     clubName: raw.clubName ?? null,
     clubAvatarUrl: raw.clubAvatarUrl ?? null,
     clubCoverUrl: raw.clubCoverUrl ?? null,
+    bannerUrl: raw.bannerUrl ?? null,
     myRegistrationStatus: raw.myRegistrationStatus ?? null,
     phaseDays: raw.phaseDays ?? [],
   };
@@ -140,6 +145,34 @@ export class TournamentRepository implements ITournamentRepository {
       `/club/tournaments/${id}`,
       patch,
     );
+    return asTournament(readData(response));
+  }
+
+  uploadBanner(id: string, file: File) {
+    return this.sendBanner(`/club/tournaments/${id}/banner`, file);
+  }
+
+  async deleteBanner(id: string): Promise<Tournament> {
+    this.assertClubHeader();
+    const response = await this.http.delete<ApiEnvelope<Tournament>>(
+      `/club/tournaments/${id}/banner`,
+    );
+    return asTournament(readData(response));
+  }
+
+  private assertClubHeader() {
+    if (!resolveClubHeaderId(useAuthStore.getState())) {
+      throw new Error("Seleccioná un club para gestionar torneos");
+    }
+  }
+
+  private async sendBanner(path: string, file: File): Promise<Tournament> {
+    this.assertClubHeader();
+    const form = new FormData();
+    form.append("file", file);
+    const response = await this.http.post<ApiEnvelope<Tournament>>(path, form, {
+      headers: { "Content-Type": false as unknown as string },
+    });
     return asTournament(readData(response));
   }
 }

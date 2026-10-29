@@ -6,6 +6,7 @@ import Api from "@/api/Api";
 import { EmptyState } from "@/components/EmptyState";
 import Avatar from "@/components/Avatar";
 import MatchCard from "@/components/tournaments/MatchCard";
+import TournamentSummaryCard from "@/components/tournaments/TournamentSummaryCard";
 import PlayerRegistrationPanel from "@/components/tournaments/PlayerRegistrationPanel";
 import StatusBadge from "@/components/tournaments/StatusBadge";
 import TournamentRulesDialog from "@/components/tournaments/TournamentRulesDialog";
@@ -174,45 +175,46 @@ export default function UserTournamentDetailScreen() {
         </div>
       </div>
 
-      <section
-        className="rounded-xl border border-border bg-card p-4"
-        data-testid="tournament-summary-card"
-      >
-        <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-          <SummaryStat label="Categoría" value={category.name} />
-          <SummaryStat label="Fechas" value={dates} />
-          <SummaryStat
-            label={page.tournamentStarted ? "En cuadro" : "Aceptados"}
-            value={`${summary.pairCount} parejas`}
-          />
-          <SummaryStat
-            label="Inscripción"
-            value={
+      <TournamentSummaryCard
+        bannerUrl={tournament.bannerUrl}
+        fallbackName={tournament.name}
+        stats={[
+          { kind: "category", label: "Categoría", value: category.name },
+          {
+            kind: "pairs",
+            label: page.tournamentStarted ? "En cuadro" : "Aceptados",
+            value: `${summary.pairCount} parejas`,
+          },
+          {
+            kind: "fee",
+            label: "Inscripción",
+            value:
               tournament.registrationFee > 0
                 ? `$ ${tournament.registrationFee.toLocaleString("es-AR")}`
-                : "Sin cargo"
-            }
-          />
-          <SummaryStat
-            label="Circuito"
-            value={category.circuitType === "CICUPA" ? "CICUPA" : "Sin circuito"}
-          />
-          <SummaryStat
-            label="Zonas"
-            value={
-              summary.zones
-                ? summary.qualify > 0
-                  ? `${summary.zones} · clasifican ${summary.qualify}`
-                  : `${summary.zones}`
-                : "Pendiente de cupo"
-            }
-          />
-          <SummaryStat
-            label="Partidos"
-            value={`${summary.liveCount} en juego · ${summary.finishedCount} finalizados`}
-          />
-        </dl>
-      </section>
+                : "Sin cargo",
+          },
+          {
+            kind: "circuit",
+            label: "Circuito",
+            value: category.circuitType === "CICUPA" ? "CICUPA" : "Sin circuito",
+          },
+          {
+            kind: "zones",
+            label: "Zonas",
+            value: summary.zones
+              ? summary.qualify > 0
+                ? `${summary.zones} · clasifican ${summary.qualify}`
+                : `${summary.zones}`
+              : "Pendiente de cupo",
+          },
+          {
+            kind: "matches",
+            label: "Partidos",
+            value: `${summary.liveCount} en juego · ${summary.finishedCount} finalizados`,
+          },
+          { kind: "dates", label: "Fechas", value: dates },
+        ]}
+      />
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(String(value))}>
         <TabsList className="flex h-auto flex-wrap gap-1">
@@ -403,15 +405,6 @@ export default function UserTournamentDetailScreen() {
           }
         }}
       />
-    </div>
-  );
-}
-
-function SummaryStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="text-sm text-muted-foreground">{label}</dt>
-      <dd className="mt-1 text-base font-semibold text-foreground">{value}</dd>
     </div>
   );
 }

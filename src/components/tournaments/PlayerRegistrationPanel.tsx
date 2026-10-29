@@ -281,6 +281,8 @@ export default function PlayerRegistrationPanel({
       type: "info",
       message: tournament.status === "finished" ? "El torneo ya finalizó." : "El torneo ya comenzó.",
     };
+  } else if (tournament.status === "cancelled") {
+    blockedNotice = { type: "info", message: "El torneo está cancelado." };
   } else if (closed) {
     blockedNotice = { type: "info", message: "Inscripciones cerradas" };
   }
@@ -305,7 +307,10 @@ export default function PlayerRegistrationPanel({
                   Inscribirme
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>El cupo de parejas aceptadas está completo.</TooltipContent>
+              <TooltipContent>
+                El cupo está completo: ya están las parejas aceptadas y los 2
+                suplentes.
+              </TooltipContent>
             </Tooltip>
           </TooltipProvider>
         ) : (

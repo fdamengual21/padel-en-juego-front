@@ -43,7 +43,7 @@ export default function ScoringTournamentInfoDialog({
                 variant="ghost"
                 size="icon-sm"
                 type="button"
-                className="absolute top-3 right-3 text-sidebar-foreground hover:bg-sidebar-foreground/10 hover:text-sidebar-foreground"
+                className="absolute top-3 right-3 z-10 text-sidebar-foreground hover:bg-sidebar-foreground/10 hover:text-sidebar-foreground"
               />
             }
           >
@@ -84,9 +84,9 @@ export default function ScoringTournamentInfoDialog({
           </RuleRow>
 
           <RuleRow icon={Users}>
-            Ese mínimo y ese máximo se controlan al inscribir: no se anota por
-            encima del máximo. Con menos de {SCORING_MIN_PAIRS} parejas el torneo
-            no suma.
+            Ese mínimo y ese máximo son del cuadro: no se aceptan más parejas
+            que el máximo. Se pueden anotar 2 suplentes. Con menos de{" "}
+            {SCORING_MIN_PAIRS} parejas el torneo no suma.
           </RuleRow>
 
           <div>

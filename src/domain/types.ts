@@ -309,6 +309,8 @@ export interface Tournament {
   clubAvatarUrl?: string | null;
   /** Portada publica del club, cuando el listado la trae. */
   clubCoverUrl?: string | null;
+  /** Flyer publico del torneo. Null si el club no cargo uno. */
+  bannerUrl?: string | null;
   /** Inscripcion del jugador logueado en alguna categoria del torneo. */
   myRegistrationStatus?: "PENDING" | "ACCEPTED" | "WAITLIST" | null;
   /** Categorias, cuando el listado publico las trae. */
@@ -778,6 +780,7 @@ export interface TournamentCard {
   clubName: string | null;
   clubAvatarUrl: string | null;
   clubCoverUrl: string | null;
+  bannerUrl: string | null;
   myRegistrationStatus: "PENDING" | "ACCEPTED" | "WAITLIST" | null;
   /** Pareja del jugador. Null en el catálogo público. */
   pairId: string | null;
@@ -926,10 +929,17 @@ export interface CategoryCapacity {
   maxPairs: number;
   completePairs: number;
   soloPlayers: number;
+  /** Parejas completas aceptadas. No incluye pendientes ni lista de espera. */
+  acceptedPairs: number;
+  /** Jugadores solos aceptados. */
+  acceptedSoloPlayers: number;
   heldSpots: number;
   /** Parejas sentadas en alguna zona del cuadro. */
   inDraw: number;
+  /** Alta cerrada: cupo de aceptadas lleno y ya hay 2 suplentes. */
   full: boolean;
+  /** No se puede aceptar otra pareja al cuadro. */
+  acceptedFull?: boolean;
 }
 
 /** Jugador de una inscripción, para el detalle de la tarjeta. */

@@ -47,6 +47,7 @@ export function toPublicTournamentPage(dto: PublicTournamentPageDto): PublicTour
       status: asStatus(dto.tournament.status),
       format: asTournamentFormat(dto.tournament.format),
       registrationFee: Number(dto.tournament.registrationFee ?? 0),
+      bannerUrl: dto.tournament.bannerUrl ?? null,
     },
     categories: categories.length ? categories : [category],
     category,

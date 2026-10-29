@@ -20,6 +20,7 @@ import {
 } from "@/domain";
 import Api from "@/api/Api";
 import MatchCard from "@/components/tournaments/MatchCard";
+import TournamentSummaryCard from "@/components/tournaments/TournamentSummaryCard";
 import RegistrationDetailModal from "@/components/tournaments/RegistrationDetailModal";
 import StatusBadge from "@/components/tournaments/StatusBadge";
 import TournamentRulesDialog from "@/components/tournaments/TournamentRulesDialog";
@@ -58,6 +59,7 @@ import {
   countTournamentDays,
   phaseDayListFromMap,
   phaseDayMapFromList,
+  type TournamentBannerDraft,
   type TournamentFormValues,
 } from "@/modules/tournaments/types";
 import { ROUTES } from "@/router/routes";
@@ -120,6 +122,9 @@ export default function TournamentDetailView({
   const [resultMatchId, setResultMatchId] = useState<string | null>(null);
   const [pendingDateValues, setPendingDateValues] =
     useState<TournamentFormValues | null>(null);
+  const [pendingBanner, setPendingBanner] = useState<TournamentBannerDraft | null>(
+    null,
+  );
   const [dqRegistrationId, setDqRegistrationId] = useState<string | null>(null);
   const [dqNote, setDqNote] = useState("");
   const [removeRegistrationId, setRemoveRegistrationId] = useState<string | null>(
@@ -351,10 +356,12 @@ export default function TournamentDetailView({
       return {
         kind: "create" as const,
         pair: result.pair,
+        registration: result.registration,
         autoMatch: result.autoMatch,
       };
     },
     onSuccess: async (data, vars) => {
+      const status = data.kind === "create" ? data.registration.status : null;
       if (data.autoMatch) {
         toastSuccess(
           "Pareja armada automáticamente",
@@ -362,8 +369,13 @@ export default function TournamentDetailView({
         );
       } else if (vars.mode === "edit") {
         toastSuccess("Pareja actualizada");
-      } else if (vars.player2Id) {
+      } else if (status === "ACCEPTED") {
         toastSuccess("Inscripción aceptada");
+      } else if (status === "WAITLIST") {
+        toastSuccess(
+          "Quedó como suplente",
+          "El cupo de aceptadas está completo. Entra si se baja una pareja.",
+        );
       } else {
         toastSuccess(
           "Inscripción creada",
@@ -371,8 +383,11 @@ export default function TournamentDetailView({
         );
       }
       await invalidateOps();
-      const shouldSyncStructure = Boolean(vars.player2Id) || Boolean(data.autoMatch);
-      if (shouldSyncStructure) {
+      const accepted =
+        status === "ACCEPTED" ||
+        Boolean(data.autoMatch) ||
+        (data.kind === "edit" && Boolean(vars.player2Id));
+      if (accepted) {
         const result =
           await Api.TournamentOpsService().syncCategoryStructure(categoryId);
         if (result.message) toastInfo("Estructura actualizada", result.message);
@@ -380,7 +395,7 @@ export default function TournamentDetailView({
       }
     },
     onError: (err: Error) => {
-      toastError("No se pudo guardar la pareja", err.message);
+      toastError("No se pudo agregar la pareja", err.message);
     },
   });
 
@@ -717,8 +732,11 @@ export default function TournamentDetailView({
   });
 
   const saveConfig = useMutation({
-    mutationFn: async (input: { values: TournamentFormValues }) => {
-      const { values } = input;
+    mutationFn: async (input: {
+      values: TournamentFormValues;
+      banner: TournamentBannerDraft;
+    }) => {
+      const { values, banner } = input;
       const cfgTournament = configBoard?.tournament ?? tournament;
       const cfgCategory = configBoard?.category ?? category;
       if (!cfgTournament || !cfgCategory) throw new Error("Sin torneo");
@@ -758,12 +776,15 @@ export default function TournamentDetailView({
         ],
         groupCount: null,
       });
+      await Api.TournamentService().applyBanner(cfgTournament.id, banner);
       return Api.TournamentOpsService().syncCategoryStructure(cfgCategory.id);
     },
     onSuccess: async (result) => {
       toastSuccess("Configuración guardada", result.message);
       setPendingDateValues(null);
+      setPendingBanner(null);
       await invalidateOps();
+      void qc.invalidateQueries({ queryKey: ["tournaments"] });
     },
     onError: (err: Error) => {
       toastError("No se pudo guardar la configuración", err.message);
@@ -858,28 +879,58 @@ export default function TournamentDetailView({
     const pairById = new Map(pairs.map((pair) => [pair.id, pair]));
     let completePairs = 0;
     let soloPlayers = 0;
+    let acceptedComplete = 0;
+    let acceptedSolo = 0;
+    let substituteComplete = 0;
+    let substituteSolo = 0;
     for (const reg of registrations) {
-      if (reg.status !== "ACCEPTED") continue;
       const pair = pairById.get(reg.pairId);
-      if (pair && pair.player2Id == null) soloPlayers += 1;
-      else completePairs += 1;
+      const solo = pair != null && pair.player2Id == null;
+      if (reg.status === "ACCEPTED") {
+        if (solo) {
+          acceptedSolo += 1;
+          soloPlayers += 1;
+        } else {
+          acceptedComplete += 1;
+          completePairs += 1;
+        }
+        continue;
+      }
+      if (reg.status !== "PENDING" && reg.status !== "WAITLIST") continue;
+      if (solo) {
+        substituteSolo += 1;
+        soloPlayers += 1;
+      } else {
+        substituteComplete += 1;
+        completePairs += 1;
+      }
     }
-    const heldSpots = completePairs + Math.ceil(soloPlayers / 2);
+    const spots = (complete: number, solos: number) => complete + Math.ceil(solos / 2);
+    const heldSpots = spots(completePairs, soloPlayers);
+    const acceptedSpots = spots(acceptedComplete, acceptedSolo);
+    const substituteSpots = spots(substituteComplete, substituteSolo);
     const maxPairs = category?.maxPairs ?? 0;
     const inDraw = new Set(
       (zonesBoard?.groups ?? groups).flatMap((group) => group.pairIds),
     ).size;
+    const acceptedFull = maxPairs > 0 && acceptedSpots >= maxPairs;
     return {
       maxPairs,
       completePairs,
       soloPlayers,
+      acceptedPairs: acceptedComplete,
+      acceptedSoloPlayers: acceptedSolo,
       heldSpots,
       inDraw,
-      full: maxPairs > 0 && heldSpots >= maxPairs,
+      full: acceptedFull && substituteSpots >= 2,
+      acceptedFull,
     };
   })();
-  const capacity = participantsBoard?.capacity ?? localCapacity;
+  const capacity = participantsBoard?.capacity
+    ? { ...localCapacity, ...participantsBoard.capacity }
+    : localCapacity;
   const categoryFull = category != null && capacity.full;
+  const acceptedFull = Boolean(capacity.acceptedFull);
   const admission = participantsBoard?.admission ?? { allowed: true, reason: null };
   const tournamentLocked =
     tournament.status === "finished" || tournament.status === "cancelled";
@@ -892,9 +943,11 @@ export default function TournamentDetailView({
     ? participantsLockedReason
     : !admission.allowed
       ? (admission.reason ?? "No se pueden sumar parejas en este momento.")
-      : categoryFull
+      : tournament.status === "inProgress" && acceptedFull
         ? "El cupo de parejas aceptadas está completo."
-        : null;
+        : categoryFull
+          ? "El cupo está completo: ya están las parejas aceptadas y los 2 suplentes."
+          : null;
   const canMutateParticipants = !tournamentLocked;
   const matchRules =
     zonesBoard?.matchRules ??
@@ -1039,7 +1092,8 @@ export default function TournamentDetailView({
       ].filter(Boolean);
       return parts.length ? parts.join(" · ") : null;
     }
-    const outside = capacity.completePairs + capacity.soloPlayers - capacity.inDraw;
+    const outside =
+      capacity.acceptedPairs + capacity.acceptedSoloPlayers - capacity.inDraw;
     return outside > 0 ? `${outside} ${outside === 1 ? "aceptada" : "aceptadas"} fuera del cuadro` : null;
   })();
 
@@ -1135,69 +1189,63 @@ export default function TournamentDetailView({
         </div>
       </div>
 
-      <section
-        className="rounded-xl border border-border bg-card p-4"
-        data-testid="tournament-summary-card"
-      >
-        <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-          <SummaryStat
-            label="Categoría"
-            value={category?.name ?? "Sin categoría"}
-          />
-          <SummaryStat
-            label="Fechas"
-            value={
-              tournament.endDate && tournament.endDate !== tournament.startDate
-                ? `${formatTournamentDayEs(tournament.startDate)} → ${formatTournamentDayEs(tournament.endDate)}`
-                : formatTournamentDayEs(tournament.startDate)
-            }
-          />
-          {tournamentStarted ? (
-            <SummaryStat
-              label="En cuadro"
-              value={`${capacity.inDraw} parejas`}
-              detail={outOfDrawSummary}
-            />
-          ) : (
-            <SummaryStat
-              label="Aceptados"
-              value={
-                capacity.soloPlayers > 0
-                  ? `${capacity.completePairs} parejas · ${capacity.soloPlayers} buscando pareja`
-                  : `${capacity.completePairs} parejas`
+      <TournamentSummaryCard
+        bannerUrl={tournament.bannerUrl}
+        fallbackName={tournament.name}
+        stats={[
+          { kind: "category", label: "Categoría", value: category?.name ?? "Sin categoría" },
+          tournamentStarted
+            ? {
+                kind: "pairs",
+                label: "En cuadro",
+                value: `${capacity.inDraw} parejas`,
+                detail: outOfDrawSummary,
               }
-            />
-          )}
-          <SummaryStat
-            label="Inscripción"
-            value={
+            : {
+                kind: "pairs",
+                label: "Aceptados",
+                value:
+                  capacity.acceptedSoloPlayers > 0
+                    ? `${capacity.acceptedPairs} parejas · ${capacity.acceptedSoloPlayers} buscando pareja`
+                    : `${capacity.acceptedPairs} parejas`,
+              },
+          {
+            kind: "fee",
+            label: "Inscripción",
+            value:
               tournament.registrationFee > 0
                 ? `$ ${tournament.registrationFee.toLocaleString("es-AR")}`
-                : "Sin cargo"
-            }
-          />
-          <SummaryStat
-            label="Circuito"
-            value={
-              category?.circuitType === "CICUPA" ? "CICUPA" : "Sin circuito"
-            }
-          />
-          <SummaryStat
-            label="Zonas"
-            value={
-              summaryGroups.length
-                ? summaryQualify > 0
-                  ? `${summaryGroups.length} · clasifican ${summaryQualify}`
-                  : `${summaryGroups.length}`
-                : "Pendiente de cupo"
-            }
-          />
-          <SummaryStat
-            label="Partidos"
-            value={`${liveCount} en juego · ${finishedCount} finalizados`}
-          />
-        </dl>
-      </section>
+                : "Sin cargo",
+          },
+          {
+            kind: "circuit",
+            label: "Circuito",
+            value: category?.circuitType === "CICUPA" ? "CICUPA" : "Sin circuito",
+          },
+          {
+            kind: "zones",
+            label: "Zonas",
+            value: summaryGroups.length
+              ? summaryQualify > 0
+                ? `${summaryGroups.length} · clasifican ${summaryQualify}`
+                : `${summaryGroups.length}`
+              : "Pendiente de cupo",
+          },
+          {
+            kind: "matches",
+            label: "Partidos",
+            value: `${liveCount} en juego · ${finishedCount} finalizados`,
+          },
+          {
+            kind: "dates",
+            label: "Fechas",
+            value:
+              tournament.endDate && tournament.endDate !== tournament.startDate
+                ? `${formatTournamentDayEs(tournament.startDate)} → ${formatTournamentDayEs(tournament.endDate)}`
+                : formatTournamentDayEs(tournament.startDate),
+          },
+        ]}
+      />
 
       <Tabs
         value={activeTab}
@@ -1407,7 +1455,7 @@ export default function TournamentDetailView({
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
-                        ) : admission.allowed ? (
+                        ) : admission.allowed && !acceptedFull ? (
                           <Button
                             type="button"
                             size="sm"
@@ -1425,7 +1473,9 @@ export default function TournamentDetailView({
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent className="max-w-xs">
-                                {admission.reason ?? "No se pueden sumar parejas en este momento."}
+                                {acceptedFull
+                                  ? "El cupo de parejas aceptadas está completo."
+                                  : (admission.reason ?? "No se pueden sumar parejas en este momento.")}
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
@@ -1689,10 +1739,11 @@ export default function TournamentDetailView({
                 .filter((court) => court.status === "active")
                 .map((court) => ({ id: court.id, name: court.name }))}
               initialValues={formInitial}
+              bannerUrl={formSource.tournament.bannerUrl}
               submitLabel="Guardar configuración"
               isSubmitting={saveConfig.isPending}
               readOnly={tournamentLocked}
-              onSubmit={async (values) => {
+              onSubmit={async (values, banner) => {
                 if (tournamentLocked) {
                   toastError(
                     "No se puede guardar la configuración",
@@ -1711,9 +1762,10 @@ export default function TournamentDetailView({
                 );
                 if (datesTouched && played) {
                   setPendingDateValues(values);
+                  setPendingBanner(banner);
                   return;
                 }
-                await saveConfig.mutateAsync({ values });
+                await saveConfig.mutateAsync({ values, banner });
               }}
             />
           ) : (
@@ -1725,7 +1777,10 @@ export default function TournamentDetailView({
       <Dialog
         open={Boolean(pendingDateValues)}
         onOpenChange={(open) => {
-          if (!open) setPendingDateValues(null);
+          if (!open) {
+            setPendingDateValues(null);
+            setPendingBanner(null);
+          }
         }}
       >
         <DialogContent data-testid="date-change-dialog">
@@ -1743,7 +1798,10 @@ export default function TournamentDetailView({
               type="button"
               variant="outline"
               disabled={saveConfig.isPending}
-              onClick={() => setPendingDateValues(null)}
+              onClick={() => {
+                setPendingDateValues(null);
+                setPendingBanner(null);
+              }}
             >
               Cancelar
             </Button>
@@ -1752,7 +1810,10 @@ export default function TournamentDetailView({
               disabled={saveConfig.isPending || !pendingDateValues}
               onClick={() => {
                 if (!pendingDateValues) return;
-                void saveConfig.mutateAsync({ values: pendingDateValues });
+                void saveConfig.mutateAsync({
+                  values: pendingDateValues,
+                  banner: pendingBanner ?? { file: null, remove: false },
+                });
               }}
             >
               Cambiar fecha
@@ -1920,9 +1981,9 @@ export default function TournamentDetailView({
         }}
         title="Comenzar torneo"
         description={
-          capacity.soloPlayers > 0
-            ? `Se cierra la inscripción y se arma el cuadro con las ${capacity.completePairs} parejas aceptadas. Hay ${capacity.soloPlayers} jugadores sin pareja: se emparejan entre sí por orden de inscripción aunque jueguen del mismo lado; si queda uno impar, queda afuera. Esta acción no se deshace.`
-            : `Se cierra la inscripción y se arma el cuadro con las ${capacity.completePairs} parejas aceptadas. Esta acción no se deshace.`
+          capacity.acceptedSoloPlayers > 0
+            ? `Se cierra la inscripción y se arma el cuadro con las ${capacity.acceptedPairs} parejas aceptadas. Hay ${capacity.acceptedSoloPlayers} jugadores sin pareja: se emparejan entre sí por orden de inscripción aunque jueguen del mismo lado; si queda uno impar, queda afuera. Esta acción no se deshace.`
+            : `Se cierra la inscripción y se arma el cuadro con las ${capacity.acceptedPairs} parejas aceptadas. Esta acción no se deshace.`
         }
         cancelLabel="Cancelar"
         confirmLabel="Comenzar"
@@ -2172,25 +2233,6 @@ export default function TournamentDetailView({
           }}
         />
       ) : null}
-    </div>
-  );
-}
-
-function SummaryStat({
-  label,
-  value,
-  detail,
-}: {
-  label: string;
-  value: string;
-  /** Línea secundaria bajo el valor (p. ej. aceptadas que no entraron al cuadro). */
-  detail?: string | null;
-}) {
-  return (
-    <div>
-      <dt className="text-sm text-muted-foreground">{label}</dt>
-      <dd className="mt-1 text-base font-semibold text-foreground">{value}</dd>
-      {detail ? <dd className="text-xs text-amber-700">{detail}</dd> : null}
     </div>
   );
 }

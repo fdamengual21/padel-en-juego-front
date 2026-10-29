@@ -62,6 +62,12 @@ export interface TournamentFormValues {
   phaseDays: Record<string, number[]>;
 }
 
+/** Flyer elegido en el formulario, se sube aparte del PATCH. */
+export interface TournamentBannerDraft {
+  file: File | null;
+  remove: boolean;
+}
+
 export function buildMatchRulesFromForm(values: TournamentFormValues): MatchRules {
   const playType = values.matchPlayType;
   const setsToWin =

@@ -21,6 +21,7 @@ export interface PublicTournamentPage {
     status: TournamentStatus;
     format: TournamentFormat;
     registrationFee: number;
+    bannerUrl: string | null;
   };
   categories: PublicTournamentCategoryRef[];
   category: PublicTournamentCategoryRef;

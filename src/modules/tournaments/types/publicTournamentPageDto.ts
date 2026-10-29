@@ -26,6 +26,7 @@ export interface PublicTournamentDto {
   status: string;
   format: string;
   registrationFee: number;
+  bannerUrl: string | null;
 }
 
 export interface PublicTournamentCategoryRefDto {

@@ -14,6 +14,8 @@ interface ImagePickerFieldProps {
   disabled?: boolean;
   ariaLabel?: string;
   frameClassName?: string;
+  /** Clases del img / empty. Por defecto portada 16/9. */
+  mediaClassName?: string;
   className?: string;
   testId?: string;
   children?: ReactNode;
@@ -30,6 +32,7 @@ export default function ImagePickerField({
   disabled = false,
   ariaLabel = "Editar imagen",
   frameClassName,
+  mediaClassName,
   className,
   testId,
   children,
@@ -69,6 +72,7 @@ export default function ImagePickerField({
 
   const frameClass = cn(
     "group relative",
+    editable && "cursor-pointer",
     children
       ? null
       : "block w-full overflow-hidden rounded-lg border border-border bg-muted",
@@ -79,9 +83,18 @@ export default function ImagePickerField({
     <>
       {children ??
         (shownUrl ? (
-          <img src={shownUrl} alt={alt} className="aspect-[16/9] w-full object-cover" />
+          <img
+            src={shownUrl}
+            alt={alt}
+            className={mediaClassName ?? "aspect-[16/9] w-full object-cover"}
+          />
         ) : (
-          <span className="flex aspect-[16/9] w-full items-center justify-center px-3 text-sm text-muted-foreground">
+          <span
+            className={cn(
+              "flex w-full items-center justify-center px-3 text-sm text-muted-foreground",
+              mediaClassName ?? "aspect-[16/9]",
+            )}
+          >
             {emptyLabel}
           </span>
         ))}

@@ -10,6 +10,7 @@ import {
   reconcilePhaseDays,
   countTournamentDays,
   tournamentFormatLabel,
+  type TournamentBannerDraft,
   type TournamentFormValues,
 } from "@/modules/tournaments/types";
 import { formatLongDateEs, parseIsoDateOnly, toIsoDateOnly } from "@/lib/dates";
@@ -22,7 +23,6 @@ import {
   type CategoryLevel,
   type EqualsResolution,
   type RulesetPreset,
-  type TournamentCircuitType,
   type TournamentFormat,
   asTournamentFormat,
   SCORING_MAX_PAIRS,
@@ -36,7 +36,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { circuitTypeLabel } from "@/modules/tournaments/types";
+import TournamentBannerField from "./TournamentBannerField";
 
 function isoPlusDays(iso: string, days: number): string {
   const date = parseIsoDateOnly(iso);
@@ -61,7 +61,7 @@ export function defaultTournamentFormValues(
   const format =
     scoring && !isScoringFormat(requestedFormat) ? "GROUPS_ELIMINATION" : requestedFormat;
   const values: TournamentFormValues = {
-    name: "Open Padel Club",
+    name: "",
     description: "",
     dailyStartTime: "10:00",
     dailyEndTime: "",
@@ -112,9 +112,13 @@ export function buildCategoryDisplayName(values: TournamentFormValues): string {
 
 interface TournamentFormProps {
   initialValues?: Partial<TournamentFormValues>;
+  bannerUrl?: string | null;
   courts?: Array<{ id: string; name: string }>;
   submitLabel: string;
-  onSubmit: (values: TournamentFormValues) => Promise<void> | void;
+  onSubmit: (
+    values: TournamentFormValues,
+    banner: TournamentBannerDraft,
+  ) => Promise<void> | void;
   isSubmitting?: boolean;
   /** Torneo finalizado/cancelado: se ve la config, no se edita. */
   readOnly?: boolean;
@@ -122,12 +126,15 @@ interface TournamentFormProps {
 
 export default function TournamentForm({
   initialValues,
+  bannerUrl = null,
   submitLabel,
   onSubmit,
   isSubmitting = false,
   readOnly = false,
 }: TournamentFormProps) {
   const [rulesOpen, setRulesOpen] = useState(false);
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [removeBanner, setRemoveBanner] = useState(false);
   const [values, setValues] = useState<TournamentFormValues>(() =>
     defaultTournamentFormValues(initialValues),
   );
@@ -193,6 +200,7 @@ export default function TournamentForm({
   const startDateInvalid = values.startDate !== savedDates.startDate && values.startDate < today;
   const endDateInvalid = endDateShown !== savedDates.endDate && endDateShown < today;
   const datesInvalid = startDateInvalid || endDateInvalid;
+  const nameInvalid = !values.name.trim();
   const endMinDate = values.startDate > today ? values.startDate : today;
 
   return (
@@ -202,6 +210,10 @@ export default function TournamentForm({
       onSubmit={(e) => {
         e.preventDefault();
         if (readOnly) return;
+        if (!values.name.trim()) {
+          toastError("Ingresá el nombre del torneo");
+          return;
+        }
         if (
           (values.startDate !== savedDates.startDate && values.startDate < today) ||
           (values.endDate !== savedDates.endDate && values.endDate < today)
@@ -212,7 +224,7 @@ export default function TournamentForm({
           );
           return;
         }
-        void onSubmit(values);
+        void onSubmit(values, { file: bannerFile, remove: removeBanner });
       }}
     >
       <fieldset
@@ -226,6 +238,7 @@ export default function TournamentForm({
                 id="name"
                 value={values.name}
                 disabled={readOnly}
+                placeholder="Nombre del torneo"
                 onChange={(e) => patch("name", e.target.value)}
               />
             </Field>
@@ -237,6 +250,20 @@ export default function TournamentForm({
                 onChange={(e) => patch("description", e.target.value)}
               />
             </Field>
+            <TournamentBannerField
+              bannerUrl={bannerUrl}
+              file={bannerFile}
+              remove={removeBanner}
+              readOnly={readOnly}
+              onFileSelect={(file) => {
+                setBannerFile(file);
+                setRemoveBanner(false);
+              }}
+              onRemove={() => {
+                setBannerFile(null);
+                setRemoveBanner(true);
+              }}
+            />
             <Field label="Precio de inscripción" htmlFor="registrationFee">
               <Input
                 id="registrationFee"
@@ -408,39 +435,6 @@ export default function TournamentForm({
                 onChange={(e) => patch("categoryName", e.target.value)}
               />
             </Field>
-
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Circuito de ranking</p>
-              {(
-                [
-                  ["NONE", circuitTypeLabel("NONE")],
-                  ["CICUPA", circuitTypeLabel("CICUPA")],
-                ] as const
-              ).map(([value, label]) => (
-                <label
-                  key={value}
-                  className={cn(
-                    "flex items-center gap-2 text-sm",
-                    readOnly && "cursor-not-allowed text-muted-foreground",
-                  )}
-                >
-                  <input
-                    type="radio"
-                    name="circuitType"
-                    checked={values.circuitType === value}
-                    disabled={readOnly}
-                    onChange={() =>
-                      patch("circuitType", value as TournamentCircuitType)
-                    }
-                  />
-                  {label}
-                </label>
-              ))}
-              <p className="text-xs text-muted-foreground">
-                Si hay circuito, al inscribir se puede anotar el snapshot de
-                puntos acumulados de cada jugador.
-              </p>
-            </div>
           </div>
         </Section>
 
@@ -674,7 +668,7 @@ export default function TournamentForm({
           <Button
             type="submit"
             data-testid="tournament-form-submit"
-            disabled={isSubmitting || datesInvalid}
+            disabled={isSubmitting || datesInvalid || nameInvalid}
           >
             {submitLabel}
           </Button>

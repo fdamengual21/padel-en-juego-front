@@ -215,6 +215,7 @@ export function tournamentRulesSections(
     title: "Inscripción y comienzo",
     items: [
       "El cupo cuenta parejas completas más jugadores solos de a dos.",
+      "Las inscripciones se cortan cuando el cupo de aceptadas está lleno y hay 2 suplentes. Si el torneo comenzó, finalizó o está cancelado, tampoco se puede inscribir.",
       "El torneo comienza solo con «Comenzar torneo»: ahí se cierra la inscripción y se arma el cuadro definitivo con las parejas aceptadas, por orden de inscripción.",
       "Los jugadores solos que no consiguieron pareja se emparejan entre sí por orden de inscripción, aunque jueguen del mismo lado; si queda uno impar, queda afuera.",
       "Con el torneo comenzado, una pareja nueva solo entra en una zona que todavía no jugó; los partidos jugados no se tocan.",

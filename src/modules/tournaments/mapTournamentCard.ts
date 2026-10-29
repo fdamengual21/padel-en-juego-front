@@ -27,6 +27,7 @@ export function asTournamentCard(raw: unknown): TournamentCard | null {
     clubName: asText(row.clubName) || null,
     clubAvatarUrl: asText(row.clubAvatarUrl) || null,
     clubCoverUrl: asText(row.clubCoverUrl) || null,
+    bannerUrl: asText(row.bannerUrl) || null,
     myRegistrationStatus: asChip(row.myRegistrationStatus),
     pairId: asText(row.pairId) || null,
     categories: asCategories(row.categories),

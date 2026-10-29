@@ -15,7 +15,12 @@ export type HomeTournamentCardData = Pick<
   Partial<
     Pick<
       Tournament,
-      "clubName" | "clubCoverUrl" | "clubAvatarUrl" | "categories" | "myRegistrationStatus"
+      | "clubName"
+      | "clubCoverUrl"
+      | "clubAvatarUrl"
+      | "bannerUrl"
+      | "categories"
+      | "myRegistrationStatus"
     >
   >;
 
@@ -45,7 +50,9 @@ export default function HomeTournamentCard({
   to,
 }: HomeTournamentCardProps) {
   const [failed, setFailed] = useState(false);
-  const photo = failed ? null : (tournament.clubCoverUrl ?? tournament.clubAvatarUrl);
+  const photo = failed
+    ? null
+    : (tournament.bannerUrl ?? tournament.clubCoverUrl ?? tournament.clubAvatarUrl);
   const category =
     tournament.categories?.map((item) => item.name).filter(Boolean).join(" · ") || "Sin categoría";
   const chip = tournament.myRegistrationStatus
@@ -55,7 +62,7 @@ export default function HomeTournamentCard({
   return (
     <Link
       to={to}
-      className="flex gap-3 rounded-xl border border-border bg-card p-3.5 text-left"
+      className="flex cursor-pointer gap-3 rounded-xl border border-border bg-card p-3.5 text-left"
       data-testid={`home-tournament-${tournament.id}`}
     >
       <div className="relative size-[72px] shrink-0 overflow-hidden rounded-md bg-muted">

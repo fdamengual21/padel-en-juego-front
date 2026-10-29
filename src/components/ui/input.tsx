@@ -2,7 +2,49 @@ import * as React from "react"
 import { Input as InputPrimitive } from "@base-ui/react/input"
 import { cn } from "@/lib/utils"
 
-function Input({ className, type, ...props }: React.ComponentProps<"input">) {
+/** When the field shows 0, a typed digit replaces it instead of becoming 05 or 50. */
+function replaceDefaultZero(previous: string, next: string): string {
+  if (previous !== "0") return next
+  if (next === "" || next === "0" || next === "00") return next === "" ? "" : "0"
+  if (next === "0." || next === "-0.") return next
+  if (next.length === 2) {
+    const added = next.startsWith("0") ? next[1] : next[0]
+    return added === "." ? "0." : added
+  }
+  return next
+}
+
+function selectZeroValue(element: HTMLInputElement) {
+  if (element.value === "0") element.select()
+}
+
+function Input({
+  className,
+  type,
+  value,
+  onChange,
+  onFocus,
+  onMouseUp,
+  ...props
+}: React.ComponentProps<"input">) {
+  const handleFocus = (event: React.FocusEvent<HTMLInputElement>) => {
+    if (type === "number") selectZeroValue(event.currentTarget)
+    onFocus?.(event)
+  }
+
+  const handleMouseUp = (event: React.MouseEvent<HTMLInputElement>) => {
+    if (type === "number") selectZeroValue(event.currentTarget)
+    onMouseUp?.(event)
+  }
+
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (type === "number" && value !== undefined && value !== null) {
+      const resolved = replaceDefaultZero(String(value), event.target.value)
+      if (resolved !== event.target.value) event.target.value = resolved
+    }
+    onChange?.(event)
+  }
+
   return (
     <InputPrimitive
       type={type}
@@ -12,6 +54,10 @@ function Input({ className, type, ...props }: React.ComponentProps<"input">) {
         className
       )}
       {...props}
+      value={value}
+      onChange={handleChange}
+      onFocus={handleFocus}
+      onMouseUp={handleMouseUp}
     />
   )
 }

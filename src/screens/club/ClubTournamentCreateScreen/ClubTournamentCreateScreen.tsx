@@ -6,6 +6,7 @@ import TournamentForm from "@/screens/club/components/TournamentForm";
 import {
   buildMatchRulesFromForm,
   phaseDayListFromMap,
+  type TournamentBannerDraft,
   type TournamentFormValues,
 } from "@/modules/tournaments/types";
 import { createId } from "@/domain";
@@ -26,7 +27,11 @@ export default function ClubTournamentCreateScreen() {
     .map((court) => ({ id: court.id, name: court.name }));
 
   const mutation = useMutation({
-    mutationFn: async (values: TournamentFormValues) => {
+    mutationFn: async (input: {
+      values: TournamentFormValues;
+      banner: TournamentBannerDraft;
+    }) => {
+      const { values, banner } = input;
       const tournament = await Api.TournamentService().create({
         clubId,
         name: values.name,
@@ -60,6 +65,7 @@ export default function ClubTournamentCreateScreen() {
         groupCount: null,
       });
       await Api.TournamentOpsService().syncCategoryStructure(category.id);
+      await Api.TournamentService().applyBanner(tournament.id, banner);
       return tournament;
     },
     onSuccess: (tournament) => {
@@ -79,8 +85,8 @@ export default function ClubTournamentCreateScreen() {
         courts={activeCourts}
         submitLabel="Crear torneo"
         isSubmitting={mutation.isPending}
-        onSubmit={async (values) => {
-          await mutation.mutateAsync(values);
+        onSubmit={async (values, banner) => {
+          await mutation.mutateAsync({ values, banner });
         }}
       />
     </div>
