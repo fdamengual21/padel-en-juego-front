@@ -29,7 +29,7 @@ Sin hex hardcodeados en screens/components. Usar clases semánticas (`bg-primary
 ## UI
 
 - Superficies antes que Card; no Cards anidadas. Card solo si agrupa (partido, torneo, cliente) o hay interacción.
-- Estados de partido/torneo: chips chicos, no bloques de color. Lima para inscripciones abiertas (invitación). En vivo: `destructive` + punto; resto muted/warning. En jugador, abierto sin inscripción propia = “Anotate”.
+- Estados de partido/torneo: chips chicos, no bloques de color. Lima para inscripciones abiertas (invitación). En vivo: `destructive` + punto; resto muted/warning.
 - Preferir domain (`MatchCard`, `Score`, `TournamentCard`, `BracketView`, …) antes que Card/Badge genéricos.
 - Detalle de torneo (club): cards de resumen **siempre visibles**; tabs sin Resumen/Resultados.
 - Player: light, mobile, bottom nav; activo = icono en pastilla lima.

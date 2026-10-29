@@ -27,14 +27,11 @@ const labels: Record<string, string> = {
 interface StatusBadgeProps {
   status: string;
   className?: string;
-  /** Player invite: open registration reads as "Anotate" instead of a backoffice status. */
-  invite?: boolean;
 }
 
-export default function StatusBadge({ status, className, invite = false }: StatusBadgeProps) {
+export default function StatusBadge({ status, className }: StatusBadgeProps) {
   const isLive = status === "inProgress";
   const isOpen = status === "registrationOpen";
-  const label = invite && isOpen ? "Anotate" : (labels[status] ?? status);
 
   return (
     <Badge
@@ -48,7 +45,7 @@ export default function StatusBadge({ status, className, invite = false }: Statu
       {isLive ? (
         <span className="size-1.5 shrink-0 animate-pulse rounded-full bg-current" aria-hidden />
       ) : null}
-      {label}
+      {labels[status] ?? status}
     </Badge>
   );
 }
