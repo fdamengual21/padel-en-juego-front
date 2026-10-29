@@ -993,10 +993,12 @@ export default function TournamentDetailView({
   const admission = participantsBoard?.admission ?? { allowed: true, reason: null };
   const tournamentLocked =
     tournament.status === "finished" || tournament.status === "cancelled";
-  // Solo el botón «Comenzar torneo» inicia el torneo; horarios y canchas no cuentan.
+  // «Comenzar torneo» deja el status en inProgress. No usar solo el board de
+  // participantes: en Zonas no se refetcha y un false cacheado tapa el repechaje.
   const tournamentStarted =
-    participantsBoard?.tournamentStarted ??
-    (tournament.status === "inProgress" || tournament.status === "finished");
+    tournament.status === "inProgress" ||
+    tournament.status === "finished" ||
+    Boolean(participantsBoard?.tournamentStarted);
   const configLocked =
     tournamentLocked || tournamentStarted || Boolean(configBoard?.structureLocked);
   const participantsLockedReason = tournamentLocked
