@@ -62,7 +62,7 @@ export default function HomeTournamentCard({
   return (
     <Link
       to={to}
-      className="flex cursor-pointer gap-3 rounded-xl border border-border bg-card p-3.5 text-left"
+      className="flex min-w-0 cursor-pointer gap-3 overflow-hidden rounded-xl border border-border bg-card p-3.5 text-left"
       data-testid={`home-tournament-${tournament.id}`}
     >
       <div className="relative size-[72px] shrink-0 overflow-hidden rounded-md bg-muted">
@@ -80,15 +80,17 @@ export default function HomeTournamentCard({
         )}
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <div className="flex items-start justify-between gap-2">
-          <p className="truncate text-sm font-semibold tracking-tight">{tournament.name}</p>
-          <StatusBadge status={tournament.status} className="shrink-0" />
+        <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-2">
+          <p className="min-w-0 truncate text-sm font-semibold tracking-tight">
+            {tournament.name}
+          </p>
+          <StatusBadge status={tournament.status} className="w-fit max-w-full shrink-0" />
         </div>
         {tournament.clubName ? (
           <p className="truncate text-sm text-muted-foreground">{tournament.clubName}</p>
         ) : null}
         <p className="truncate text-sm text-muted-foreground">{category}</p>
-        <div className="mt-auto flex items-center gap-2 pt-2">
+        <div className="mt-auto flex min-w-0 items-center gap-2 pt-2">
           {chip ? (
             <Badge
               variant="secondary"
