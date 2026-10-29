@@ -1,24 +1,44 @@
 <!doctype html>
-<html lang="es" class="light">
+<html lang="es" class="light" style="color-scheme: only light">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="only light" />
+    <meta name="supported-color-schemes" content="light" />
+    <meta name="theme-color" content="#f4f6f8" />
     <title>Start Point</title>
+    <style>
+      html,
+      html.light {
+        color-scheme: light;
+        color-scheme: only light;
+      }
+      html.dark {
+        color-scheme: dark;
+        color-scheme: only dark;
+      }
+    </style>
     <script>
       (function () {
         try {
+          var theme = "light";
           var stored = localStorage.getItem("padel-en-juego.settings");
-          if (!stored) return;
-          var theme = JSON.parse(stored).state.theme;
-          if (theme !== "dark") return;
+          if (stored) {
+            var parsed = JSON.parse(stored).state.theme;
+            if (parsed === "dark" || parsed === "light") theme = parsed;
+          }
+          var isDark = theme === "dark";
           var root = document.documentElement;
-          root.classList.remove("light");
-          root.classList.add("dark");
-          root.style.colorScheme = "only dark";
-          var meta = document.querySelector('meta[name="color-scheme"]');
-          if (meta) meta.setAttribute("content", "only dark");
+          root.classList.toggle("light", !isDark);
+          root.classList.toggle("dark", isDark);
+          root.style.colorScheme = isDark ? "only dark" : "only light";
+          var scheme = document.querySelector('meta[name="color-scheme"]');
+          if (scheme) scheme.setAttribute("content", isDark ? "only dark" : "only light");
+          var supported = document.querySelector('meta[name="supported-color-schemes"]');
+          if (supported) supported.setAttribute("content", theme);
+          var themeColor = document.querySelector('meta[name="theme-color"]');
+          if (themeColor) themeColor.setAttribute("content", isDark ? "#1b2030" : "#f4f6f8");
         } catch (e) {}
       })();
     </script>

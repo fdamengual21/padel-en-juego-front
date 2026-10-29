@@ -151,17 +151,24 @@
   --sidebar-ring: oklch(0.88 0.21 125);
 }
 
+html,
+html.light {
+  color-scheme: light;
+  color-scheme: only light;
+}
+
+html.dark {
+  color-scheme: dark;
+  color-scheme: only dark;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
   html {
-    color-scheme: only light;
     font-size: 17px;
     @apply font-sans;
-  }
-  html.dark {
-    color-scheme: only dark;
   }
   body {
     @apply bg-background text-foreground;

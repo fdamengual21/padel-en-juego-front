@@ -29,19 +29,30 @@ function readPersistedTheme(): AppTheme {
   }
 }
 
+const THEME_COLOR = {
+  light: "#f4f6f8",
+  dark: "#1b2030",
+} as const;
+
 export function applyDocumentTheme(theme: AppTheme) {
   if (typeof document === "undefined") return;
 
   const root = document.documentElement;
   const isDark = theme === "dark";
-  const colorScheme = isDark ? "only dark" : "only light";
+  const colorSchemeOnly = isDark ? "only dark" : "only light";
 
   root.classList.toggle("dark", isDark);
   root.classList.toggle("light", !isDark);
-  root.style.colorScheme = colorScheme;
+  root.style.colorScheme = colorSchemeOnly;
 
-  const meta = document.querySelector('meta[name="color-scheme"]');
-  if (meta) meta.setAttribute("content", colorScheme);
+  const schemeMeta = document.querySelector('meta[name="color-scheme"]');
+  if (schemeMeta) schemeMeta.setAttribute("content", colorSchemeOnly);
+
+  const supportedMeta = document.querySelector('meta[name="supported-color-schemes"]');
+  if (supportedMeta) supportedMeta.setAttribute("content", theme);
+
+  const themeColor = document.querySelector('meta[name="theme-color"]');
+  if (themeColor) themeColor.setAttribute("content", THEME_COLOR[theme]);
 }
 
 const initialTheme = readPersistedTheme();
