@@ -27,6 +27,8 @@ export type HomeTournamentCardData = Pick<
 interface HomeTournamentCardProps {
   tournament: HomeTournamentCardData;
   to: string;
+  /** Player cards invite to sign up. Club lists keep the backoffice label. */
+  invite?: boolean;
 }
 
 const inscriptionChip: Record<string, { label: string; className: string }> = {
@@ -48,6 +50,7 @@ const inscriptionChip: Record<string, { label: string; className: string }> = {
 export default function HomeTournamentCard({
   tournament,
   to,
+  invite = true,
 }: HomeTournamentCardProps) {
   const [failed, setFailed] = useState(false);
   const photo = failed
@@ -84,7 +87,11 @@ export default function HomeTournamentCard({
           <p className="min-w-0 truncate text-sm font-semibold tracking-tight">
             {tournament.name}
           </p>
-          <StatusBadge status={tournament.status} className="w-fit max-w-full shrink-0" />
+          <StatusBadge
+            status={tournament.status}
+            invite={invite && !chip}
+            className="w-fit max-w-full shrink-0"
+          />
         </div>
         {tournament.clubName ? (
           <p className="truncate text-sm text-muted-foreground">{tournament.clubName}</p>

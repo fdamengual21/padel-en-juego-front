@@ -143,6 +143,7 @@ export default function ClubTournamentsScreen() {
             key={tournament.id}
             tournament={tournament}
             to={ROUTES.club.tournamentDetail(tournament.id)}
+            invite={false}
           />
         ))}
       </div>
