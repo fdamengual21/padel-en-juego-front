@@ -1361,17 +1361,33 @@ export default function TournamentDetailView({
         value={activeTab}
         onValueChange={(value) => setActiveTab(String(value))}
       >
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <TabsList className="flex flex-wrap h-auto gap-1">
-            <TabsTrigger value="grupos">Zonas</TabsTrigger>
-            <TabsTrigger value="participantes">Participantes</TabsTrigger>
-            <TabsTrigger value="cuadro">Cuadro</TabsTrigger>
-            {repechageCreated ? <TabsTrigger value="repechaje">Repechaje</TabsTrigger> : null}
-            <TabsTrigger value="partidos">Partidos</TabsTrigger>
-            <TabsTrigger value="config">Configuración</TabsTrigger>
-          </TabsList>
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div className="min-w-0 overflow-x-auto">
+            <TabsList className="h-8 w-max min-w-full">
+              <TabsTrigger value="grupos" className="flex-none">
+                Zonas
+              </TabsTrigger>
+              <TabsTrigger value="participantes" className="flex-none">
+                Participantes
+              </TabsTrigger>
+              <TabsTrigger value="cuadro" className="flex-none">
+                Cuadro
+              </TabsTrigger>
+              {repechageCreated ? (
+                <TabsTrigger value="repechaje" className="flex-none">
+                  Repechaje
+                </TabsTrigger>
+              ) : null}
+              <TabsTrigger value="partidos" className="flex-none">
+                Partidos
+              </TabsTrigger>
+              <TabsTrigger value="config" className="flex-none">
+                Configuración
+              </TabsTrigger>
+            </TabsList>
+          </div>
           {showCreateRepechageButton || showKnockoutPhasesButton ? (
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
               {showCreateRepechageButton ? (
                 <PermissionsGuard permission={PERMISSION_CLUB_TOURNAMENTS_WRITE}>
                   <Button

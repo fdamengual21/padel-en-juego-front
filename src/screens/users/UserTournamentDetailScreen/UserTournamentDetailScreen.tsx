@@ -263,13 +263,27 @@ export default function UserTournamentDetailScreen() {
       />
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(String(value))}>
-        <TabsList className="flex h-auto flex-wrap gap-1">
-          <TabsTrigger value="grupos">Zonas</TabsTrigger>
-          <TabsTrigger value="participantes">Participantes</TabsTrigger>
-          <TabsTrigger value="cuadro">Cuadro</TabsTrigger>
-          {page.repechageCreated ? <TabsTrigger value="repechaje">Repechaje</TabsTrigger> : null}
-          <TabsTrigger value="partidos">Partidos</TabsTrigger>
-        </TabsList>
+        <div className="min-w-0 overflow-x-auto">
+          <TabsList className="h-8 w-max min-w-full">
+            <TabsTrigger value="grupos" className="flex-none">
+              Zonas
+            </TabsTrigger>
+            <TabsTrigger value="participantes" className="flex-none">
+              Participantes
+            </TabsTrigger>
+            <TabsTrigger value="cuadro" className="flex-none">
+              Cuadro
+            </TabsTrigger>
+            {page.repechageCreated ? (
+              <TabsTrigger value="repechaje" className="flex-none">
+                Repechaje
+              </TabsTrigger>
+            ) : null}
+            <TabsTrigger value="partidos" className="flex-none">
+              Partidos
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="grupos" className="space-y-4 pt-4">
           {zonesQuery.data?.notice ? (
