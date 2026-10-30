@@ -14,7 +14,7 @@ export default function ClubCourtConfigScreen() {
   const navigate = useNavigate();
   const { clubId } = useMockSession();
   const { can } = usePermissions();
-  const { session } = useClubSession();
+  const { session, isLoading: sessionLoading } = useClubSession();
   const queryClient = useQueryClient();
 
   const courtQuery = useQuery({
@@ -30,14 +30,14 @@ export default function ClubCourtConfigScreen() {
     status: session?.isActive === false ? "inactive" : "active",
     province: null,
     city: null,
-    openTime: session?.openTime ?? "08:00",
-    closeTime: session?.closeTime ?? "23:00",
+    openTime: session?.openTime ?? "",
+    closeTime: session?.closeTime ?? "",
     openDays: session?.openDays ?? [],
     createdAt: "",
     updatedAt: "",
   };
 
-  if (courtQuery.isLoading) {
+  if (courtQuery.isLoading || (sessionLoading && !session)) {
     return <p className="text-base text-muted-foreground">Cargando cancha…</p>;
   }
 
@@ -58,9 +58,10 @@ export default function ClubCourtConfigScreen() {
         ← Canchas
       </Link>
       <CourtConfigForm
+        key={`${club.openTime}-${club.closeTime}-${club.openDays.join(",")}`}
         club={club}
         court={court}
-        priceRules={court.priceRules ?? []}
+        priceRules={court.priceRules}
         readOnly={!can(PERMISSION_CLUB_COURTS_WRITE)}
         onCancel={() => navigate(ROUTES.club.courts)}
         onSaved={() => {

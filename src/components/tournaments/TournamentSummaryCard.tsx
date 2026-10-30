@@ -165,7 +165,7 @@ export default function TournamentSummaryCard({
       {isDescriptionTruncated ? (
         <Dialog open={descriptionOpen} onOpenChange={setDescriptionOpen}>
           <DialogContent
-            className="max-h-[85vh] max-w-lg overflow-y-auto"
+            className="max-w-lg"
             data-testid="tournament-description-dialog"
           >
             <DialogHeader>

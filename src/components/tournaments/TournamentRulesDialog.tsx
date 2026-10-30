@@ -53,7 +53,7 @@ export default function TournamentRulesDialog({
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
-      <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto" data-testid="tournament-rules-dialog">
+      <DialogContent className="max-w-lg" data-testid="tournament-rules-dialog">
         <DialogHeader>
           <DialogTitle>Reglamento · {tournamentFormatLabel(format)}</DialogTitle>
           <DialogDescription>

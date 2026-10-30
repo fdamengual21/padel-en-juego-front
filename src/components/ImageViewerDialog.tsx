@@ -125,7 +125,7 @@ export default function ImageViewerDialog({
         showCloseButton={false}
         overlayClassName="bg-black/80 supports-backdrop-filter:backdrop-blur-sm"
         className={cn(
-          "gap-0 overflow-hidden border-0 bg-black p-0 text-white shadow-none",
+          "gap-0 border-0 bg-black p-0 text-white shadow-none",
           isAvatar ? "max-w-lg" : "max-w-[min(96vw,64rem)]",
         )}
         data-testid="profile-image-viewer"

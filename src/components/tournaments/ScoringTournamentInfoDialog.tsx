@@ -33,7 +33,7 @@ export default function ScoringTournamentInfoDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        className="max-h-[min(42rem,calc(100%-2rem))] max-w-lg gap-0 overflow-hidden p-0"
+        className="max-h-[min(42rem,calc(100dvh-2rem))] max-w-lg gap-0 overflow-hidden p-0"
       >
         <div className="relative shrink-0 overflow-hidden bg-sidebar px-5 py-4 text-sidebar-foreground">
           <CourtMark />
@@ -68,7 +68,7 @@ export default function ScoringTournamentInfoDialog({
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4 text-sm text-foreground">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-4 text-sm text-foreground">
           <div className="flex gap-3 rounded-xl bg-muted px-3 py-3">
             <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
             <DialogDescription className="text-sm leading-snug text-foreground">

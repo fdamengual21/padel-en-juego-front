@@ -76,9 +76,13 @@ export {
 export {
   resolvePriceForSlot,
   validateCourtPriceRules,
+  inspectPriceRuleJornada,
+  findPriceRuleOverlap,
   listDayPriceRanges,
   isoWeekdayFromDate,
   type DayPriceRange,
+  type ClubJornada,
+  type PriceRuleJornadaIssues,
 } from "./courtPricing";
 export {
   PLAYER_SIDE_PREFERENCES,

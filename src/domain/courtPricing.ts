@@ -92,12 +92,106 @@ function ruleCoversStart(
   return evening || morningAfter;
 }
 
+export interface ClubJornada {
+  openTime: string | null;
+  closeTime: string | null;
+  openDays: readonly WeekdayIso[];
+}
+
+export interface PriceRuleJornadaIssues {
+  startTime?: string;
+  endTime?: string;
+  daysOfWeek?: string;
+  price?: string;
+  label?: string;
+}
+
+function jornadaHoursLabel(openTime: string, closeTime: string): string {
+  const open = parseHm(openTime);
+  const close = parseHm(closeTime);
+  if (Number.isFinite(open) && Number.isFinite(close) && close < open) {
+    return `${openTime}–${closeTime} (cierra día siguiente)`;
+  }
+  return `${openTime}–${closeTime}`;
+}
+
+/**
+ * La franja de una tarifa, en minutos desde el mediodía de apertura.
+ * Si "hasta" es menor, cruza medianoche y sigue siendo del día marcado
+ * (sábado 02:00 = jornada del viernes si abre 14:00–02:00).
+ */
+function ruleIntervalMinutes(
+  startTime: string,
+  endTime: string,
+): { start: number; end: number } | null {
+  const start = parseHm(startTime);
+  const end = parseHm(endTime);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start === end) {
+    return null;
+  }
+  return { start, end: end > start ? end : end + MINUTES_PER_DAY };
+}
+
+function jornadaWindowMinutes(
+  openTime: string,
+  closeTime: string,
+): { start: number; end: number } | null {
+  const open = parseHm(openTime);
+  const close = parseHm(closeTime);
+  if (!Number.isFinite(open) || !Number.isFinite(close) || open === close) {
+    return null;
+  }
+  return { start: open, end: close > open ? close : close + MINUTES_PER_DAY };
+}
+
+/**
+ * Marca desde/hasta/días que quedan fuera de la jornada del club.
+ * La madrugada del cierre (p. ej. sábado 01:00 si cierra 02:00) es del día
+ * en que abre (viernes), no del día calendario siguiente.
+ */
+export function inspectPriceRuleJornada(
+  rule: Pick<CourtPriceRuleDraft, "startTime" | "endTime" | "daysOfWeek">,
+  club: ClubJornada,
+): PriceRuleJornadaIssues | null {
+  const issues: PriceRuleJornadaIssues = {};
+  if (!club.openTime || !club.closeTime) {
+    issues.startTime = "El club no tiene horario de apertura.";
+    issues.endTime = "El club no tiene horario de apertura.";
+    return issues;
+  }
+
+  const closedDays = rule.daysOfWeek.filter(
+    (day) => !club.openDays.includes(day),
+  );
+  if (rule.daysOfWeek.length > 0 && closedDays.length > 0) {
+    issues.daysOfWeek = "La tarifa solo puede usar días en que abre el club.";
+  }
+
+  const window = jornadaWindowMinutes(club.openTime, club.closeTime);
+  const interval = ruleIntervalMinutes(rule.startTime, rule.endTime);
+  if (!window || !interval) {
+    return Object.keys(issues).length > 0 ? issues : null;
+  }
+
+  const hoursLabel = jornadaHoursLabel(club.openTime, club.closeTime);
+  const outOfHours = `Ese horario está fuera de la apertura del club (${hoursLabel}).`;
+  if (interval.start < window.start || interval.start >= window.end) {
+    issues.startTime = outOfHours;
+  }
+  if (interval.end <= window.start || interval.end > window.end) {
+    issues.endTime = outOfHours;
+  }
+
+  return Object.keys(issues).length > 0 ? issues : null;
+}
+
 /**
  * Valida franjas de tarifa: días, horarios y que no se solapen
  * en el mismo día. Devuelve mensaje en español o `null` si OK.
  */
 export function validateCourtPriceRules(
   rules: readonly CourtPriceRuleDraft[],
+  club?: ClubJornada,
 ): string | null {
   for (let i = 0; i < rules.length; i++) {
     const rule = rules[i]!;
@@ -115,8 +209,27 @@ export function validateCourtPriceRules(
     if (from === to) {
       return `La tarifa ${i + 1}: "desde" y "hasta" no pueden coincidir`;
     }
+    if (club) {
+      const issues = inspectPriceRuleJornada(rule, club);
+      if (issues?.daysOfWeek) {
+        return `La tarifa ${i + 1}: ${issues.daysOfWeek}`;
+      }
+      if (issues?.startTime) {
+        return `La tarifa ${i + 1}: ${issues.startTime}`;
+      }
+      if (issues?.endTime) {
+        return `La tarifa ${i + 1}: ${issues.endTime}`;
+      }
+    }
   }
 
+  const overlap = findPriceRuleOverlap(rules);
+  return overlap?.message ?? null;
+}
+
+export function findPriceRuleOverlap(
+  rules: readonly CourtPriceRuleDraft[],
+): { left: number; right: number; message: string } | null {
   for (let i = 0; i < rules.length; i++) {
     for (let j = i + 1; j < rules.length; j++) {
       const a = rules[i]!;
@@ -147,7 +260,11 @@ export function validateCourtPriceRules(
               (left, right) => left - right,
             );
       const daysLabel = days.map((d) => WEEKDAY_LABEL_ES[d]).join(", ");
-      return `Las tarifas ${i + 1} y ${j + 1} se solapan el ${daysLabel} (${a.startTime}–${a.endTime} y ${b.startTime}–${b.endTime})`;
+      return {
+        left: i,
+        right: j,
+        message: `Las tarifas ${i + 1} y ${j + 1} se solapan el ${daysLabel} (${a.startTime}–${a.endTime} y ${b.startTime}–${b.endTime})`,
+      };
     }
   }
 

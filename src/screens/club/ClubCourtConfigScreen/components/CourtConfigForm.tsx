@@ -1,17 +1,31 @@
 import { useEffect, useState } from "react";
+import { FormProvider, useFieldArray, useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
 import { Link } from "react-router-dom";
+import * as yup from "yup";
 import type { Club, Court, CourtPriceRule, CourtStatus, WeekdayIso } from "@/domain";
-import { COURT_STATUS_LABELS, validateCourtPriceRules } from "@/domain";
+import {
+  COURT_STATUS_LABELS,
+  findPriceRuleOverlap,
+  inspectPriceRuleJornada,
+} from "@/domain";
 import Api from "@/api/Api";
 import { toastError, toastSuccess } from "@/lib/toast";
+import {
+  applyApiFieldErrors,
+  fieldErrorsFromUnknown,
+  firstErrorPath,
+  scrollToFormField,
+} from "@/lib/formFieldErrors";
 import ImagePickerField from "@/components/ImagePickerField";
+import { FieldHint, InputField, SelectField } from "@/components/Form";
 import { Button } from "@/components/ui/button";
 import { PERMISSION_CLUB_SETTINGS_READ } from "@/authorization/permissionCodes";
 import { PermissionsGuard } from "@/components/guards";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { formatClubScheduleEs } from "@/lib/clubSchedule";
+import { clubClosesNextDay, formatClubScheduleEs } from "@/lib/clubSchedule";
 import { ROUTES } from "@/router/routes";
+import { cn } from "@/lib/utils";
 
 interface CourtConfigFormProps {
   club: Club;
@@ -32,33 +46,178 @@ const WEEKDAY_OPTIONS: { value: WeekdayIso; label: string }[] = [
   { value: 7, label: "D" },
 ];
 
-interface RuleDraft {
+const STATUS_OPTIONS = (Object.keys(COURT_STATUS_LABELS) as CourtStatus[]).map(
+  (value) => ({ value, label: COURT_STATUS_LABELS[value] }),
+);
+
+interface PriceRuleFormValue {
   id?: string;
   startTime: string;
   endTime: string;
   daysOfWeek: WeekdayIso[];
-  price: string;
+  price: number | null;
   label: string;
 }
 
-function emptyRuleDraft(): RuleDraft {
+interface CourtConfigFormValues {
+  name: string;
+  status: CourtStatus;
+  slotDurationMinutes: number;
+  basePrice: number | null;
+  priceRules: PriceRuleFormValue[];
+}
+
+function jornadaContext(club: Club) {
   return {
-    startTime: "18:00",
-    endTime: "23:00",
-    daysOfWeek: [1, 2, 3, 4, 5],
-    price: "16000",
-    label: "",
+    openTime: club.openTime || null,
+    closeTime: club.closeTime || null,
+    openDays: club.openDays ?? [],
   };
 }
 
-function toRuleDraft(rule: CourtPriceRule): RuleDraft {
+const schema = yup.object({
+  name: yup.string().trim().required("Ingresá el nombre de la cancha"),
+  status: yup.mixed<CourtStatus>().required("Elegí un estado"),
+  slotDurationMinutes: yup
+    .number()
+    .oneOf([90, 120], "Elegí 90 o 120 minutos")
+    .required("Elegí la duración del turno"),
+  basePrice: yup
+    .number()
+    .nullable()
+    .test("base-price", "Precio base inválido", (value) => value != null && value >= 0),
+  priceRules: yup
+    .array()
+    .of(
+      yup.object({
+        id: yup.string().optional(),
+        startTime: yup
+          .string()
+          .required("Indicá desde qué hora")
+          .test("jornada-start", function (value) {
+            const club = jornadaContextFromYup(this.options.context);
+            if (!club || !value) return true;
+            const issues = inspectPriceRuleJornada(
+              {
+                startTime: value,
+                endTime: this.parent.endTime,
+                daysOfWeek: this.parent.daysOfWeek ?? [],
+              },
+              club,
+            );
+            if (issues?.startTime) {
+              return this.createError({ message: issues.startTime });
+            }
+            return true;
+          }),
+        endTime: yup
+          .string()
+          .required("Indicá hasta qué hora")
+          .test("jornada-end", function (value) {
+            const club = jornadaContextFromYup(this.options.context);
+            if (!club || !value) return true;
+            const issues = inspectPriceRuleJornada(
+              {
+                startTime: this.parent.startTime,
+                endTime: value,
+                daysOfWeek: this.parent.daysOfWeek ?? [],
+              },
+              club,
+            );
+            if (issues?.endTime) {
+              return this.createError({ message: issues.endTime });
+            }
+            return true;
+          }),
+        daysOfWeek: yup
+          .array()
+          .of(
+            yup
+              .number()
+              .oneOf([1, 2, 3, 4, 5, 6, 7])
+              .required() as yup.NumberSchema<WeekdayIso>,
+          )
+          .min(1, "Elegí al menos un día")
+          .required("Elegí al menos un día")
+          .test("open-days", function (value) {
+            const club = jornadaContextFromYup(this.options.context);
+            if (!club || !value?.length) return true;
+            const issues = inspectPriceRuleJornada(
+              {
+                startTime: this.parent.startTime,
+                endTime: this.parent.endTime,
+                daysOfWeek: value as WeekdayIso[],
+              },
+              club,
+            );
+            if (issues?.daysOfWeek) {
+              return this.createError({ message: issues.daysOfWeek });
+            }
+            return true;
+          }),
+        price: yup
+          .number()
+          .nullable()
+          .test("rule-price", "Precio inválido", (value) => value != null && value >= 0),
+        label: yup.string().default(""),
+      }),
+    )
+    .required()
+    .test("no-overlap", function (rules) {
+      const overlap = findPriceRuleOverlap(
+        (rules ?? []).map((rule) => ({
+          startTime: rule.startTime,
+          endTime: rule.endTime,
+          daysOfWeek: rule.daysOfWeek,
+          price: rule.price ?? 0,
+        })),
+      );
+      if (!overlap) return true;
+      return this.createError({
+        path: `${this.path}.${overlap.right}.startTime`,
+        message: overlap.message,
+      });
+    }),
+});
+
+function jornadaContextFromYup(context: unknown) {
+  if (!context || typeof context !== "object") return null;
+  const club = context as {
+    openTime?: string | null;
+    closeTime?: string | null;
+    openDays?: WeekdayIso[];
+  };
   return {
-    id: rule.id,
-    startTime: rule.startTime,
-    endTime: rule.endTime,
-    daysOfWeek: [...rule.daysOfWeek],
-    price: String(rule.price),
-    label: rule.label ?? "",
+    openTime: club.openTime ?? null,
+    closeTime: club.closeTime ?? null,
+    openDays: club.openDays ?? [],
+  };
+}
+
+function toFormValues(court: Court, priceRules: CourtPriceRule[]): CourtConfigFormValues {
+  return {
+    name: court.name,
+    status: court.status,
+    slotDurationMinutes: court.slotDurationMinutes === 120 ? 120 : 90,
+    basePrice: court.basePrice,
+    priceRules: priceRules.map((rule) => ({
+      id: rule.id,
+      startTime: rule.startTime,
+      endTime: rule.endTime,
+      daysOfWeek: [...rule.daysOfWeek],
+      price: rule.price,
+      label: rule.label ?? "",
+    })),
+  };
+}
+
+function emptyRule(club: Club, basePrice: number | null): PriceRuleFormValue {
+  return {
+    startTime: club.openTime || "18:00",
+    endTime: club.closeTime || "23:00",
+    daysOfWeek: club.openDays.length > 0 ? [...club.openDays] : [1, 2, 3, 4, 5],
+    price: basePrice ?? 0,
+    label: "",
   };
 }
 
@@ -70,95 +229,105 @@ export default function CourtConfigForm({
   onCancel,
   onSaved,
 }: CourtConfigFormProps) {
-  const [name, setName] = useState(court.name);
-  const [status, setStatus] = useState<CourtStatus>(court.status);
-  const [slotDurationMinutes, setSlotDurationMinutes] = useState(90);
-  const [basePrice, setBasePrice] = useState("0");
-  const [rules, setRules] = useState<RuleDraft[]>([]);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [removePhoto, setRemovePhoto] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+
+  const form = useForm<CourtConfigFormValues>({
+    resolver: yupResolver(schema) as never,
+    mode: "onChange",
+    criteriaMode: "all",
+    shouldFocusError: true,
+    context: jornadaContext(club),
+    defaultValues: toFormValues(court, priceRules),
+  });
+
+  const {
+    control,
+    handleSubmit,
+    reset,
+    setError,
+    setFocus,
+    setValue,
+    watch,
+    formState: { isSubmitting, isValid, errors },
+  } = form;
+
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: "priceRules",
+  });
+
+  const watchedRules = watch("priceRules");
+  const basePrice = watch("basePrice");
+  const startHint = club.openTime
+    ? clubClosesNextDay(club.openTime, club.closeTime)
+      ? `Conviene alinearlo con la apertura del club (${club.openTime}). La madrugada hasta ${club.closeTime} cuenta como el día en que abre.`
+      : `Conviene alinearlo con la apertura del club (${club.openTime}).`
+    : "Conviene alinearlo con la apertura del club.";
 
   useEffect(() => {
-    setName(court.name);
-    setStatus(court.status);
-    setSlotDurationMinutes(court.slotDurationMinutes === 120 ? 120 : 90);
-    setBasePrice(String(court.basePrice));
-    setRules(priceRules.map(toRuleDraft));
+    reset(toFormValues(court, priceRules));
     setPhotoFile(null);
     setRemovePhoto(false);
-    setError(null);
-    setBusy(false);
-  }, [court, priceRules]);
+  }, [court, priceRules, reset]);
 
-  const toggleDay = (index: number, day: WeekdayIso) => {
-    setRules((prev) =>
-      prev.map((rule, i) => {
-        if (i !== index) return rule;
-        const has = rule.daysOfWeek.includes(day);
-        return {
-          ...rule,
-          daysOfWeek: has
-            ? rule.daysOfWeek.filter((d) => d !== day)
-            : [...rule.daysOfWeek, day].sort((a, b) => a - b),
-        };
-      }),
-    );
+  const focusFirstError = (formErrors: typeof errors) => {
+    const path = firstErrorPath(formErrors);
+    if (!path) return;
+    scrollToFormField(path);
   };
 
-  const handleSave = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      if (!name.trim()) throw new Error("Ingresá el nombre de la cancha");
-      const price = Number(basePrice);
-      if (!Number.isFinite(price) || price < 0) {
-        throw new Error("Precio base inválido");
+  const onSubmit = handleSubmit(
+    async (values) => {
+      try {
+        if (values.basePrice == null) throw new Error("Precio base inválido");
+        await Api.CourtService().update(court.id, {
+          name: values.name.trim(),
+          slotDurationMinutes: values.slotDurationMinutes,
+          basePrice: values.basePrice,
+          status: values.status,
+          priceRules: values.priceRules.map((rule) => ({
+            startTime: rule.startTime,
+            endTime: rule.endTime,
+            daysOfWeek: rule.daysOfWeek,
+            price: Number(rule.price),
+            label: rule.label.trim() || null,
+          })),
+        });
+
+        if (photoFile) {
+          await Api.CourtService().uploadPhoto(court.id, photoFile);
+        } else if (removePhoto && court.imageUrl) {
+          await Api.CourtService().deletePhoto(court.id);
+        }
+
+        toastSuccess("Cancha actualizada");
+        onSaved();
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "No se pudo guardar";
+        const apiFields = fieldErrorsFromUnknown(err);
+        if (apiFields) {
+          const paths = applyApiFieldErrors(setError, apiFields);
+          const first = paths[0];
+          if (first) {
+            void setFocus(first);
+            scrollToFormField(first);
+          }
+        }
+        toastError("No se pudo guardar la cancha", message);
       }
+    },
+    (formErrors) => {
+      focusFirstError(formErrors);
+    },
+  );
 
-      const draftRules = rules.map((rule) => ({
-        startTime: rule.startTime,
-        endTime: rule.endTime,
-        daysOfWeek: rule.daysOfWeek,
-        price: Number(rule.price),
-        label: rule.label.trim() || null,
-      }));
-      const rulesError = validateCourtPriceRules(draftRules);
-      if (rulesError) {
-        throw new Error(rulesError);
-      }
-
-      await Api.CourtService().update(court.id, {
-        name: name.trim(),
-        slotDurationMinutes,
-        basePrice: price,
-        status,
-        priceRules: draftRules,
-      });
-
-      if (photoFile) {
-        await Api.CourtService().uploadPhoto(court.id, photoFile);
-      } else if (removePhoto && court.imageUrl) {
-        await Api.CourtService().deletePhoto(court.id);
-      }
-
-      toastSuccess("Cancha actualizada");
-      onSaved();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "No se pudo guardar";
-      setError(message);
-      toastError("No se pudo guardar la cancha", message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const shownPhoto =
-    photoFile || removePhoto ? null : court.imageUrl;
+  const shownPhoto = photoFile || removePhoto ? null : court.imageUrl;
+  const hasSchedule = Boolean(club.openTime && club.closeTime);
 
   return (
-    <div className="space-y-5" data-testid="court-config-form">
+    <FormProvider {...form}>
+      <form className="space-y-5" data-testid="court-config-form" onSubmit={onSubmit} noValidate>
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">Configurar {court.name}</h2>
           <p className="text-sm text-muted-foreground">
@@ -173,11 +342,13 @@ export default function CourtConfigForm({
               <div>
                 <p className="text-sm font-medium">Horario del club</p>
                 <p className="text-sm text-muted-foreground">
-                  {formatClubScheduleEs(
-                    club.openTime,
-                    club.closeTime,
-                    club.openDays ?? [],
-                  )}
+                  {hasSchedule
+                    ? formatClubScheduleEs(
+                        club.openTime,
+                        club.closeTime,
+                        club.openDays ?? [],
+                      )
+                    : "Sin horario de apertura."}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   Solo lectura. Se edita en Configuración del club.
@@ -194,15 +365,12 @@ export default function CourtConfigForm({
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="court-name">Nombre</Label>
-            <Input
-              id="court-name"
-              value={name}
-              disabled={readOnly}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </div>
+          <InputField
+            control={control}
+            name="name"
+            label="Nombre"
+            disabled={readOnly}
+          />
 
           <div className="space-y-2">
             <Label htmlFor="court-photo">Foto</Label>
@@ -233,48 +401,34 @@ export default function CourtConfigForm({
             ) : null}
           </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="court-status">Estado</Label>
-            <select
-              id="court-status"
-              className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm"
-              value={status}
-              disabled={readOnly}
-              onChange={(event) => setStatus(event.target.value as CourtStatus)}
-            >
-              {(Object.keys(COURT_STATUS_LABELS) as CourtStatus[]).map((value) => (
-                <option key={value} value={value}>
-                  {COURT_STATUS_LABELS[value]}
-                </option>
-              ))}
-            </select>
-          </div>
+          <SelectField
+            control={control}
+            name="status"
+            label="Estado"
+            disabled={readOnly}
+            options={STATUS_OPTIONS}
+          />
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="slot-duration">Duración del turno</Label>
-              <select
-                id="slot-duration"
-                className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm"
-                value={slotDurationMinutes}
-                disabled={readOnly}
-                onChange={(e) => setSlotDurationMinutes(Number(e.target.value))}
-              >
-                <option value={90}>90 minutos</option>
-                <option value={120}>120 minutos</option>
-              </select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="base-price">Precio base (ARS)</Label>
-              <Input
-                id="base-price"
-                type="number"
-                min={0}
-                value={basePrice}
-                disabled={readOnly}
-                onChange={(e) => setBasePrice(e.target.value)}
-              />
-            </div>
+            <SelectField
+              control={control}
+              name="slotDurationMinutes"
+              label="Duración del turno"
+              disabled={readOnly}
+              valueAs="number"
+              options={[
+                { value: "90", label: "90 minutos" },
+                { value: "120", label: "120 minutos" },
+              ]}
+            />
+            <InputField
+              control={control}
+              name="basePrice"
+              label="Precio base (ARS)"
+              type="number"
+              min={0}
+              disabled={readOnly}
+            />
           </div>
 
           <div className="space-y-3">
@@ -285,138 +439,120 @@ export default function CourtConfigForm({
                   type="button"
                   size="sm"
                   variant="outline"
-                  onClick={() => setRules((prev) => [...prev, emptyRuleDraft()])}
+                  onClick={() => append(emptyRule(club, basePrice))}
                 >
                   Agregar tarifa
                 </Button>
               ) : null}
             </div>
 
-            {rules.length === 0 ? (
+            {fields.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 Sin tarifas: se usa el precio base.
               </p>
             ) : (
               <ul className="space-y-3">
-                {rules.map((rule, index) => (
-                  <li
-                    key={rule.id ?? `new-${index}`}
-                    className="space-y-2 rounded-lg border border-border p-3"
-                  >
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      <div className="space-y-1">
-                        <Label>Desde</Label>
-                        <Input
+                {fields.map((field, index) => {
+                  const dayError = errors.priceRules?.[index]?.daysOfWeek?.message;
+                  const daysId = `priceRules.${index}.daysOfWeek`;
+                  return (
+                    <li
+                      key={field.id}
+                      className="space-y-2 rounded-lg border border-border p-3"
+                    >
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <InputField
+                          control={control}
+                          name={`priceRules.${index}.startTime`}
+                          label="Desde"
                           type="time"
-                          value={rule.startTime}
                           disabled={readOnly}
-                          onChange={(e) =>
-                            setRules((prev) =>
-                              prev.map((item, i) =>
-                                i === index
-                                  ? { ...item, startTime: e.target.value }
-                                  : item,
-                              ),
-                            )
-                          }
+                          hint={startHint}
                         />
-                      </div>
-                      <div className="space-y-1">
-                        <Label>Hasta</Label>
-                        <Input
+                        <InputField
+                          control={control}
+                          name={`priceRules.${index}.endTime`}
+                          label="Hasta"
                           type="time"
-                          value={rule.endTime}
                           disabled={readOnly}
-                          onChange={(e) =>
-                            setRules((prev) =>
-                              prev.map((item, i) =>
-                                i === index
-                                  ? { ...item, endTime: e.target.value }
-                                  : item,
-                              ),
-                            )
-                          }
                         />
-                      </div>
-                      <div className="space-y-1">
-                        <Label>Precio</Label>
-                        <Input
+                        <InputField
+                          control={control}
+                          name={`priceRules.${index}.price`}
+                          label="Precio"
                           type="number"
                           min={0}
-                          value={rule.price}
                           disabled={readOnly}
-                          onChange={(e) =>
-                            setRules((prev) =>
-                              prev.map((item, i) =>
-                                i === index
-                                  ? { ...item, price: e.target.value }
-                                  : item,
-                              ),
-                            )
-                          }
+                        />
+                        <InputField
+                          control={control}
+                          name={`priceRules.${index}.label`}
+                          label="Etiqueta"
+                          disabled={readOnly}
                         />
                       </div>
                       <div className="space-y-1">
-                        <Label>Etiqueta</Label>
-                        <Input
-                          value={rule.label}
-                          placeholder="Ej. Finde noche"
-                          disabled={readOnly}
-                          onChange={(e) =>
-                            setRules((prev) =>
-                              prev.map((item, i) =>
-                                i === index
-                                  ? { ...item, label: e.target.value }
-                                  : item,
-                              ),
-                            )
-                          }
-                        />
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-1">
-                      {WEEKDAY_OPTIONS.map((day) => {
-                        const active = rule.daysOfWeek.includes(day.value);
-                        return (
-                          <button
-                            key={day.value}
-                            type="button"
-                            disabled={readOnly}
-                            className={
-                              active
-                                ? "rounded-md bg-primary px-2 py-1 text-xs text-primary-foreground disabled:opacity-70"
-                                : "rounded-md border border-border px-2 py-1 text-xs text-muted-foreground disabled:opacity-70"
-                            }
-                            onClick={() => {
-                              if (readOnly) return;
-                              toggleDay(index, day.value);
-                            }}
-                          >
-                            {day.label}
-                          </button>
-                        );
-                      })}
-                      {!readOnly ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          className="ml-auto text-destructive"
-                          onClick={() => {
-                            setRules((prev) => prev.filter((_, i) => i !== index));
-                          }}
+                        <div
+                          id={daysId}
+                          tabIndex={-1}
+                          className="flex flex-wrap items-center gap-1 outline-none"
                         >
-                          Eliminar
-                        </Button>
-                      ) : null}
-                    </div>
-                  </li>
-                ))}
+                          {WEEKDAY_OPTIONS.map((day) => {
+                            const selected = watchedRules[index]?.daysOfWeek ?? [];
+                            const active = selected.includes(day.value);
+                            return (
+                              <button
+                                key={day.value}
+                                type="button"
+                                disabled={readOnly}
+                                className={
+                                  active
+                                    ? "rounded-md bg-primary px-2 py-1 text-xs text-primary-foreground disabled:opacity-70"
+                                    : "rounded-md border border-border px-2 py-1 text-xs text-muted-foreground disabled:opacity-70"
+                                }
+                                onClick={() => {
+                                  if (readOnly) return;
+                                  const next = active
+                                    ? selected.filter((item) => item !== day.value)
+                                    : [...selected, day.value].sort((a, b) => a - b);
+                                  setValue(`priceRules.${index}.daysOfWeek`, next, {
+                                    shouldDirty: true,
+                                    shouldValidate: true,
+                                  });
+                                }}
+                              >
+                                {day.label}
+                              </button>
+                            );
+                          })}
+                          {!readOnly ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              className="ml-auto text-destructive"
+                              onClick={() => remove(index)}
+                            >
+                              Eliminar
+                            </Button>
+                          ) : null}
+                        </div>
+                        {dayError ? (
+                          <p id={`${daysId}-error`} className="text-xs text-destructive">
+                            {dayError}
+                          </p>
+                        ) : (
+                          <FieldHint>
+                            Si el club cierra de madrugada, esa franja es del día en que abre.
+                          </FieldHint>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>
-
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
         </div>
 
         <div className="flex gap-2">
@@ -424,11 +560,16 @@ export default function CourtConfigForm({
             Volver
           </Button>
           {!readOnly ? (
-            <Button type="button" disabled={busy} onClick={() => void handleSave()}>
-              {busy ? "Guardando…" : "Guardar"}
+            <Button
+              type="submit"
+              disabled={isSubmitting || !isValid}
+              className={cn(isSubmitting && "opacity-80")}
+            >
+              {isSubmitting ? "Guardando…" : "Guardar"}
             </Button>
           ) : null}
         </div>
-    </div>
+      </form>
+    </FormProvider>
   );
 }

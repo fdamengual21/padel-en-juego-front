@@ -45,8 +45,8 @@ export default function LegalDocumentDialog({
       open={open}
       onOpenChange={onOpenChange}
     >
-      <DialogContent className="max-h-[min(90vh,44rem)] max-w-2xl gap-0 overflow-hidden p-0 sm:max-w-2xl">
-        <DialogHeader className="border-b border-border px-5 py-4 pr-12">
+      <DialogContent className="max-h-[min(44rem,calc(100dvh-2rem))] max-w-2xl gap-0 overflow-hidden p-0 sm:max-w-2xl">
+        <DialogHeader className="shrink-0 border-b border-border px-5 py-4 pr-12">
           <DialogTitle>Documentos legales</DialogTitle>
           <DialogDescription>{documentMeta(active)}</DialogDescription>
         </DialogHeader>
@@ -54,9 +54,9 @@ export default function LegalDocumentDialog({
         <Tabs
           value={tab}
           onValueChange={(value) => setTab(value as LegalDocumentType)}
-          className="min-h-0 gap-0"
+          className="flex min-h-0 flex-1 flex-col gap-0 overflow-hidden"
         >
-          <div className="px-5 pt-3">
+          <div className="shrink-0 px-5 pt-3">
             <TabsList className="w-full">
               <TabsTrigger value="privacy" className="flex-1">
                 Privacidad
@@ -68,7 +68,7 @@ export default function LegalDocumentDialog({
           </div>
           <TabsContent
             value="privacy"
-            className="max-h-[min(55vh,28rem)] overflow-y-auto px-5 py-4"
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4"
           >
             {documents ? (
               <LegalMarkdown markdown={documents.privacy.body} />
@@ -76,13 +76,13 @@ export default function LegalDocumentDialog({
           </TabsContent>
           <TabsContent
             value="terms"
-            className="max-h-[min(55vh,28rem)] overflow-y-auto px-5 py-4"
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4"
           >
             {documents ? <LegalMarkdown markdown={documents.terms.body} /> : null}
           </TabsContent>
         </Tabs>
 
-        <DialogFooter className="border-t border-border px-5 py-3">
+        <DialogFooter className="shrink-0 border-t border-border px-5 py-3">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Cerrar
           </Button>

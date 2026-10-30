@@ -392,7 +392,7 @@ export default function CourtReservationModal({
           className="max-w-lg gap-0 overflow-hidden p-0"
           data-testid="court-reservation-modal"
         >
-          <DialogHeader className="gap-2 border-b border-border px-4 py-4">
+          <DialogHeader className="shrink-0 gap-2 border-b border-border px-4 py-4">
             <div className="flex items-start gap-3">
               <div className="flex size-10 items-center justify-center rounded-lg bg-primary/15 text-foreground">
                 <CalendarClock className="size-5" />
@@ -408,7 +408,7 @@ export default function CourtReservationModal({
             </div>
           </DialogHeader>
 
-          <div className="space-y-4 px-4 py-4">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4">
             {readOnly ? (
               <dl className="grid gap-3 text-sm sm:grid-cols-2">
                 <div>
@@ -612,7 +612,7 @@ export default function CourtReservationModal({
             {error ? <p className="text-sm text-destructive">{error}</p> : null}
           </div>
 
-          <DialogFooter className="border-t border-border px-4 py-3 sm:justify-between">
+          <DialogFooter className="shrink-0 border-t border-border px-4 py-3 sm:justify-between">
             <div className="flex flex-wrap gap-2">
               {canMutate &&
               mode === "view" &&

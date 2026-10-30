@@ -131,7 +131,7 @@ export default function MatchResultModal({
         className="max-w-md gap-3 p-0 overflow-hidden"
         data-testid="match-result-modal"
       >
-        <DialogHeader className="px-4 pt-4">
+        <DialogHeader className="shrink-0 px-4 pt-4">
           <DialogTitle>
             {readOnly
               ? "Resultado"
@@ -148,7 +148,7 @@ export default function MatchResultModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="px-4">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4">
           <MatchScoreboard
             pairANames={pairANames}
             pairBNames={pairBNames}
@@ -164,7 +164,7 @@ export default function MatchResultModal({
           {error ? <p className="mt-2 text-sm text-destructive">{error}</p> : null}
         </div>
 
-        <DialogFooter className="px-4 pb-4">
+        <DialogFooter className="shrink-0 px-4 pb-4">
           {readOnly ? (
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cerrar

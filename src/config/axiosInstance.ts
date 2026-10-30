@@ -5,6 +5,7 @@ import {
 } from "./handleGlobal401ResponseError";
 import {
   ApiHttpError,
+  fieldErrorsFromEnvelope,
   messageFromEnvelope,
   type ApiEnvelope,
 } from "@/lib/apiClient";
@@ -52,6 +53,7 @@ axiosInstance.interceptors.response.use(
       throw new ApiHttpError(
         messageFromEnvelope(body, "No se pudo completar la operación"),
         response.status,
+        fieldErrorsFromEnvelope(body),
       );
     }
     return response;
@@ -78,6 +80,7 @@ axiosInstance.interceptors.response.use(
         new ApiHttpError(
           messageFromEnvelope(body, "No se pudo completar la operación"),
           status,
+          fieldErrorsFromEnvelope(body),
         ),
       );
     }

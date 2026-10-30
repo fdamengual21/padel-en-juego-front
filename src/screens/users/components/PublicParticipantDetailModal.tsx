@@ -48,7 +48,7 @@ export default function PublicParticipantDetailModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="flex max-h-[90vh] max-w-2xl flex-col gap-0 overflow-hidden p-0"
+        className="flex max-w-2xl flex-col gap-0 overflow-hidden p-0"
         data-testid="registration-detail-modal"
       >
         <DialogHeader className="shrink-0 border-b border-border px-4 py-4">
@@ -59,7 +59,7 @@ export default function PublicParticipantDetailModal({
           </DialogDescription>
         </DialogHeader>
         {row ? (
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4">
             {playersQuery.isLoading ? (
               <p className="flex items-center gap-2 text-sm text-muted-foreground">
                 <LoaderCircle className="size-4 animate-spin" />
