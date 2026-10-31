@@ -1,6 +1,5 @@
 import { Link } from "react-router-dom";
 import dayjs from "dayjs";
-import { ChevronRight } from "lucide-react";
 import { useState } from "react";
 import StatusBadge from "@/components/tournaments/StatusBadge";
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +54,7 @@ export default function HomeTournamentCard({
     : (tournament.bannerUrl ?? tournament.clubCoverUrl ?? tournament.clubAvatarUrl);
   const category =
     tournament.categories?.map((item) => item.name).filter(Boolean).join(" · ") || "Sin categoría";
+  const meta = tournament.clubName ? `${tournament.clubName} · ${category}` : category;
   const chip = tournament.myRegistrationStatus
     ? inscriptionChip[tournament.myRegistrationStatus]
     : undefined;
@@ -65,7 +65,7 @@ export default function HomeTournamentCard({
       className="flex min-w-0 cursor-pointer gap-3 overflow-hidden rounded-xl border border-border bg-card p-3.5 text-left"
       data-testid={`home-tournament-${tournament.id}`}
     >
-      <div className="relative size-[72px] shrink-0 overflow-hidden rounded-md bg-muted">
+      <div className="relative w-[72px] shrink-0 self-stretch overflow-hidden rounded-md bg-muted">
         {photo ? (
           <img
             src={photo}
@@ -83,12 +83,8 @@ export default function HomeTournamentCard({
         <p className="min-w-0 truncate text-sm font-semibold tracking-tight">
           {tournament.name}
         </p>
-        <StatusBadge status={tournament.status} className="w-fit max-w-full shrink-0" />
-        {tournament.clubName ? (
-          <p className="truncate text-sm text-muted-foreground">{tournament.clubName}</p>
-        ) : null}
         <div className="flex min-w-0 items-center gap-2">
-          <p className="min-w-0 truncate text-sm text-muted-foreground">{category}</p>
+          <p className="min-w-0 truncate text-sm text-muted-foreground">{meta}</p>
           {chip ? (
             <Badge
               variant="secondary"
@@ -98,13 +94,10 @@ export default function HomeTournamentCard({
             </Badge>
           ) : null}
         </div>
-        <div className="mt-auto flex min-w-0 items-center gap-2 pt-2">
-          <span className="min-w-0 truncate text-xs font-bold text-foreground">
+        <div className="mt-auto flex min-w-0 items-center gap-2">
+          <StatusBadge status={tournament.status} className="min-w-0 w-fit max-w-full shrink" />
+          <span className="ml-auto shrink-0 text-xs font-bold text-foreground">
             {formatRange(tournament.startDate, tournament.endDate)}
-          </span>
-          <span className="ml-auto inline-flex shrink-0 items-center text-xs font-medium text-primary-strong">
-            Ver torneo
-            <ChevronRight className="size-3.5" aria-hidden />
           </span>
         </div>
       </div>
