@@ -375,7 +375,6 @@ export default function UserTournamentDetailScreen() {
               onOpenResult={openResult}
               onOpenPair={openPairDetail}
               readOnly
-              tournamentStarted={page.tournamentStarted}
               tournamentLocked={tournamentLocked}
             />
           ) : cuadroQuery.isFetching ? (
@@ -418,7 +417,6 @@ export default function UserTournamentDetailScreen() {
                   onOpenResult={openResult}
                   onOpenPair={openPairDetail}
                   readOnly
-                  tournamentStarted={page.tournamentStarted}
                   tournamentLocked={tournamentLocked}
                 />
               </>

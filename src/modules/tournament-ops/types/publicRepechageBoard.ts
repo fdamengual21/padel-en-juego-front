@@ -21,6 +21,7 @@ export interface PublicRepechageBoard {
   pairLabels: Record<string, string>;
   pairPlayerNames: Record<string, [string, string]>;
   matchRules: MatchRules;
+  courts: Array<{ id: string; name: string }>;
   allMatches: Match[];
   finishedGroupIds: string[];
   unresolvedTies: UnresolvedTie[];

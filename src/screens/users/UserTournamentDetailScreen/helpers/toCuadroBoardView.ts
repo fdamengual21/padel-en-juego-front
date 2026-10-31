@@ -16,6 +16,7 @@ export function toCuadroBoardView(
     pairLabels: board.pairLabels,
     pairPlayerNames: board.pairPlayerNames,
     matchRules: board.matchRules,
+    courts: board.courts ?? [],
     unresolvedTies: board.unresolvedTies,
     pairingCandidates: [],
     notice: board.notice,

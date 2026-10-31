@@ -17,6 +17,7 @@ import {
   matchMoveBlockedReason,
   matchPairingBlockedReason,
   matchWinnerSide,
+  qualifyChangeBlockedReason,
   scoreboardSlotCount,
   tieBreakHint,
   tieBreakLabel,
@@ -27,6 +28,7 @@ import MatchCourtSelect, {
 } from "./MatchScheduleCell";
 import MatchPairingModal from "./MatchPairingModal";
 import MovePairPhaseModal from "./MovePairPhaseModal";
+import QualifyPairModal from "./QualifyPairModal";
 import ResolveTieModal from "./ResolveTieModal";
 import { EmptyState } from "@/components/EmptyState";
 import MatchLiveButton from "@/components/tournaments/MatchLiveButton";
@@ -148,6 +150,8 @@ interface GroupZonesPanelProps {
     groupId?: string;
   }) => Promise<void> | void;
   moveSaving?: boolean;
+  onQualifyPair?: (input: { matchId: string; pairId: string | null }) => Promise<void> | void;
+  qualifySaving?: boolean;
 }
 
 const STANDINGS_HINT =
@@ -379,14 +383,14 @@ function ZoneSectionFrame({
         />
       </button>
       <div className="overflow-x-auto">
-        <Table className={cn("table-fixed text-xs", showActions ? "min-w-[50rem]" : "min-w-[44rem]")}>
+        <Table className={cn("table-fixed text-xs", showActions ? "min-w-[41.3rem]" : "min-w-[35.3rem]")}>
           <colgroup>
             <col className="w-[2.5rem]" />
-            <col className="w-[8rem]" />
+            <col className="w-[4rem]" />
             <col className="w-[7.25rem]" />
             <col className="w-[6.25rem]" />
             <col className="w-[17rem]" />
-            <col className="w-[11rem]" />
+            <col className="w-[6.3rem]" />
             {showActions ? <col className="w-[5.5rem]" /> : null}
             {showAgenda ? <col className="w-[7.5rem]" /> : null}
           </colgroup>
@@ -476,11 +480,14 @@ export default function GroupZonesPanel({
   pairingSavingMatchId = null,
   onMovePair,
   moveSaving = false,
+  onQualifyPair,
+  qualifySaving = false,
 }: GroupZonesPanelProps) {
   const [scheduleMatchId, setScheduleMatchId] = useState<string | null>(null);
   const [tieGroupId, setTieGroupId] = useState<string | null>(null);
   const [pairingMatchId, setPairingMatchId] = useState<string | null>(null);
   const [movingMatchId, setMovingMatchId] = useState<string | null>(null);
+  const [qualifyingMatchId, setQualifyingMatchId] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const tieByGroup = new Map(unresolvedTies.map((tie) => [tie.groupId, tie]));
   const tieGroup = tieGroupId ? (groups.find((g) => g.id === tieGroupId) ?? null) : null;
@@ -538,6 +545,23 @@ export default function GroupZonesPanel({
       pairId,
       names: pairNamesFromLabel(pairId, pairLabels, pairPlayerNames),
     }));
+  const qualifyingMatch =
+    qualifyingMatchId != null
+      ? (scheduleMatches.find((match) => match.id === qualifyingMatchId) ?? null)
+      : null;
+  const qualifyingPairs = [qualifyingMatch?.pairAId, qualifyingMatch?.pairBId]
+    .filter((id): id is string => Boolean(id))
+    .map((pairId) => ({
+      pairId,
+      names: pairNamesFromLabel(pairId, pairLabels, pairPlayerNames),
+    }));
+  const qualifyingLockedReason = qualifyingMatch
+    ? qualifyChangeBlockedReason(qualifyingMatch, scheduleMatches, slots)
+    : null;
+  const nextQualifyIndex =
+    qualifyingMatch != null ? knockoutPhases.indexOf(qualifyingMatch.phase) : -1;
+  const nextQualifyPhase =
+    nextQualifyIndex >= 0 ? knockoutPhases[nextQualifyIndex + 1] : undefined;
   const knockoutPairingCandidates = [
     ...new Set([
       ...groups.flatMap((group) => group.pairIds),
@@ -1163,6 +1187,47 @@ export default function GroupZonesPanel({
             if (!pairingMatch) return;
             await onSetPairing({ matchId: pairingMatch.id, pairAId, pairBId, note });
             setPairingMatchId(null);
+          }}
+          onQualify={
+            onQualifyPair && pairingMatch?.roundId
+              ? () => {
+                  setQualifyingMatchId(pairingMatch.id);
+                  setPairingMatchId(null);
+                }
+              : undefined
+          }
+        />
+      ) : null}
+
+      {onQualifyPair ? (
+        <QualifyPairModal
+          open={Boolean(qualifyingMatch)}
+          roundLabel={
+            qualifyingMatch
+              ? roundSectionLabel(qualifyingMatch.phase)
+              : "esta ronda"
+          }
+          nextRoundLabel={nextQualifyPhase ? roundSectionLabel(nextQualifyPhase) : null}
+          pairs={qualifyingPairs}
+          isSubmitting={qualifySaving}
+          lockedReason={qualifyingLockedReason}
+          alreadyClassified={qualifyingMatch?.status === "walkover"}
+          initialPairId={
+            qualifyingMatch?.winnerPairId ??
+            qualifyingMatch?.pairAId ??
+            qualifyingMatch?.pairBId
+          }
+          onOpenChange={(open) => {
+            if (!open) setQualifyingMatchId(null);
+          }}
+          onSubmit={async (pairId) => {
+            if (!qualifyingMatch) return;
+            if (pairId == null && qualifyingMatch.status !== "walkover") {
+              setQualifyingMatchId(null);
+              return;
+            }
+            await onQualifyPair({ matchId: qualifyingMatch.id, pairId });
+            setQualifyingMatchId(null);
           }}
         />
       ) : null}

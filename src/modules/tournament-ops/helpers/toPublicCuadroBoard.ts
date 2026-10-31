@@ -16,6 +16,7 @@ export function toPublicCuadroBoard(dto: PublicCuadroBoardDto): PublicCuadroBoar
     pairLabels: dto.pairLabels ?? {},
     pairPlayerNames: toPairPlayerNames(dto.pairPlayerNames),
     matchRules: toMatchRules(dto.matchRules),
+    courts: (dto.courts ?? []).map((court) => ({ id: court.id, name: court.name })),
     unresolvedTies: dto.unresolvedTies ?? [],
     notice: dto.notice ?? null,
   };

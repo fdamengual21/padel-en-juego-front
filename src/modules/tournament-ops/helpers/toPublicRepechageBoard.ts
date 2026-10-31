@@ -17,6 +17,7 @@ export function toPublicRepechageBoard(dto: PublicRepechageBoardDto): PublicRepe
     pairLabels: dto.pairLabels ?? {},
     pairPlayerNames: toPairPlayerNames(dto.pairPlayerNames),
     matchRules: toMatchRules(dto.matchRules),
+    courts: (dto.courts ?? []).map((court) => ({ id: court.id, name: court.name })),
     allMatches: dto.allMatches ?? dto.groupMatches ?? [],
     finishedGroupIds: dto.finishedGroupIds ?? [],
     unresolvedTies: dto.unresolvedTies ?? [],

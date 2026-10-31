@@ -885,6 +885,8 @@ export interface CuadroBoardView {
   pairLabels: Record<string, string>;
   pairPlayerNames: Record<string, [string, string]>;
   matchRules: MatchRules;
+  /** Canchas del club (id + nombre) para el diagrama. */
+  courts: Array<Pick<Court, "id" | "name">>;
   /** Zonas con empates que esperan al club; sus puestos no pasan al cuadro. */
   unresolvedTies: UnresolvedTie[];
   /** Parejas que pueden ocupar un cruce a mano: aceptadas, en el cuadro y sin retiro. */

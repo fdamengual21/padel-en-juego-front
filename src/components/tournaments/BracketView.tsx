@@ -16,12 +16,7 @@ import type {
   TournamentGroup,
   TournamentRound,
 } from "@/domain";
-import {
-  canOpenMatchResult,
-  matchLiveAction,
-  matchWinnerSide,
-  scoreboardSlotCount,
-} from "@/domain";
+import { canOpenMatchResult, matchWinnerSide, scoreboardSlotCount } from "@/domain";
 import "@xyflow/react/dist/style.css";
 import RoundMatchesTable, {
   type MatchTableRow,
@@ -31,12 +26,14 @@ import { matchPlayStatusHint, resolveMatchPlayStatus } from "@/lib/matchPlayStat
 import { roundSectionLabel } from "@/lib/tournamentLabels";
 import { cn } from "@/lib/utils";
 
-const ZONE_W = 760;
-const ROUND_W = 760;
+const ZONE_W = 620;
+const ROUND_W = 620;
 const COL_GAP = 64;
 const ROW_GAP = 28;
 const HEADER_H = 44;
 const TABLE_HEADER_H = 36;
+/** Fila de título de zona (Zona A) encima de las columnas. */
+const TABLE_TITLE_H = 28;
 /** Fila con PairVsBlock (2 líneas) + cuadrados de resultado. */
 const TABLE_ROW_H = 56;
 
@@ -45,43 +42,27 @@ interface BracketViewProps {
   matches: Match[];
   slots: MatchSlot[];
   pairLabels: Record<string, string>;
-  pairPlayerNames?: Record<string, [string, string]>;
   matchRules?: MatchRules;
   groups?: TournamentGroup[];
   groupMatches?: Match[];
+  courts?: Array<{ id: string; name: string }>;
   onMatchClick?: (match: Match) => void;
   /** Si es false, la fila solo abre cuando el partido ya tiene resultado. */
   canEditResult?: boolean;
   onOpenPair?: (pairId: string) => void;
-  /** Cruce manual. Si falta, no se muestra la opción. */
-  onEditPairing?: (match: Match) => void;
-  /** Motivo por el que un cruce no se puede modificar; null si se puede. */
-  pairingBlockedReason?: (match: Match) => string | null;
-  /** Mover pareja a otra ronda o zona. Si falta, no se muestra. */
-  onMovePair?: (match: Match) => void;
-  /** Motivo por el que no se puede mover; null si se puede. */
-  moveBlockedReason?: (match: Match) => string | null;
-  onSetStatus?: (input: { matchId: string; status: "scheduled" | "inProgress" }) => void;
-  statusSavingMatchId?: string | null;
-  tournamentStarted?: boolean;
   heightClassName?: string;
 }
 
 type MatchesTableNodeData = {
-  title: string;
+  title?: string | null;
   rows: MatchTableRow[];
   slotCount: number;
   decidingSlotIndex: number | null;
-  showIndexColumn: boolean;
   showTargetHandle: boolean;
   emptyLabel: string;
   testId: string;
   onOpenMatch?: (matchId: string) => void;
   onOpenPair?: (pairId: string) => void;
-  onEditPairing?: (matchId: string) => void;
-  onMovePair?: (matchId: string) => void;
-  onSetStatus?: (matchId: string, status: "scheduled" | "inProgress") => void;
-  statusSavingMatchId?: string | null;
 };
 
 export function displayZoneName(name: string): string {
@@ -99,14 +80,21 @@ function zoneWithoutMatchesLabel(
   return "Sin partidos en esta zona.";
 }
 
-function pairIndexInGroup(group: TournamentGroup, pairId: string | null): number | null {
-  if (!pairId) return null;
-  const idx = group.pairIds.indexOf(pairId);
-  return idx >= 0 ? idx + 1 : null;
+function resolveCourtName(
+  courtId: string | null,
+  courtNames: Record<string, string>,
+): string {
+  if (!courtId) return "Sin cancha";
+  return courtNames[courtId] ?? "Sin cancha";
 }
 
-function tableNodeHeight(rowCount: number): number {
-  return TABLE_HEADER_H + Math.max(1, rowCount) * TABLE_ROW_H + 2;
+function tableNodeHeight(rowCount: number, hasTitle = false): number {
+  return (
+    (hasTitle ? TABLE_TITLE_H : 0) +
+    TABLE_HEADER_H +
+    Math.max(1, rowCount) * TABLE_ROW_H +
+    2
+  );
 }
 
 function MatchesTableNode({ data }: NodeProps) {
@@ -125,14 +113,9 @@ function MatchesTableNode({ data }: NodeProps) {
         rows={d.rows}
         slotCount={d.slotCount}
         decidingSlotIndex={d.decidingSlotIndex}
-        showIndexColumn={d.showIndexColumn}
         emptyLabel={d.emptyLabel}
         onOpenMatch={d.onOpenMatch}
         onOpenPair={d.onOpenPair}
-        onEditPairing={d.onEditPairing}
-        onMovePair={d.onMovePair}
-        onSetStatus={d.onSetStatus}
-        statusSavingMatchId={d.statusSavingMatchId}
       />
     </div>
   );
@@ -192,16 +175,6 @@ const FALLBACK_RULES: MatchRules = {
 
 const EDGE_STYLE = { stroke: "#64748b", strokeWidth: 2 };
 
-function liveRowFields(
-  match: Match,
-  enabled: boolean,
-  started: boolean,
-): Pick<MatchTableRow, "liveKind" | "liveBlockedReason"> {
-  if (!enabled) return {};
-  const live = matchLiveAction(match, started);
-  return { liveKind: live.kind, liveBlockedReason: live.blockedReason };
-}
-
 function openMatchHandler(
   matches: Match[],
   onMatchClick?: (match: Match) => void,
@@ -219,20 +192,13 @@ export default function BracketView({
   matches,
   slots,
   pairLabels,
-  pairPlayerNames = {},
   matchRules = FALLBACK_RULES,
   groups = [],
   groupMatches = [],
+  courts = [],
   onMatchClick,
   canEditResult = true,
   onOpenPair,
-  onEditPairing,
-  pairingBlockedReason,
-  onMovePair,
-  moveBlockedReason,
-  onSetStatus,
-  statusSavingMatchId = null,
-  tournamentStarted = false,
   heightClassName = "h-[560px]",
 }: BracketViewProps) {
   const groupNames = useMemo(() => {
@@ -240,6 +206,11 @@ export default function BracketView({
     for (const g of groups) map[g.id] = displayZoneName(g.name);
     return map;
   }, [groups]);
+  const courtNames = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const court of courts) map[court.id] = court.name;
+    return map;
+  }, [courts]);
 
   const { nodes, edges } = useMemo(() => {
     const sortedRounds = [...rounds].sort((a, b) => a.order - b.order);
@@ -284,23 +255,12 @@ export default function BracketView({
         const zoneMatches = groupMatches
           .filter((m) => m.groupId === group.id && m.phase === "GROUP")
           .sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
-        const rows: MatchTableRow[] = zoneMatches.map((match, index) => {
-          const seedA = pairIndexInGroup(group, match.pairAId);
-          const seedB = pairIndexInGroup(group, match.pairBId);
+        const rows: MatchTableRow[] = zoneMatches.map((match) => {
           const labelA = resolvePairLabel(match, "A", slots, pairLabels, groupNames);
           const labelB = resolvePairLabel(match, "B", slots, pairLabels, groupNames);
-          const vs =
-            seedA && seedB
-              ? `${seedA} vs ${seedB}`
-              : labelA === "Ganador" && labelB === "Ganador"
-                ? "G vs G"
-                : labelA === "Perdedor" && labelB === "Perdedor"
-                  ? "P vs P"
-                  : "—";
           return {
-            n: index + 1,
-            vs,
             schedule: formatScheduleShortEs(match.scheduledAt),
+            court: resolveCourtName(match.courtId, courtNames),
             matchId: match.id,
             pairAId: match.pairAId,
             pairBId: match.pairBId,
@@ -313,16 +273,9 @@ export default function BracketView({
             canOpen: Boolean(onMatchClick && canOpenMatchResult(match, canEditResult)),
             pairingManual: match.pairingManual,
             pairingNote: match.pairingNote,
-            pairingBlockedReason: onEditPairing
-              ? (pairingBlockedReason?.(match) ?? null)
-              : undefined,
-            moveBlockedReason: onMovePair
-              ? (moveBlockedReason?.(match) ?? null)
-              : undefined,
-            ...liveRowFields(match, Boolean(onSetStatus), tournamentStarted),
           };
         });
-        const h = tableNodeHeight(rows.length);
+        const h = tableNodeHeight(rows.length, true);
         nodesOut.push({
           id: `zone-${group.id}`,
           type: "matchesTable",
@@ -334,18 +287,11 @@ export default function BracketView({
             rows,
             slotCount,
             decidingSlotIndex,
-            showIndexColumn: true,
             showTargetHandle: false,
             emptyLabel: zoneWithoutMatchesLabel(group, pairLabels),
             testId: `zone-table-node-${displayZoneName(group.name)}`,
             onOpenMatch: openMatchHandler(zoneMatches, onMatchClick),
             onOpenPair,
-            onEditPairing: openMatchHandler(zoneMatches, onEditPairing),
-            onMovePair: openMatchHandler(zoneMatches, onMovePair),
-            onSetStatus: onSetStatus
-              ? (matchId, status) => onSetStatus({ matchId, status })
-              : undefined,
-            statusSavingMatchId,
           } satisfies MatchesTableNodeData,
           sourcePosition: Position.Right,
           draggable: false,
@@ -380,10 +326,9 @@ export default function BracketView({
         : roundIndex * (ROUND_W + COL_GAP);
       const roundLabel = roundSectionLabel(round.type, round.name);
       const roundMatches = matchesByRound.get(round.id) ?? [];
-      const rows: MatchTableRow[] = roundMatches.map((match, index) => ({
-        n: index + 1,
-        vs: "—",
+      const rows: MatchTableRow[] = roundMatches.map((match) => ({
         schedule: formatScheduleShortEs(match.scheduledAt),
+        court: resolveCourtName(match.courtId, courtNames),
         matchId: match.id,
         pairAId: match.pairAId,
         pairBId: match.pairBId,
@@ -396,11 +341,6 @@ export default function BracketView({
         canOpen: Boolean(onMatchClick && canOpenMatchResult(match, canEditResult)),
         pairingManual: match.pairingManual,
         pairingNote: match.pairingNote,
-        pairingBlockedReason: onEditPairing
-          ? (pairingBlockedReason?.(match) ?? null)
-          : undefined,
-        moveBlockedReason: onMovePair ? (moveBlockedReason?.(match) ?? null) : undefined,
-        ...liveRowFields(match, Boolean(onSetStatus), tournamentStarted),
       }));
       const h = tableNodeHeight(rows.length);
       const y = HEADER_H + Math.max(0, (referenceHeight - h) / 2);
@@ -421,27 +361,14 @@ export default function BracketView({
         className: "nopan nodrag nowheel !overflow-visible",
         style: { width: ROUND_W, height: h, pointerEvents: "all", zIndex: 10 },
         data: {
-          title: roundLabel,
           rows,
           slotCount,
           decidingSlotIndex,
-          showIndexColumn: false,
           showTargetHandle: hasZones || roundIndex > 0,
           emptyLabel: "Sin partidos en esta ronda.",
           testId: `round-table-node-${round.type}`,
           onOpenMatch: openMatchHandler(roundMatches, onMatchClick),
           onOpenPair,
-          onEditPairing: openMatchHandler(roundMatches, onEditPairing),
-          onMovePair: onMovePair
-            ? (matchId) => {
-                const match = roundMatches.find((item) => item.id === matchId);
-                if (match) onMovePair(match);
-              }
-            : undefined,
-          onSetStatus: onSetStatus
-            ? (matchId, status) => onSetStatus({ matchId, status })
-            : undefined,
-          statusSavingMatchId,
         } satisfies MatchesTableNodeData,
         sourcePosition: Position.Right,
         targetPosition: Position.Left,
@@ -479,21 +406,14 @@ export default function BracketView({
     matches,
     slots,
     pairLabels,
-    pairPlayerNames,
     matchRules,
     groups,
     groupMatches,
     onMatchClick,
     canEditResult,
     onOpenPair,
-    onEditPairing,
-    pairingBlockedReason,
-    onMovePair,
-    moveBlockedReason,
-    onSetStatus,
-    statusSavingMatchId,
-    tournamentStarted,
     groupNames,
+    courtNames,
   ]);
 
   return (

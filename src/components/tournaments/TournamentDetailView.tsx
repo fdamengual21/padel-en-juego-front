@@ -1772,6 +1772,10 @@ export default function TournamentDetailView({
               onMovePair={async (input) => {
                 await movePairMutation.mutateAsync(input);
               }}
+              qualifySaving={qualifyPairMutation.isPending}
+              onQualifyPair={async (input) => {
+                await qualifyPairMutation.mutateAsync(input);
+              }}
             />
           ) : (
             <p className="text-sm text-muted-foreground">Cargando zonas…</p>
@@ -1785,28 +1789,7 @@ export default function TournamentDetailView({
               isLoading={cuadroFetching}
               onOpenResult={openResult}
               onOpenPair={openPairDetail}
-              tournamentStarted={tournamentStarted}
               tournamentLocked={tournamentLocked}
-              pairingSavingMatchId={
-                pairingMutation.isPending
-                  ? (pairingMutation.variables?.matchId ?? null)
-                  : null
-              }
-              onSetPairing={async (input) => {
-                await pairingMutation.mutateAsync(input);
-              }}
-              moveSaving={movePairMutation.isPending}
-              onMovePair={async (input) => {
-                await movePairMutation.mutateAsync(input);
-              }}
-              qualifySaving={qualifyPairMutation.isPending}
-              onQualifyPair={async (input) => {
-                await qualifyPairMutation.mutateAsync(input);
-              }}
-              statusSavingMatchId={
-                setLive.isPending ? (setLive.variables?.matchId ?? null) : null
-              }
-              onSetStatus={requestSetStatus}
             />
           ) : cuadroFetching ? (
             <p className="text-sm text-muted-foreground">Cargando cuadro…</p>
@@ -1900,30 +1883,17 @@ export default function TournamentDetailView({
                 onMovePair={async (input) => {
                   await movePairMutation.mutateAsync(input);
                 }}
+                qualifySaving={qualifyPairMutation.isPending}
+                onQualifyPair={async (input) => {
+                  await qualifyPairMutation.mutateAsync(input);
+                }}
               />
               <CuadroBoard
                 board={repechageBoard}
                 isLoading={repechageFetching}
                 onOpenResult={openResult}
                 onOpenPair={openPairDetail}
-                tournamentStarted={tournamentStarted}
                 tournamentLocked={tournamentLocked}
-                pairingSavingMatchId={
-                  pairingMutation.isPending
-                    ? (pairingMutation.variables?.matchId ?? null)
-                    : null
-                }
-                onSetPairing={async (input) => {
-                  await pairingMutation.mutateAsync(input);
-                }}
-                moveSaving={movePairMutation.isPending}
-                onMovePair={async (input) => {
-                  await movePairMutation.mutateAsync(input);
-                }}
-                qualifySaving={qualifyPairMutation.isPending}
-                onQualifyPair={async (input) => {
-                  await qualifyPairMutation.mutateAsync(input);
-                }}
               />
             </>
           ) : repechageFetching ? (

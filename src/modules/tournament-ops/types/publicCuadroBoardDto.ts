@@ -19,6 +19,7 @@ export interface PublicCuadroBoardDto {
   pairLabels: Record<string, string>;
   pairPlayerNames: Record<string, string[]>;
   matchRules: MatchRules;
+  courts?: Array<{ id: string; name: string }>;
   unresolvedTies: UnresolvedTie[];
   notice: string | null;
 }

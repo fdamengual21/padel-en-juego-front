@@ -114,6 +114,7 @@ export function emptyCuadroBoard(categoryId: string): CuadroBoardView {
     pairLabels: {},
     pairPlayerNames: {},
     matchRules: DEFAULT_MATCH_RULES,
+    courts: [],
     unresolvedTies: [],
     pairingCandidates: [],
     knockoutStructure: null,
