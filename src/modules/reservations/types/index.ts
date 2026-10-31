@@ -87,11 +87,17 @@ export interface ClubFreeSlots {
   withinThreeHours: number;
 }
 
-/** Ingresos del día según el precio del turno, no una caja. */
-export interface ClubDayIncome {
+/** Ingresos de un período según el precio del turno, no una caja. */
+export interface ClubPeriodIncome {
   amount: number;
-  /** Porcentaje contra ayer. Null si ayer no hubo ingresos. */
+  /** Porcentaje contra el período anterior. Null si el anterior no tuvo ingresos. */
   deltaPercent: number | null;
+}
+
+/** Ingresos del día y del mes en el resumen. */
+export interface ClubIncome {
+  day: ClubPeriodIncome;
+  month: ClubPeriodIncome;
 }
 
 /** Cards del resumen. Los turnos de hoy y los pendientes llegan por otro request. */
@@ -99,7 +105,7 @@ export interface ClubReservationSummary {
   month: ClubMonthOccupancy;
   today: ClubTodayOccupancy;
   freeSlots: ClubFreeSlots;
-  income: ClubDayIncome;
+  income: ClubIncome;
 }
 
 /** Turno de hoy en el resumen del club. */

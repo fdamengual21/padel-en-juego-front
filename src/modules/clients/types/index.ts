@@ -19,6 +19,7 @@ export interface ClubClient {
   sidePreference: string | null;
   avatarUrl: string | null;
   hasAccount: boolean;
+  note: string | null;
   reservationsCount: number;
 }
 
@@ -38,4 +39,5 @@ export interface SaveClubClientInput {
   phone: string;
   categoryLevel: number;
   sidePreference?: string | null;
+  note?: string | null;
 }

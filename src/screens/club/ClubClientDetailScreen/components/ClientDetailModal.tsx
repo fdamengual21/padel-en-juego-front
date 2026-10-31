@@ -50,7 +50,7 @@ export default function ClientDetailModal({
   const sideLabel = playerSidePreferenceLabel(data?.sidePreference);
 
   const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: ["club-client", clubId, clientId] });
+    void queryClient.invalidateQueries({ queryKey: ["club-client"] });
     void queryClient.invalidateQueries({ queryKey: ["club-clients", clubId] });
   };
 
@@ -64,7 +64,9 @@ export default function ClientDetailModal({
           <DialogTitle>{editing ? "Editar cliente" : title}</DialogTitle>
           <DialogDescription>
             {editing
-              ? "Nombre, apellido, email, sexo, teléfono y categoría."
+              ? data?.hasAccount
+                ? "Esta ficha tiene cuenta. Los datos los edita el jugador; el club solo puede dejar una nota."
+                : "Nombre, apellido, email, sexo, teléfono y categoría."
               : "Ficha del cliente en el club"}
           </DialogDescription>
         </DialogHeader>
@@ -74,11 +76,12 @@ export default function ClientDetailModal({
             <p className="text-sm text-muted-foreground">Cargando cliente…</p>
           ) : isError || !data ? (
             <p className="text-sm text-muted-foreground">No se encontró el cliente.</p>
-          ) : editing && !data.hasAccount ? (
+          ) : editing ? (
             <ClientFormDialog
               embedded
               open
               clientId={data.id}
+              hasAccount={data.hasAccount}
               onOpenChange={onOpenChange}
               onCancel={() => setEditing(false)}
               onSaved={refresh}
@@ -104,6 +107,13 @@ export default function ClientDetailModal({
                 ]}
               />
 
+              <div className="space-y-1.5">
+                <p className="text-sm font-medium">Nota</p>
+                <p className="whitespace-pre-wrap text-sm text-foreground">
+                  {data.note?.trim() || "—"}
+                </p>
+              </div>
+
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="rounded-xl border border-border bg-card px-4 py-3">
                   <p className="text-xs text-muted-foreground">Reservas</p>
@@ -116,7 +126,7 @@ export default function ClientDetailModal({
           )}
         </div>
 
-        {!editing && data && !data.hasAccount && can(PERMISSION_CLUB_CLIENTS_WRITE) ? (
+        {!editing && data && can(PERMISSION_CLUB_CLIENTS_WRITE) ? (
           <DialogFooter className="shrink-0 border-t border-border px-4 py-4">
             <Button type="button" onClick={() => setEditing(true)}>
               Editar

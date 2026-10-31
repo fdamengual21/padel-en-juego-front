@@ -13,6 +13,7 @@ import type {
   PlayerReservationClub,
   PlayerReservationStatus,
   ClubReservationSummary,
+  ClubPeriodIncome,
   ClubTodayTurn,
   ClubTodayTurnStatus,
   CourtFixedReservation,
@@ -108,6 +109,13 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value as Record<string, unknown>;
 }
 
+function normalizePeriodIncome(raw: Record<string, unknown> | null): ClubPeriodIncome {
+  return {
+    amount: asNumber(raw?.amount),
+    deltaPercent: asPercent(raw?.deltaPercent),
+  };
+}
+
 function normalizeTodayTurn(item: Record<string, unknown>): ClubTodayTurn {
   return {
     reservationId: asString(item.reservationId) || null,
@@ -141,8 +149,8 @@ function normalizeSummary(raw: Record<string, unknown> | null): ClubReservationS
       withinThreeHours: asNumber(freeSlots?.withinThreeHours),
     },
     income: {
-      amount: asNumber(income?.amount),
-      deltaPercent: asPercent(income?.deltaPercent),
+      day: normalizePeriodIncome(asRecord(income?.day)),
+      month: normalizePeriodIncome(asRecord(income?.month)),
     },
   };
 }

@@ -74,6 +74,7 @@ function normalizeClient(raw: Record<string, unknown>): ClubClient {
     categoryLevel: item.categoryLevel,
     sidePreference: isPlayerSidePreference(raw.sidePreference) ? raw.sidePreference : null,
     hasAccount: raw.hasAccount === true,
+    note: asNullableString(raw.note),
     reservationsCount: asNullableNumber(raw.reservationsCount) ?? 0,
   };
 }

@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Calendar, CalendarRange, ChevronRight, CircleDollarSign, Clock, Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import type { ClubReservationSummary } from "@/modules/reservations";
+import type { ClubPeriodIncome, ClubReservationSummary } from "@/modules/reservations";
 import DashboardIconWell from "@/screens/club/components/DashboardIconWell";
 import { OccupancyDetailDialog } from "./DashboardOccupancyHelp";
 
@@ -120,27 +120,63 @@ export function IncomeCard({ summary, isLoading, isError }: IncomeCardProps) {
   const income = summary?.income;
   return (
     <article className={cn(compactCard, "bg-success/10")}>
-      <div className="flex items-center gap-2">
-        <DashboardIconWell icon={CircleDollarSign} tone="accent" />
-        <p className="text-sm text-muted-foreground">Ingresos del día</p>
-      </div>
       {isError || !income ? (
-        <p className="mt-2 text-sm text-muted-foreground">No se pudieron cargar los ingresos.</p>
-      ) : (
         <>
-          <p className="mt-2 text-2xl font-semibold leading-none tabular-nums tracking-tight">
-            {formatMoney(income.amount)}
-          </p>
-          {income.deltaPercent != null ? (
-            <p className={cn("mt-1 text-xs font-medium", deltaTone(income.deltaPercent))}>
-              {formatDelta(income.deltaPercent, "ayer")}
-            </p>
-          ) : (
-            <p className="mt-1 text-xs text-muted-foreground">hoy</p>
-          )}
+          <div className="flex items-center gap-2">
+            <DashboardIconWell icon={CircleDollarSign} tone="accent" />
+            <p className="text-sm text-muted-foreground">Ingresos</p>
+          </div>
+          <p className="mt-2 text-sm text-muted-foreground">No se pudieron cargar los ingresos.</p>
         </>
+      ) : (
+        <div className="flex min-h-0 flex-1 items-stretch">
+          <IncomeColumn
+            label="Ingresos del día"
+            value={income.day}
+            against="ayer"
+            fallbackCaption="hoy"
+          />
+          <span className="mx-3 my-2 w-px shrink-0 self-stretch bg-border" aria-hidden />
+          <IncomeColumn
+            label="Ingresos del mes"
+            value={income.month}
+            against="mes anterior"
+            fallbackCaption="este mes"
+          />
+        </div>
       )}
     </article>
+  );
+}
+
+function IncomeColumn({
+  label,
+  value,
+  against,
+  fallbackCaption,
+}: {
+  label: string;
+  value: ClubPeriodIncome;
+  against: string;
+  fallbackCaption: string;
+}) {
+  return (
+    <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex items-center gap-2">
+        <DashboardIconWell icon={CircleDollarSign} tone="accent" />
+        <p className="text-sm text-muted-foreground">{label}</p>
+      </div>
+      <p className="mt-2 text-xl font-semibold leading-none tabular-nums tracking-tight">
+        {formatMoney(value.amount)}
+      </p>
+      {value.deltaPercent != null ? (
+        <p className={cn("mt-1 text-xs font-medium", deltaTone(value.deltaPercent))}>
+          {formatDelta(value.deltaPercent, against)}
+        </p>
+      ) : (
+        <p className="mt-1 text-xs text-muted-foreground">{fallbackCaption}</p>
+      )}
+    </div>
   );
 }
 

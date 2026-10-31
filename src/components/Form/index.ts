@@ -6,3 +6,5 @@ export type { DateFieldName } from "./DateField";
 export { default as SelectField } from "./SelectField";
 export type { SelectFieldOption, SelectFieldName } from "./SelectField";
 export { default as PhoneField } from "./PhoneField";
+export { default as TextareaField } from "./TextareaField";
+export type { TextareaFieldName } from "./TextareaField";
