@@ -26,8 +26,9 @@ import { matchPlayStatusHint, resolveMatchPlayStatus } from "@/lib/matchPlayStat
 import { roundSectionLabel } from "@/lib/tournamentLabels";
 import { cn } from "@/lib/utils";
 
-const ZONE_W = 620;
-const ROUND_W = 620;
+/** 10% menos en Partidos + Resultado respecto de 620. */
+const ZONE_W = 576;
+const ROUND_W = 576;
 const COL_GAP = 64;
 const ROW_GAP = 28;
 const HEADER_H = 44;

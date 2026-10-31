@@ -11,6 +11,7 @@ import { isCategoryLevel } from "@/domain";
 import Api from "@/api/Api";
 import DuplicateIdentityDialog from "@/components/auth/DuplicateIdentityDialog";
 import { Button } from "@/components/ui/button";
+import WarningDialog from "@/components/ui/warning-dialog";
 import {
   Dialog,
   DialogContent,
@@ -30,6 +31,11 @@ import PlayerPickerField, {
   type ManualPlayerDraft,
   type PlayerSlotValue,
 } from "./PlayerPickerField";
+import SoloRegistrantsPicker, {
+  type SoloRegistrationCandidate,
+} from "./SoloRegistrantsPicker";
+
+export type { SoloRegistrationCandidate };
 
 export interface PairFormSubmitValues {
   player1Id: string;
@@ -37,6 +43,8 @@ export interface PairFormSubmitValues {
   sidePreference: PairSidePreference | null;
   rankingPointsPlayer1: number | null;
   rankingPointsPlayer2: number | null;
+  joinedSolo?: boolean;
+  splitSolo?: boolean;
   availability?: Array<{
     date: string;
     startTime: string;
@@ -61,6 +69,8 @@ interface PairFormModalProps {
   categoryId: string;
   /** Jugadores que ya ocupan un lugar en la categoría. */
   enrolledPlayerIds?: string[];
+  /** Otras inscripciones incompletas vigentes de la categoría. */
+  soloCandidates?: SoloRegistrationCandidate[];
   isSaving?: boolean;
   onOpenChange: (open: boolean) => void;
   onCreatePlayer: (draft: ManualPlayerDraft) => Promise<Player>;
@@ -208,6 +218,7 @@ export default function PairFormModal({
   dailyEndTime,
   categoryId,
   enrolledPlayerIds = [],
+  soloCandidates = [],
   isSaving = false,
   onOpenChange,
   onCreatePlayer,
@@ -215,6 +226,10 @@ export default function PairFormModal({
 }: PairFormModalProps) {
   const [slot1, setSlot1] = useState<PlayerSlotValue>(emptyPlayerSlot);
   const [slot2, setSlot2] = useState<PlayerSlotValue>(emptyPlayerSlot);
+  const [selectedSoloPlayerId, setSelectedSoloPlayerId] = useState<string | null>(
+    null,
+  );
+  const [confirmSplitOpen, setConfirmSplitOpen] = useState(false);
   const [points1, setPoints1] = useState("");
   const [points2, setPoints2] = useState("");
   const [availability, setAvailability] = useState<AvailabilityDraft[]>([]);
@@ -248,6 +263,8 @@ export default function PairFormModal({
     setDupOpen(false);
     setDupMatches([]);
     setSkipDupForSlot({});
+    setSelectedSoloPlayerId(null);
+    setConfirmSplitOpen(false);
     if (mode === "edit" && pair) {
       if (editPlayers.isLoading) return;
       if (editPlayers.isError) {
@@ -356,6 +373,95 @@ export default function PairFormModal({
   const exclude2 = slot1PlayerId
     ? [...blockedPlayerIds, slot1PlayerId]
     : blockedPlayerIds;
+  const visibleSoloCandidates = useMemo(
+    () =>
+      soloCandidates.filter(
+        (candidate) =>
+          candidate.playerId !== slot1PlayerId &&
+          candidate.playerId !== pair?.player1Id,
+      ),
+    [soloCandidates, slot1PlayerId, pair?.player1Id],
+  );
+  const showSoloList =
+    mode === "edit" && slot2Empty && visibleSoloCandidates.length > 0;
+  const removingPartner =
+    mode === "edit" && Boolean(pair?.player2Id) && slot2Empty && !selectedSoloPlayerId;
+
+  const savePair = async () => {
+    setError(null);
+    try {
+      const maybeCheck = async (
+        slot: PlayerSlotValue,
+        slotIndex: 1 | 2,
+      ): Promise<"blocked" | "ok"> => {
+        if (slot.mode !== "manual") return "ok";
+        if (skipDupForSlot[slotIndex]) return "ok";
+        const draft = slot.draft;
+        if (!draft.email.trim() && !draft.phone.trim()) return "ok";
+        const { matches } =
+          await Api.TournamentOpsService().findIdentityMatches({
+            clubId,
+            email: draft.email || null,
+            phone: draft.phone || null,
+          });
+        if (matches.length === 0) return "ok";
+        setDupSlot(slotIndex);
+        setDupMatches(matches);
+        setDupOpen(true);
+        return "blocked";
+      };
+
+      if ((await maybeCheck(slot1, 1)) === "blocked") return;
+      if (
+        !selectedSoloPlayerId &&
+        !slot2Empty &&
+        (await maybeCheck(slot2, 2)) === "blocked"
+      ) {
+        return;
+      }
+
+      const player1Id = await resolveSlotPlayerId(slot1, onCreatePlayer);
+      if (!player1Id) {
+        setError("Completá el jugador 1 (nombre y apellido)");
+        return;
+      }
+      const joinedSolo = Boolean(selectedSoloPlayerId);
+      const player2Id = selectedSoloPlayerId
+        ? selectedSoloPlayerId
+        : slot2Empty
+          ? null
+          : await resolveSlotPlayerId(slot2, onCreatePlayer);
+      if (!joinedSolo && !slot2Empty && !player2Id) {
+        setError(
+          "Completá el jugador 2 (nombre y apellido) o dejalo vacío",
+        );
+        return;
+      }
+      await onSubmit({
+        player1Id,
+        player2Id,
+        sidePreference: player2Id ? null : sidePreferenceFromSlot(slot1),
+        rankingPointsPlayer1: showRankingSnapshot
+          ? parsePointsInput(points1)
+          : null,
+        rankingPointsPlayer2:
+          showRankingSnapshot && player2Id
+            ? parsePointsInput(points2)
+            : null,
+        joinedSolo,
+        splitSolo: Boolean(pair?.player2Id) && !player2Id,
+        availability:
+          requireAvailability && mode === "create"
+            ? availability.filter((a) => a.date && a.startTime && a.endTime)
+            : undefined,
+      });
+      onOpenChange(false);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "No se pudo guardar";
+      setError(message);
+      toastError("No se pudo guardar", message);
+    }
+  };
 
   return (
     <>
@@ -386,8 +492,21 @@ export default function PairFormModal({
             label="Jugador 2 (opcional)"
             value={slot2}
             excludeIds={exclude2}
-            onChange={setSlot2}
+            onChange={(value) => {
+              setSelectedSoloPlayerId(null);
+              setSlot2(value);
+            }}
           />
+          {showSoloList ? (
+            <SoloRegistrantsPicker
+              candidates={visibleSoloCandidates}
+              selectedPlayerId={selectedSoloPlayerId}
+              onSelect={(playerId) => {
+                setSelectedSoloPlayerId(playerId);
+                if (playerId) setSlot2(emptyPlayerSlot());
+              }}
+            />
+          ) : null}
 
           {showRankingSnapshot ? (
             <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
@@ -504,80 +623,11 @@ export default function PairFormModal({
             type="button"
             disabled={!canSubmit}
             onClick={() => {
-              void (async () => {
-                setError(null);
-                try {
-                  const maybeCheck = async (
-                    slot: PlayerSlotValue,
-                    slotIndex: 1 | 2,
-                  ): Promise<"blocked" | "ok"> => {
-                    if (slot.mode !== "manual") return "ok";
-                    if (skipDupForSlot[slotIndex]) return "ok";
-                    const draft = slot.draft;
-                    if (!draft.email.trim() && !draft.phone.trim()) return "ok";
-                    const { matches } =
-                      await Api.TournamentOpsService().findIdentityMatches({
-                        clubId,
-                        email: draft.email || null,
-                        phone: draft.phone || null,
-                      });
-                    if (matches.length === 0) return "ok";
-                    setDupSlot(slotIndex);
-                    setDupMatches(matches);
-                    setDupOpen(true);
-                    return "blocked";
-                  };
-
-                  if ((await maybeCheck(slot1, 1)) === "blocked") return;
-                  if (!slot2Empty && (await maybeCheck(slot2, 2)) === "blocked") {
-                    return;
-                  }
-
-                  const player1Id = await resolveSlotPlayerId(
-                    slot1,
-                    onCreatePlayer,
-                  );
-                  if (!player1Id) {
-                    setError("Completá el jugador 1 (nombre y apellido)");
-                    return;
-                  }
-                  const player2Id = slot2Empty
-                    ? null
-                    : await resolveSlotPlayerId(slot2, onCreatePlayer);
-                  if (!slot2Empty && !player2Id) {
-                    setError(
-                      "Completá el jugador 2 (nombre y apellido) o dejalo vacío",
-                    );
-                    return;
-                  }
-                  await onSubmit({
-                    player1Id,
-                    player2Id,
-                    sidePreference: player2Id
-                      ? null
-                      : sidePreferenceFromSlot(slot1),
-                    rankingPointsPlayer1: showRankingSnapshot
-                      ? parsePointsInput(points1)
-                      : null,
-                    rankingPointsPlayer2:
-                      showRankingSnapshot && player2Id
-                        ? parsePointsInput(points2)
-                        : null,
-                    availability:
-                      requireAvailability && mode === "create"
-                        ? availability.filter(
-                            (a) => a.date && a.startTime && a.endTime,
-                          )
-                        : undefined,
-                  });
-                  onOpenChange(false);
-                } catch (err) {
-                  const message =
-                    err instanceof Error ? err.message : "No se pudo guardar";
-                  setError(message);
-                  toastError("No se pudo guardar", message);
-                }
-              })();
+              if (removingPartner) {
+                setConfirmSplitOpen(true);
+                return;
+              }
+              void savePair();
             }}
           >
             {isSaving ? "Guardando…" : "Guardar"}
@@ -614,6 +664,19 @@ export default function PairFormModal({
       onCreateNew={() => {
         setSkipDupForSlot((prev) => ({ ...prev, [dupSlot]: true }));
         setDupOpen(false);
+      }}
+    />
+    <WarningDialog
+      open={confirmSplitOpen}
+      onOpenChange={setConfirmSplitOpen}
+      title="Quitar compañero"
+      description="Al quitarle la pareja, la inscripción queda pendiente hasta que le asignes un compañero."
+      confirmLabel="Quitar y dejar pendiente"
+      cancelLabel="Volver"
+      isConfirming={isSaving}
+      onConfirm={() => {
+        setConfirmSplitOpen(false);
+        void savePair();
       }}
     />
     </>

@@ -512,8 +512,8 @@ export default function GroupZonesPanel({
     return (
       <EmptyState
         icon={Users}
-        title="Todavía no hay parejas confirmadas."
-        description="Cuando los jugadores se inscriban, se generarán las zonas y se completará el cuadro del torneo."
+        title="Todavía no hay zonas"
+        description="Hacen falta al menos dos parejas aceptadas y completas para armar las zonas y el cuadro."
         className={compact ? "min-h-0 py-8" : undefined}
       />
     );

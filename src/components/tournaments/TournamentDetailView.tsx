@@ -9,7 +9,6 @@ import {
   canOpenMatchResult,
   isMatchResultComplete,
   isQualityPreset,
-  knockoutRebuildBlockedReason,
   resolveMatchDurationMinutes,
   FIVE_PAIR_ZONE_NOTICE,
   acceptedOverflowSubstitutes,
@@ -54,11 +53,12 @@ import Avatar from "@/components/Avatar";
 import { formatRegisteredAtEs } from "@/lib/dates";
 import ClientDetailModal from "@/screens/club/ClubClientDetailScreen/components/ClientDetailModal";
 import CuadroBoard from "@/screens/club/ClubTournamentDetailScreen/components/CuadroBoard";
-import KnockoutPhasesModal from "@/screens/club/ClubTournamentDetailScreen/components/KnockoutPhasesModal";
 import GroupZonesPanel from "@/screens/club/ClubTournamentDetailScreen/components/GroupZonesPanel";
 import RepechagePairsModal from "@/screens/club/ClubTournamentDetailScreen/components/RepechagePairsModal";
 import MatchResultModal from "@/screens/club/ClubTournamentDetailScreen/components/MatchResultModal";
-import PairFormModal from "@/screens/club/ClubTournamentDetailScreen/components/PairFormModal";
+import PairFormModal, {
+  type SoloRegistrationCandidate,
+} from "@/screens/club/ClubTournamentDetailScreen/components/PairFormModal";
 import TournamentForm, {
   defaultTournamentFormValues,
 } from "@/screens/club/components/TournamentForm";
@@ -187,7 +187,6 @@ export default function TournamentDetailView({
   const [finishOk, setFinishOk] = useState(false);
   const [finishDetail, setFinishDetail] = useState("");
   const [activeTab, setActiveTab] = useState("grupos");
-  const [knockoutPhasesOpen, setKnockoutPhasesOpen] = useState(false);
   const [repechagePairsOpen, setRepechagePairsOpen] = useState(false);
   const [repechageCreatedLocal, setRepechageCreatedLocal] = useState(false);
   const [clientDetailId, setClientDetailId] = useState<string | null>(null);
@@ -387,6 +386,8 @@ export default function TournamentDetailView({
       sidePreference: import("@/domain").PairSidePreference | null;
       rankingPointsPlayer1?: number | null;
       rankingPointsPlayer2?: number | null;
+      joinedSolo?: boolean;
+      splitSolo?: boolean;
       availability?: Array<{
         date: string;
         startTime: string;
@@ -429,8 +430,13 @@ export default function TournamentDetailView({
           "Pareja armada automáticamente",
           `${data.autoMatch.player1Name} y ${data.autoMatch.player2Name} se unieron por preferencia de lado`,
         );
+      } else if (vars.splitSolo) {
+        toastSuccess(
+          "Inscripción pendiente",
+          "Queda pendiente hasta que le asignes un compañero.",
+        );
       } else if (vars.mode === "edit") {
-        toastSuccess("Pareja actualizada");
+        toastSuccess(vars.joinedSolo ? "Pareja unida" : "Pareja actualizada");
       } else if (status === "ACCEPTED") {
         toastSuccess("Inscripción aceptada");
       } else if (status === "WAITLIST") {
@@ -449,7 +455,7 @@ export default function TournamentDetailView({
         status === "ACCEPTED" ||
         Boolean(data.autoMatch) ||
         (data.kind === "edit" && Boolean(vars.player2Id));
-      if (accepted) {
+      if (accepted || vars.splitSolo) {
         const result =
           await Api.TournamentOpsService().syncCategoryStructure(categoryId);
         if (result.message) toastInfo("Estructura actualizada", result.message);
@@ -524,6 +530,29 @@ export default function TournamentDetailView({
       if (row.pair.player2Id) ids.push(row.pair.player2Id);
     }
     return ids;
+  }, [participantsBoard?.rows]);
+
+  const soloCandidates = useMemo(() => {
+    const items: SoloRegistrationCandidate[] = [];
+    for (const row of participantsBoard?.rows ?? []) {
+      const status = row.registration?.status;
+      if (!row.incomplete || !row.pair.player1Id) continue;
+      if (
+        status !== "PENDING" &&
+        status !== "ACCEPTED" &&
+        status !== "WAITLIST"
+      ) {
+        continue;
+      }
+      items.push({
+        pairId: row.pair.id,
+        playerId: row.pair.player1Id,
+        displayName: row.playerNames[0] ?? "Jugador",
+        status,
+        sidePreference: row.pair.sidePreference,
+      });
+    }
+    return items;
   }, [participantsBoard?.rows]);
 
   const submitResult = useMutation({
@@ -686,38 +715,6 @@ export default function TournamentDetailView({
       const logic = err instanceof ApiHttpError && err.status === 422;
       toastError(
         logic ? "No se puede desempatar así" : "No se pudo resolver el empate",
-        logic ? err.message : undefined,
-      );
-    },
-  });
-
-  const addKnockoutPhaseMutation = useMutation({
-    mutationFn: (phase: MatchPhase) =>
-      Api.TournamentOpsService().addKnockoutPhase(categoryId, phase),
-    onSuccess: async (result) => {
-      toastSuccess("Ronda agregada", result.message);
-      await invalidateOps();
-    },
-    onError: (err: Error) => {
-      const logic = err instanceof ApiHttpError && err.status === 422;
-      toastError(
-        logic ? "No se puede agregar esa ronda" : "No se pudo agregar la ronda",
-        logic ? err.message : undefined,
-      );
-    },
-  });
-
-  const removeKnockoutPhaseMutation = useMutation({
-    mutationFn: (phase: MatchPhase) =>
-      Api.TournamentOpsService().removeKnockoutPhase(categoryId, phase),
-    onSuccess: async (result) => {
-      toastSuccess("Ronda quitada", result.message);
-      await invalidateOps();
-    },
-    onError: (err: Error) => {
-      const logic = err instanceof ApiHttpError && err.status === 422;
-      toastError(
-        logic ? "No se puede quitar esa ronda" : "No se pudo quitar la ronda",
         logic ? err.message : undefined,
       );
     },
@@ -982,6 +979,46 @@ export default function TournamentDetailView({
     return ids.size;
   }, [repechageBoard]);
 
+  const overflowSubstituteLabels = useMemo(() => {
+    if (!pendingConfigSave?.overflow) return [];
+    const nextMax = pendingConfigSave.values.maxPairs;
+    const items = registrations.flatMap((registration) => {
+      const pair = pairs.find((item) => item.id === registration.pairId);
+      if (!pair) return [];
+      return [
+        {
+          pairId: pair.id,
+          player2Id: pair.player2Id,
+          pairStatus: pair.status,
+          registrationId: registration.id,
+          registrationStatus: registration.status,
+          registeredAt: registration.registeredAt,
+          statusChangedAt: registration.statusChangedAt,
+          sidePreference: pair.sidePreference,
+        },
+      ];
+    });
+    const sideByPair = new Map(
+      items.map((item) => [item.pairId, item.sidePreference] as const),
+    );
+    return acceptedOverflowSubstitutes(items, nextMax).map((item) => ({
+      pairId: item.pairId,
+      label: overflowPairLabel(
+        item.pairId,
+        item.player2Id,
+        sideByPair.get(item.pairId) ?? null,
+        pairPlayerNames,
+        pairLabels,
+      ),
+    }));
+  }, [
+    pendingConfigSave,
+    registrations,
+    pairs,
+    pairLabels,
+    pairPlayerNames,
+  ]);
+
   if (!tournament) {
     return <p className="text-muted-foreground">Cargando torneo…</p>;
   }
@@ -1042,45 +1079,6 @@ export default function TournamentDetailView({
   const capacity = participantsBoard?.capacity
     ? { ...localCapacity, ...participantsBoard.capacity }
     : localCapacity;
-  const overflowSubstituteLabels = useMemo(() => {
-    if (!pendingConfigSave?.overflow) return [];
-    const nextMax = pendingConfigSave.values.maxPairs;
-    const items = registrations.flatMap((registration) => {
-      const pair = pairs.find((item) => item.id === registration.pairId);
-      if (!pair) return [];
-      return [
-        {
-          pairId: pair.id,
-          player2Id: pair.player2Id,
-          pairStatus: pair.status,
-          registrationId: registration.id,
-          registrationStatus: registration.status,
-          registeredAt: registration.registeredAt,
-          statusChangedAt: registration.statusChangedAt,
-          sidePreference: pair.sidePreference,
-        },
-      ];
-    });
-    const sideByPair = new Map(
-      items.map((item) => [item.pairId, item.sidePreference] as const),
-    );
-    return acceptedOverflowSubstitutes(items, nextMax).map((item) => ({
-      pairId: item.pairId,
-      label: overflowPairLabel(
-        item.pairId,
-        item.player2Id,
-        sideByPair.get(item.pairId) ?? null,
-        pairPlayerNames,
-        pairLabels,
-      ),
-    }));
-  }, [
-    pendingConfigSave,
-    registrations,
-    pairs,
-    pairLabels,
-    pairPlayerNames,
-  ]);
   const categoryFull = category != null && capacity.full;
   const acceptedFull = Boolean(capacity.acceptedFull);
   const admission = participantsBoard?.admission ?? { allowed: true, reason: null };
@@ -1132,18 +1130,6 @@ export default function TournamentDetailView({
     : null;
   const championAvatars =
     participantsBoard?.rows.find((row) => row.pair.id === championPairId)?.playerAvatars;
-  const knockoutStructure = cuadroBoard?.knockoutStructure;
-  const knockoutPhasesBlockedReason =
-    knockoutStructure?.rebuildBlockedReason ??
-    (cuadroBoard
-      ? knockoutRebuildBlockedReason(cuadroBoard.elimMatches, cuadroBoard.slots)
-      : null);
-  const showKnockoutPhasesButton =
-    !tournamentLocked &&
-    tournament.format === "GROUPS_ELIMINATION" &&
-    (ruleset?.preset === "QUALITY" || ruleset?.preset === "CUSTOM") &&
-    ((knockoutStructure?.addable.length ?? 0) > 0 ||
-      (knockoutStructure?.removable.length ?? 0) > 0);
   const repechageCreated = Boolean(
     repechageCreatedLocal ||
     category?.repechageCreated ||
@@ -1473,35 +1459,20 @@ export default function TournamentDetailView({
               </TabsTrigger>
             </TabsList>
           </div>
-          {showCreateRepechageButton || showKnockoutPhasesButton ? (
+          {showCreateRepechageButton ? (
             <div className="flex shrink-0 flex-wrap items-center gap-2">
-              {showCreateRepechageButton ? (
-                <PermissionsGuard permission={PERMISSION_CLUB_TOURNAMENTS_WRITE}>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    data-testid="create-repechage-button"
-                    disabled={createRepechageMutation.isPending}
-                    onClick={() => createRepechageMutation.mutate()}
-                  >
-                    {createRepechageMutation.isPending ? "Creando…" : "Crear repechaje"}
-                  </Button>
-                </PermissionsGuard>
-              ) : null}
-              {showKnockoutPhasesButton ? (
-                <PermissionsGuard permission={PERMISSION_CLUB_TOURNAMENTS_WRITE}>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    data-testid="knockout-phases-button"
-                    onClick={() => setKnockoutPhasesOpen(true)}
-                  >
-                    Fases del cuadro
-                  </Button>
-                </PermissionsGuard>
-              ) : null}
+              <PermissionsGuard permission={PERMISSION_CLUB_TOURNAMENTS_WRITE}>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  data-testid="create-repechage-button"
+                  disabled={createRepechageMutation.isPending}
+                  onClick={() => createRepechageMutation.mutate()}
+                >
+                  {createRepechageMutation.isPending ? "Creando…" : "Crear repechaje"}
+                </Button>
+              </PermissionsGuard>
             </div>
           ) : null}
         </div>
@@ -2485,6 +2456,11 @@ export default function TournamentDetailView({
         dailyEndTime={tournament?.dailyEndTime}
         categoryId={categoryId}
         enrolledPlayerIds={enrolledPlayerIds}
+        soloCandidates={
+          editingPair
+            ? soloCandidates.filter((item) => item.pairId !== editingPair.id)
+            : []
+        }
         isSaving={savePairMutation.isPending}
         onOpenChange={(open) => {
           setPairModalOpen(open);
@@ -2512,25 +2488,6 @@ export default function TournamentDetailView({
             pairId: editingPair?.id,
             ...values,
           });
-        }}
-      />
-
-      <KnockoutPhasesModal
-        open={knockoutPhasesOpen}
-        addable={knockoutStructure?.addable ?? []}
-        removable={knockoutStructure?.removable ?? []}
-        elimMatches={cuadroBoard?.elimMatches ?? []}
-        blockedReason={knockoutPhasesBlockedReason}
-        addingPhase={addKnockoutPhaseMutation.isPending ? (addKnockoutPhaseMutation.variables ?? null) : null}
-        removingPhase={
-          removeKnockoutPhaseMutation.isPending ? (removeKnockoutPhaseMutation.variables ?? null) : null
-        }
-        onOpenChange={setKnockoutPhasesOpen}
-        onAdd={(phase) => {
-          addKnockoutPhaseMutation.mutate(phase);
-        }}
-        onRemove={(phase) => {
-          removeKnockoutPhaseMutation.mutate(phase);
         }}
       />
 

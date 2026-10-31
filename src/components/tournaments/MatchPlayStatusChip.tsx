@@ -55,7 +55,7 @@ export default function MatchPlayStatusChip({
         <TooltipTrigger render={<span className="inline-flex pointer-events-auto" />}>
           {badge}
         </TooltipTrigger>
-        <TooltipContent className="max-w-xs">{hint}</TooltipContent>
+        <TooltipContent className="max-w-sm">{hint}</TooltipContent>
       </Tooltip>
     </TooltipProvider>
   );

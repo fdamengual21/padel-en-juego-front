@@ -137,7 +137,7 @@ export function matchMoveBlockedReason(
 
 /**
  * Por qué no se puede rearmar la llave (mover parejas o agregar/quitar fases).
- * Un clasificó por bye no cuenta: ese cruce no se jugó.
+ * Un «Clasificó» sin rival no cuenta: ese cruce no se jugó.
  */
 export function knockoutRebuildBlockedReason(
   matches: Pick<Match, "id" | "roundId" | "status">[],
@@ -255,8 +255,8 @@ function zoneItems(format: TournamentFormat): string[] {
     return [
       "Con 5 parejas se arma una sola zona todos contra todos, sin llave: el 1° es campeón. Dos o más zonas, a partir de 6 parejas.",
       "Las zonas se arman por orden de inscripción: con múltiplo de 3, todas de 3; si sobra 1, la zona A tiene 4; si sobran 2, las zonas A y B tienen 4.",
-      "Zona de 3: todos contra todos.",
-      "Zona de 4: 1° vs 4° y 2° vs 3°; después ganadores entre sí y perdedores entre sí. Pasan tres.",
+      "Zona de 3: todos contra todos. Pasan dos.",
+      "Zona de 4: todos contra todos (6 partidos). Primera jornada 1 vs 4 y 2 vs 3; después 1 vs 3 y 2 vs 4; al final 1 vs 2 y 3 vs 4. Pasan dos.",
       ...base,
     ];
   }
@@ -283,18 +283,17 @@ const QUALITY_TIE_BREAK_ITEMS = [
 function bracketItems(format: TournamentFormat): string[] {
   if (format === "DIRECT_ELIMINATION") {
     return [
-      "El cuadro se arma por orden de inscripción. Si la cantidad no es potencia de 2, las primeras parejas pasan la primera ronda sin jugar: el cruce se marca solo como «Clasificó».",
+      "El cuadro se arma por orden de inscripción. Si no cierran los cruces de la primera ronda, las primeras inscriptas pasan sin jugar: el cruce se marca «Clasificó». No se cruzan entre sí.",
       "El que pierde queda eliminado; el ganador pasa a la siguiente ronda.",
-      "El club puede modificar un cruce todavía no jugado desde el cuadro, solo con parejas aceptadas que estén dentro del cuadro. Si ya clasificó por bye, puede cambiar quién pasa mientras la siguiente ronda no se haya jugado.",
+      "El club puede modificar un cruce todavía no jugado desde el cuadro, solo con parejas aceptadas que estén dentro del cuadro. Si ya pasó como «Clasificó», puede cambiar quién pasa mientras la siguiente ronda no se haya jugado.",
     ];
   }
   if (format === "GROUPS_ELIMINATION") {
     return [
       "Con 5 parejas no hay cuadro: el 1° de la zona es campeón.",
-      "De cada zona de 3 pasan dos; de cada zona de 4 pasan tres.",
-      "El cuadro se arma con la cantidad de clasificados llevada a la potencia de 2 siguiente; los lugares que sobran son byes para los mejores ubicados.",
-      "Primeros contra segundos cruzados entre zonas: nunca se repite un cruce de la misma zona en la primera ronda.",
-      "Si una pareja pasa sin rival, el cruce se marca solo como «Clasificó». El club puede cambiar quién pasa o sacar esa marca mientras la siguiente ronda no se haya jugado.",
+      "De cada zona pasan dos. Las rondas de la llave las arma el cupo de clasificados, no las inscriptas: octavos a partir de 9 clasificados (16 inscriptas o más).",
+      "En la primera ronda, 1° contra 2° de otra zona. Los 1° van primero (A, después B…) y se ven lo más tarde posible. Nunca se repite un cruce de la misma zona.",
+      "Si hay más lugares que clasificados, los 1° de las primeras zonas pasan sin jugar: el cruce se marca «Clasificó». No se cruzan entre sí; se ven más adelante. El club puede cambiar quién pasa o sacar esa marca mientras la siguiente ronda no se haya jugado.",
       "El club puede modificar un cruce todavía no jugado desde el cuadro, solo con parejas aceptadas que estén dentro del cuadro. Si la pareja ya estaba en otro cruce de la ronda, se intercambian.",
     ];
   }

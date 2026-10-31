@@ -129,7 +129,7 @@ export function matchPlayStatusHint(
     (slot) => slot.matchId === match.id && slot.sourceType === "BYE",
   );
   if (bye) {
-    return `${who} de fase sin jugar: en esta ronda no tenía rival por la cantidad de clasificados.`;
+    return `${who} a la siguiente ronda sin jugar: es 1° de una de las primeras zonas (A, después B…). Con más lugares que clasificados, esas 1° pasan y no se cruzan entre sí.`;
   }
   const loserId =
     match.pairAId === match.winnerPairId ? match.pairBId : match.pairAId;

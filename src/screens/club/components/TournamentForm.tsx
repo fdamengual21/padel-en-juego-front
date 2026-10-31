@@ -625,8 +625,8 @@ export default function TournamentForm({
               {values.format === "GROUPS_ELIMINATION" ? (
                 <p className="text-sm text-muted-foreground">
                   Zonas de 3. Si sobra una pareja, la zona A queda de 4. Si sobran
-                  dos, A y B quedan de 4. De una zona de 3 pasan 2 y de una de 4
-                  pasan 3.
+                  dos, A y B quedan de 4. De cada zona pasan 2. En la llave, 1° vs
+                  2° de otra zona.
                 </p>
               ) : null}
             </div>
@@ -662,7 +662,7 @@ export default function TournamentForm({
             <p className="text-muted-foreground">
               {tournamentFormatLabel(values.format)}
               {values.format === "GROUPS_ELIMINATION"
-                ? " · zonas de 3, o de 4 si sobran parejas · pasan 2 o 3"
+                ? " · zonas de 3, o de 4 si sobran parejas · pasan 2 · 1° vs 2° de otra zona"
                 : ""}
             </p>
             <p className="text-muted-foreground">

@@ -13,8 +13,8 @@ import { cn } from "@/lib/utils";
 
 /** Horarios/cancha: 10% menos que 6.5rem. */
 const CANCHA_COL = "w-[5.85rem]";
-/** Partidos: el extra que suelta Resultado (Resultado queda con el resto). */
-const PARTIDOS_COL = "w-[16.35rem]";
+/** Partidos: 10% menos que 16.35rem. Resultado queda con el resto. */
+const PARTIDOS_COL = "w-[14.72rem]";
 const COL_COUNT = 4;
 
 export interface MatchTableRow {
