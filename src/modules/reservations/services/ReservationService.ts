@@ -2,6 +2,7 @@ import type { IReservationRepository } from "../repositories/ReservationReposito
 import type {
   CourtFixedReservationQuery,
   CreateFixedReservationInput,
+  CompleteReservationInput,
   CreateReservationInput,
   UpdateReservationInput,
 } from "../types";
@@ -53,8 +54,8 @@ export class ReservationService {
     return this.repository.cancel(id);
   }
 
-  complete(id: string) {
-    return this.repository.complete(id);
+  complete(id: string, input?: CompleteReservationInput) {
+    return this.repository.complete(id, input);
   }
 
   accept(id: string) {

@@ -75,7 +75,9 @@ export interface PublicCourtPriceRule {
   startTime: string;
   endTime: string;
   daysOfWeek: WeekdayIso[];
-  price: number;
+  transferPrice: number;
+  cashPrice: number | null;
+  monthlyPassPrice: number | null;
   label: string | null;
 }
 
@@ -98,6 +100,8 @@ export interface PublicClubSlot {
   endsAt: string;
   label: string;
   price: number;
+  cashPrice: number | null;
+  monthlyPassPrice: number | null;
   priceLabel: string | null;
   status: PublicClubSlotStatus;
 }

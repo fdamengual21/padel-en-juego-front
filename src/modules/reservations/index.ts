@@ -14,6 +14,7 @@ export type {
   ClubTodayTurn,
   ClubTodayTurnStatus,
   UpdateReservationInput,
+  CompleteReservationInput,
   CourtFixedReservation,
   CourtFixedSkip,
   CourtFixedReservationPlayer,

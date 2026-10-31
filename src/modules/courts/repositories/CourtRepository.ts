@@ -46,6 +46,16 @@ function asNumber(value: unknown, fallback = 0): number {
   return fallback;
 }
 
+function asNullableNumber(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
 function asDaysOfWeek(value: unknown): WeekdayIso[] {
   if (!Array.isArray(value)) return [];
   return value.filter(
@@ -70,7 +80,9 @@ function normalizePriceRule(
     startTime: asHour(raw.startTime),
     endTime: asHour(raw.endTime),
     daysOfWeek: asDaysOfWeek(raw.daysOfWeek),
-    price: asNumber(raw.price),
+    transferPrice: asNumber(raw.transferPrice),
+    cashPrice: asNullableNumber(raw.cashPrice),
+    monthlyPassPrice: asNullableNumber(raw.monthlyPassPrice),
     label: asNullableString(raw.label),
   };
 }

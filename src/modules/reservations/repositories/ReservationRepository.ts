@@ -19,6 +19,7 @@ import type {
   CourtFixedReservationPlayer,
   CourtFixedReservationQuery,
   CourtFixedReservationPage,
+  CompleteReservationInput,
   CreateFixedReservationInput,
   UpdateReservationInput,
 } from "../types";
@@ -38,7 +39,7 @@ export interface IReservationRepository {
   create(input: CreateReservationInput): Promise<CourtReservation>;
   update(id: string, patch: UpdateReservationInput): Promise<CourtReservation>;
   cancel(id: string): Promise<CourtReservation>;
-  complete(id: string): Promise<CourtReservation>;
+  complete(id: string, input?: CompleteReservationInput): Promise<CourtReservation>;
   accept(id: string): Promise<CourtReservation>;
   reject(id: string, reason?: string): Promise<CourtReservation>;
   listMine(): Promise<PlayerReservation[]>;
@@ -61,6 +62,16 @@ function asNumber(value: unknown): number {
     if (Number.isFinite(parsed)) return parsed;
   }
   return 0;
+}
+
+function asNullableNumber(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
 }
 
 function asStatus(value: unknown): CourtReservationStatus {
@@ -212,6 +223,8 @@ function normalizeSlot(raw: Record<string, unknown>): CourtSlot {
     endsAt,
     label: asString(raw.label),
     price: asNumber(raw.price),
+    cashPrice: asNullableNumber(raw.cashPrice),
+    monthlyPassPrice: asNullableNumber(raw.monthlyPassPrice),
     priceLabel: asString(raw.priceLabel) || null,
     status: raw.status === "pending" ? "pending" : "available",
     reservationId: asString(raw.reservationId) || null,
@@ -408,10 +421,11 @@ export class ReservationRepository implements IReservationRepository {
     return normalizeReservation(readData(response) ?? {});
   }
 
-  async complete(id: string) {
+  async complete(id: string, input?: CompleteReservationInput) {
     this.assertClubHeader();
     const response = await this.axiosInstance.post<ApiEnvelope<Record<string, unknown>>>(
       `/club/reservations/${id}/complete`,
+      input ? { price: input.price } : {},
     );
     return normalizeReservation(readData(response) ?? {});
   }

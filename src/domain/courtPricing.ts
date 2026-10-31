@@ -24,7 +24,7 @@ export function isoWeekdayFromDate(date: Date): WeekdayIso {
 
 export type CourtPriceRuleDraft = Pick<
   CourtPriceRule,
-  "startTime" | "endTime" | "daysOfWeek" | "price"
+  "startTime" | "endTime" | "daysOfWeek" | "transferPrice" | "cashPrice" | "monthlyPassPrice"
 > & {
   label?: string | null;
 };
@@ -198,8 +198,17 @@ export function validateCourtPriceRules(
     if (rule.daysOfWeek.length === 0) {
       return `La tarifa ${i + 1} debe tener al menos un día`;
     }
-    if (!Number.isFinite(rule.price) || rule.price < 0) {
-      return `La tarifa ${i + 1} tiene un precio inválido`;
+    if (!Number.isFinite(rule.transferPrice) || rule.transferPrice < 0) {
+      return `La tarifa ${i + 1} tiene un precio por transferencia inválido`;
+    }
+    if (rule.cashPrice != null && (!Number.isFinite(rule.cashPrice) || rule.cashPrice < 0)) {
+      return `La tarifa ${i + 1} tiene un precio en efectivo inválido`;
+    }
+    if (
+      rule.monthlyPassPrice != null &&
+      (!Number.isFinite(rule.monthlyPassPrice) || rule.monthlyPassPrice < 0)
+    ) {
+      return `La tarifa ${i + 1} tiene un precio por abono inválido`;
     }
     const from = parseHm(rule.startTime);
     const to = parseHm(rule.endTime);
@@ -318,7 +327,12 @@ export function listDayPriceRanges(input: {
     start = Math.max(start, openMin);
     end = Math.min(end, windowEnd);
     if (start >= end) continue;
-    covered.push({ start, end, price: rule.price, label: rule.label ?? null });
+    covered.push({
+      start,
+      end,
+      price: rule.transferPrice,
+      label: rule.label ?? null,
+    });
   }
 
   covered.sort((left, right) => left.start - right.start || left.end - right.end);
@@ -379,12 +393,12 @@ export function resolvePriceForSlot(
         : [...matching].sort((a, b) =>
             a.startTime.localeCompare(b.startTime),
           )[0]!;
-    return { price: chosen.price, label: chosen.label, rule: chosen };
+    return { price: chosen.transferPrice, label: chosen.label, rule: chosen };
   }
 
   if (dayRules.length === 1) {
     const only = dayRules[0]!;
-    return { price: only.price, label: only.label, rule: only };
+    return { price: only.transferPrice, label: only.label, rule: only };
   }
 
   return { price: court.basePrice, label: null, rule: null };

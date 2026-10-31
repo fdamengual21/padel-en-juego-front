@@ -16,6 +16,8 @@ export interface CourtSlotList {
 export interface CourtSlot extends CourtAvailableSlot {
   courtId: string;
   price: number;
+  cashPrice: number | null;
+  monthlyPassPrice: number | null;
   priceLabel: string | null;
 }
 
@@ -23,12 +25,18 @@ export interface CreateReservationInput {
   courtId: string;
   bookedByPlayerId: string;
   startsAt: string;
+  price?: number;
 }
 
 export interface UpdateReservationInput {
   courtId?: string;
   bookedByPlayerId?: string;
   startsAt?: string;
+  price?: number;
+}
+
+export interface CompleteReservationInput {
+  price: number;
 }
 
 /** Turno propio que Inicio lista. */

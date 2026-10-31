@@ -655,7 +655,9 @@ export interface CourtPriceRule {
   startTime: string;
   endTime: string;
   daysOfWeek: WeekdayIso[];
-  price: number;
+  transferPrice: number;
+  cashPrice: number | null;
+  monthlyPassPrice: number | null;
   label: string | null;
 }
 

@@ -2,16 +2,18 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { CalendarClock, Pencil, TriangleAlert } from "lucide-react";
-import type {
-  Client,
-  Court,
-  CourtAgendaEvent,
-  CourtReservation,
+import {
+  resolvePriceForSlot,
+  type Client,
+  type Court,
+  type CourtAgendaEvent,
+  type CourtReservation,
 } from "@/domain";
 import Api from "@/api/Api";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +23,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import WarningDialog from "@/components/ui/warning-dialog";
 import { cn } from "@/lib/utils";
 import { toastError, toastSuccess } from "@/lib/toast";
 import type {
@@ -82,6 +85,96 @@ function formatMoney(value: number | null | undefined): string {
   }).format(value);
 }
 
+type ChargeMethod = "transfer" | "cash" | "monthlyPass";
+
+interface CompleteQuote {
+  transferPrice: number;
+  cashPrice: number | null;
+  monthlyPassPrice: number | null;
+  label: string | null;
+}
+
+function chargeQuote(
+  court: Court | null,
+  startsAt: string | null | undefined,
+  fallbackPrice: number | null | undefined,
+): CompleteQuote {
+  const fallback = fallbackPrice ?? 0;
+  if (!court || !startsAt) {
+    return {
+      transferPrice: fallback,
+      cashPrice: null,
+      monthlyPassPrice: null,
+      label: null,
+    };
+  }
+  const quoted = resolvePriceForSlot(court, court.priceRules ?? [], startsAt);
+  if (!quoted.rule) {
+    return {
+      transferPrice: quoted.price,
+      cashPrice: null,
+      monthlyPassPrice: null,
+      label: null,
+    };
+  }
+  return {
+    transferPrice: quoted.rule.transferPrice,
+    cashPrice: quoted.rule.cashPrice,
+    monthlyPassPrice: quoted.rule.monthlyPassPrice,
+    label: quoted.rule.label,
+  };
+}
+
+function amountForMethod(quote: CompleteQuote, method: ChargeMethod): number {
+  if (method === "cash" && quote.cashPrice != null) return quote.cashPrice;
+  if (method === "monthlyPass" && quote.monthlyPassPrice != null) {
+    return quote.monthlyPassPrice;
+  }
+  return quote.transferPrice;
+}
+
+function SlotTariffLines({
+  price,
+  cashPrice,
+  monthlyPassPrice,
+  priceLabel,
+}: {
+  price: number;
+  cashPrice: number | null;
+  monthlyPassPrice: number | null;
+  priceLabel: string | null;
+}) {
+  const showBreakdown =
+    priceLabel != null || cashPrice != null || monthlyPassPrice != null;
+  if (!showBreakdown) {
+    return (
+      <p className="mt-1">
+        Precio: <span className="font-medium">{formatMoney(price)}</span>
+      </p>
+    );
+  }
+  return (
+    <>
+      <p className="mt-1">
+        Transferencia:{" "}
+        <span className="font-medium">{formatMoney(price)}</span>
+      </p>
+      {cashPrice != null ? (
+        <p className="mt-1">
+          Efectivo:{" "}
+          <span className="font-medium">{formatMoney(cashPrice)}</span>
+        </p>
+      ) : null}
+      {monthlyPassPrice != null ? (
+        <p className="mt-1">
+          Abono:{" "}
+          <span className="font-medium">{formatMoney(monthlyPassPrice)}</span>
+        </p>
+      ) : null}
+    </>
+  );
+}
+
 /** Dígitos para wa.me; null si no hay un teléfono usable. */
 function whatsappDigits(phone: string | null | undefined): string | null {
   if (!phone?.trim()) return null;
@@ -141,6 +234,10 @@ export default function CourtReservationModal({
   const [busy, setBusy] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
+  const [completeMethod, setCompleteMethod] = useState<ChargeMethod>("transfer");
+  const [completePrice, setCompletePrice] = useState<number | null>(null);
+  const [editedPrice, setEditedPrice] = useState<number | null>(null);
 
   const court =
     courts.find((c) => c.id === selectedCourtId) ??
@@ -160,6 +257,19 @@ export default function CourtReservationModal({
     setBusy(false);
     setRejectOpen(false);
     setRejectReason("");
+    setCancelConfirmOpen(false);
+    setCompleteMethod("transfer");
+    setEditedPrice(reservation?.price ?? null);
+    const nextCourt =
+      courts.find((item) => item.id === initialCourtId) ?? null;
+    if (reservation?.status === "booked") {
+      setCompletePrice(
+        chargeQuote(nextCourt, reservation.startsAt, reservation.price)
+          .transferPrice,
+      );
+    } else {
+      setCompletePrice(null);
+    }
     setSelectedCourtId(initialCourtId);
 
     if (initialMode === "create") {
@@ -258,13 +368,46 @@ export default function CourtReservationModal({
     ) ?? null;
   const quote = selectedSlot
     ? {
-        price: selectedSlot.price,
-        label: selectedSlot.priceLabel,
-        endsAt: selectedSlot.endsAt,
-      }
+      price: selectedSlot.price,
+      label: selectedSlot.priceLabel,
+      endsAt: selectedSlot.endsAt,
+    }
     : null;
 
+  useEffect(() => {
+    if (!selectedSlot) return;
+    const sameOriginal =
+      mode === "edit" &&
+      reservation != null &&
+      dayjs(selectedSlot.startsAt).isSame(dayjs(reservation.startsAt));
+    if (sameOriginal) return;
+    setEditedPrice(selectedSlot.price);
+  }, [mode, reservation, selectedSlot]);
+
   const isPending = reservation?.status === "pending";
+  const canEditPrice = !readOnly && !submitCreate;
+  const canCompleteReservation =
+    canMutate &&
+    mode === "view" &&
+    !isTournament &&
+    reservation?.status === "booked";
+  const canCancelReservation =
+    canMutate &&
+    mode === "view" &&
+    !isTournament &&
+    Boolean(reservation) &&
+    (reservation?.status === "booked" || reservation?.status === "completed");
+  const completeQuote =
+    canCompleteReservation && reservation
+      ? chargeQuote(court, reservation.startsAt, reservation.price)
+      : null;
+  const playerDisplayName =
+    [reservation?.playerFirstName, reservation?.playerLastName]
+      .filter(Boolean)
+      .join(" ")
+      .trim() ||
+    client?.displayName ||
+    "este jugador";
   const title =
     mode === "create"
       ? (createTitle ?? "Nueva reserva")
@@ -290,11 +433,14 @@ export default function CourtReservationModal({
   const clientPhone = client?.phone?.trim() || "";
   const waDigits = whatsappDigits(clientPhone);
 
+  const hasValidPrice =
+    editedPrice != null && Number.isFinite(editedPrice) && editedPrice >= 0;
   const canSubmit =
     !readOnly &&
     Boolean(selectedCourtId) &&
     Boolean(player) &&
     Boolean(selectedStartsAt) &&
+    (!canEditPrice || hasValidPrice) &&
     !busy &&
     !isSaving;
 
@@ -323,6 +469,7 @@ export default function CourtReservationModal({
         courtId: selectedCourtId,
         bookedByPlayerId: player.id,
         startsAt: selectedStartsAt,
+        ...(canEditPrice && editedPrice != null ? { price: editedPrice } : {}),
       };
       if (submitCreate) {
         await submitCreate(input);
@@ -333,7 +480,8 @@ export default function CourtReservationModal({
     }
     await Api.ReservationService().update(reservation.id, {
       bookedByPlayerId: player.id,
-      startsAt: selectedStartsAt,
+      ...(slotMessage ? {} : { startsAt: selectedStartsAt }),
+      ...(editedPrice != null ? { price: editedPrice } : {}),
     });
   };
 
@@ -349,6 +497,7 @@ export default function CourtReservationModal({
 
   const handleCancelReservation = () => {
     if (!reservation) return;
+    setCancelConfirmOpen(false);
     void run(async () => {
       await Api.ReservationService().cancel(reservation.id);
       toastSuccess("Reserva cancelada");
@@ -357,10 +506,39 @@ export default function CourtReservationModal({
 
   const handleComplete = () => {
     if (!reservation) return;
+    if (completePrice == null || !Number.isFinite(completePrice) || completePrice < 0) {
+      setError("El precio no puede ser menor a 0");
+      return;
+    }
     void run(async () => {
-      await Api.ReservationService().complete(reservation.id);
+      await Api.ReservationService().complete(reservation.id, { price: completePrice });
       toastSuccess("Reserva completada");
     });
+  };
+
+  const handleCancelEdit = () => {
+    setMode("view");
+    setError(null);
+    setCompleteMethod("transfer");
+    setEditedPrice(reservation?.price ?? null);
+    if (reservation?.status === "booked") {
+      setCompletePrice(
+        chargeQuote(court, reservation.startsAt, reservation.price)
+          .transferPrice,
+      );
+    }
+    setSelectedCourtId(initialCourtId);
+    const startIso = reservation?.startsAt ?? event?.startAt ?? presetStartsAt;
+    setDateIso(toDateIso(startIso));
+    setSelectedStartsAt(startIso ? dayjs(startIso).toISOString() : null);
+    if (reservation?.bookedByPlayerId) {
+      setPlayer({
+        id: reservation.bookedByPlayerId,
+        firstName: reservation.playerFirstName ?? "",
+        lastName: reservation.playerLastName ?? "",
+        phone: null,
+      });
+    }
   };
 
   const handleAccept = () => {
@@ -548,10 +726,18 @@ export default function CourtReservationModal({
                       No se pudieron cargar los turnos.
                     </p>
                   ) : slotMessage ? (
-                    <Alert variant="warning">
-                      <TriangleAlert />
-                      <AlertDescription>{slotMessage}</AlertDescription>
-                    </Alert>
+                    <div className="space-y-2">
+                      <Alert variant="warning">
+                        <TriangleAlert />
+                        <AlertDescription>{slotMessage}</AlertDescription>
+                      </Alert>
+                      {mode === "edit" && selectedStartsAt ? (
+                        <p className="text-sm text-muted-foreground">
+                          Se mantiene el horario{" "}
+                          {dayjs(selectedStartsAt).format("HH:mm")}
+                        </p>
+                      ) : null}
+                    </div>
                   ) : availableSlots.length === 0 ? (
                     <Alert variant="warning">
                       <TriangleAlert />
@@ -565,7 +751,7 @@ export default function CourtReservationModal({
                         const selected =
                           selectedStartsAt != null &&
                           dayjs(slot.startsAt).format("HH:mm") ===
-                            dayjs(selectedStartsAt).format("HH:mm");
+                          dayjs(selectedStartsAt).format("HH:mm");
                         return (
                           <button
                             key={slot.startsAt}
@@ -593,10 +779,6 @@ export default function CourtReservationModal({
                       <span className="font-medium">
                         {dayjs(selectedSlot.endsAt).format("HH:mm")}
                       </span>
-                    </p>
-                    <p className="mt-1">
-                      Precio:{" "}
-                      <span className="font-medium">{formatMoney(selectedSlot.price)}</span>
                       {selectedSlot.priceLabel ? (
                         <span className="text-muted-foreground">
                           {" "}
@@ -604,31 +786,154 @@ export default function CourtReservationModal({
                         </span>
                       ) : null}
                     </p>
+                    <SlotTariffLines
+                      price={selectedSlot.price}
+                      cashPrice={selectedSlot.cashPrice}
+                      monthlyPassPrice={selectedSlot.monthlyPassPrice}
+                      priceLabel={selectedSlot.priceLabel}
+                    />
+                  </div>
+                ) : null}
+
+                {canEditPrice ? (
+                  <div className="space-y-1">
+                    <Label htmlFor="reservation-price">Precio</Label>
+                    <Input
+                      id="reservation-price"
+                      type="number"
+                      min={0}
+                      value={editedPrice ?? ""}
+                      onChange={(event) => {
+                        const next = event.target.value;
+                        setEditedPrice(next === "" ? null : Number(next));
+                        setError(null);
+                      }}
+                    />
                   </div>
                 ) : null}
               </div>
             )}
+
+            {completeQuote ? (
+              <div className="space-y-3 border-t border-border pt-4">
+                {completeQuote.label ? (
+                  <p className="text-xs text-muted-foreground">{completeQuote.label}</p>
+                ) : null}
+                {completeQuote.cashPrice != null ||
+                  completeQuote.monthlyPassPrice != null ? (
+                  <fieldset className="space-y-1.5">
+                    <legend className="text-sm text-muted-foreground">
+                      Cómo se cobrará
+                    </legend>
+                    <div className="flex flex-wrap gap-2">
+                      {(
+                        [
+                          {
+                            id: "transfer" as const,
+                            label: "Transferencia",
+                            amount: completeQuote.transferPrice,
+                          },
+                          completeQuote.cashPrice != null
+                            ? {
+                              id: "cash" as const,
+                              label: "Efectivo",
+                              amount: completeQuote.cashPrice,
+                            }
+                            : null,
+                          completeQuote.monthlyPassPrice != null
+                            ? {
+                              id: "monthlyPass" as const,
+                              label: "Abono",
+                              amount: completeQuote.monthlyPassPrice,
+                            }
+                            : null,
+                        ] as Array<{
+                          id: ChargeMethod;
+                          label: string;
+                          amount: number;
+                        } | null>
+                      )
+                        .filter(
+                          (
+                            item,
+                          ): item is {
+                            id: ChargeMethod;
+                            label: string;
+                            amount: number;
+                          } => Boolean(item),
+                        )
+                        .map((option) => {
+                          const selected = completeMethod === option.id;
+                          return (
+                            <label
+                              key={option.id}
+                              className={cn(
+                                "inline-flex cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1 text-xs",
+                                selected
+                                  ? "border-primary bg-primary/15 text-foreground"
+                                  : "border-border text-muted-foreground",
+                              )}
+                            >
+                              <input
+                                type="radio"
+                                name="complete-charge"
+                                className="sr-only"
+                                checked={selected}
+                                onChange={() => {
+                                  setCompleteMethod(option.id);
+                                  setCompletePrice(
+                                    amountForMethod(completeQuote, option.id),
+                                  );
+                                  setError(null);
+                                }}
+                              />
+                              {option.label} · {formatMoney(option.amount)}
+                            </label>
+                          );
+                        })}
+                    </div>
+                  </fieldset>
+                ) : null}
+                <div className="space-y-1">
+                  <Label htmlFor="complete-price">Precio cobrado</Label>
+                  <Input
+                    id="complete-price"
+                    type="number"
+                    min={0}
+                    value={completePrice ?? ""}
+                    onChange={(event) => {
+                      const next = event.target.value;
+                      setCompletePrice(next === "" ? null : Number(next));
+                      setError(null);
+                    }}
+                  />
+                </div>
+              </div>
+            ) : null}
 
             {error ? <p className="text-sm text-destructive">{error}</p> : null}
           </div>
 
           <DialogFooter className="shrink-0 border-t border-border px-4 py-3 sm:justify-between">
             <div className="flex flex-wrap gap-2">
-              {canMutate &&
-              mode === "view" &&
-              reservation &&
-              !isTournament &&
-              !isPending ? (
+              {mode === "edit" && canMutate ? (
                 <Button
                   type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setMode("edit")}
+                  variant="ghost"
+                  disabled={busy || isSaving}
+                  onClick={handleCancelEdit}
                 >
-                  <Pencil className="size-3.5" />
-                  Editar
+                  Cancelar
                 </Button>
-              ) : null}
+              ) : (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => onOpenChange(false)}
+                >
+                  Cerrar
+                </Button>
+              )}
               {canMutate && isPending && mode === "view" && reservation ? (
                 rejectOpen ? (
                   <div className="flex w-full flex-col gap-2">
@@ -685,40 +990,47 @@ export default function CourtReservationModal({
                   </>
                 )
               ) : null}
-              {canMutate &&
-              reservation &&
-              reservation.status === "booked" &&
-              mode !== "create" ? (
-                <>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={busy || isSaving}
-                    onClick={handleComplete}
-                  >
-                    Marcar completada
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="destructive"
-                    disabled={busy || isSaving}
-                    onClick={handleCancelReservation}
-                  >
-                    Cancelar reserva
-                  </Button>
-                </>
-              ) : null}
             </div>
             <div className="flex flex-wrap justify-end gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => onOpenChange(false)}
-              >
-                Cerrar
-              </Button>
+              {canMutate &&
+                mode === "view" &&
+                reservation &&
+                !isTournament &&
+                !isPending ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setMode("edit")}
+                >
+                  <Pencil className="size-3.5" />
+                  Editar
+                </Button>
+              ) : null}
+              {canCancelReservation ? (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={busy || isSaving}
+                  onClick={() => setCancelConfirmOpen(true)}
+                >
+                  Cancelar reserva
+                </Button>
+              ) : null}
+              {canCompleteReservation ? (
+                <Button
+                  type="button"
+                  disabled={
+                    busy ||
+                    isSaving ||
+                    completePrice == null ||
+                    !Number.isFinite(completePrice) ||
+                    completePrice < 0
+                  }
+                  onClick={handleComplete}
+                >
+                  {busy || isSaving ? "Guardando…" : "Confirmar"}
+                </Button>
+              ) : null}
               {!readOnly ? (
                 <Button
                   type="button"
@@ -732,6 +1044,17 @@ export default function CourtReservationModal({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <WarningDialog
+        open={cancelConfirmOpen}
+        onOpenChange={setCancelConfirmOpen}
+        title="Cancelar reserva"
+        description={`¿Está seguro de cancelar la reserva de ${playerDisplayName}?`}
+        confirmLabel="Cancelar reserva"
+        cancelLabel="Volver"
+        confirmVariant="destructive"
+        isConfirming={busy || isSaving}
+        onConfirm={handleCancelReservation}
+      />
     </>
   );
 }

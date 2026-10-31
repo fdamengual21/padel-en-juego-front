@@ -21,6 +21,8 @@ export interface CourtPriceRuleInput {
   startTime: string;
   endTime: string;
   daysOfWeek: CourtPriceRule["daysOfWeek"];
-  price: number;
+  transferPrice: number;
+  cashPrice?: number | null;
+  monthlyPassPrice?: number | null;
   label?: string | null;
 }

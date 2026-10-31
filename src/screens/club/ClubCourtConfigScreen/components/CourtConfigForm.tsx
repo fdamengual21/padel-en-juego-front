@@ -55,7 +55,9 @@ interface PriceRuleFormValue {
   startTime: string;
   endTime: string;
   daysOfWeek: WeekdayIso[];
-  price: number | null;
+  transferPrice: number | null;
+  cashPrice: number | null;
+  monthlyPassPrice: number | null;
   label: string;
 }
 
@@ -155,10 +157,30 @@ const schema = yup.object({
             }
             return true;
           }),
-        price: yup
+        transferPrice: yup
           .number()
           .nullable()
-          .test("rule-price", "Precio inválido", (value) => value != null && value >= 0),
+          .test(
+            "transfer-price",
+            "El precio por transferencia no puede ser menor a 0",
+            (value) => value != null && Number.isFinite(value) && value >= 0,
+          ),
+        cashPrice: yup
+          .number()
+          .nullable()
+          .test(
+            "cash-price",
+            "El precio en efectivo no puede ser menor a 0",
+            (value) => value == null || (Number.isFinite(value) && value >= 0),
+          ),
+        monthlyPassPrice: yup
+          .number()
+          .nullable()
+          .test(
+            "monthly-pass-price",
+            "El precio por abono no puede ser menor a 0",
+            (value) => value == null || (Number.isFinite(value) && value >= 0),
+          ),
         label: yup.string().default(""),
       }),
     )
@@ -169,7 +191,9 @@ const schema = yup.object({
           startTime: rule.startTime,
           endTime: rule.endTime,
           daysOfWeek: rule.daysOfWeek,
-          price: rule.price ?? 0,
+          transferPrice: rule.transferPrice ?? 0,
+          cashPrice: rule.cashPrice ?? null,
+          monthlyPassPrice: rule.monthlyPassPrice ?? null,
         })),
       );
       if (!overlap) return true;
@@ -205,7 +229,9 @@ function toFormValues(court: Court, priceRules: CourtPriceRule[]): CourtConfigFo
       startTime: rule.startTime,
       endTime: rule.endTime,
       daysOfWeek: [...rule.daysOfWeek],
-      price: rule.price,
+      transferPrice: rule.transferPrice,
+      cashPrice: rule.cashPrice,
+      monthlyPassPrice: rule.monthlyPassPrice,
       label: rule.label ?? "",
     })),
   };
@@ -225,7 +251,9 @@ function emptyRule(club: Club, basePrice: number | null): PriceRuleFormValue {
     startTime: club.openTime || "18:00",
     endTime: club.closeTime || "23:00",
     daysOfWeek: club.openDays.length > 0 ? [...club.openDays] : [1, 2, 3, 4, 5],
-    price: basePrice ?? 0,
+    transferPrice: basePrice ?? 0,
+    cashPrice: null,
+    monthlyPassPrice: null,
     label: "",
   };
 }
@@ -309,7 +337,10 @@ export default function CourtConfigForm({
             startTime: rule.startTime,
             endTime: rule.endTime,
             daysOfWeek: rule.daysOfWeek,
-            price: Number(rule.price),
+            transferPrice: Number(rule.transferPrice),
+            cashPrice: rule.cashPrice == null ? null : Number(rule.cashPrice),
+            monthlyPassPrice:
+              rule.monthlyPassPrice == null ? null : Number(rule.monthlyPassPrice),
             label: rule.label.trim() || null,
           })),
         });
@@ -501,21 +532,39 @@ export default function CourtConfigForm({
                           disabled={readOnly}
                           hint={endHint}
                         />
+                      </div>
+                      <div className="grid gap-2 sm:grid-cols-3">
                         <InputField
                           control={control}
-                          name={`priceRules.${index}.price`}
-                          label="Precio"
+                          name={`priceRules.${index}.transferPrice`}
+                          label="Precio por transferencia"
                           type="number"
                           min={0}
                           disabled={readOnly}
                         />
                         <InputField
                           control={control}
-                          name={`priceRules.${index}.label`}
-                          label="Etiqueta"
+                          name={`priceRules.${index}.cashPrice`}
+                          label="Precio en efectivo"
+                          type="number"
+                          min={0}
+                          disabled={readOnly}
+                        />
+                        <InputField
+                          control={control}
+                          name={`priceRules.${index}.monthlyPassPrice`}
+                          label="Precio por abono"
+                          type="number"
+                          min={0}
                           disabled={readOnly}
                         />
                       </div>
+                      <InputField
+                        control={control}
+                        name={`priceRules.${index}.label`}
+                        label="Etiqueta"
+                        disabled={readOnly}
+                      />
                       <div className="space-y-1">
                         <div
                           id={daysId}

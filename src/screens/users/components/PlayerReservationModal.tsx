@@ -135,7 +135,9 @@ function toAgendaCourt(clubId: string, court: PublicCourt): Court {
       startTime: rule.startTime,
       endTime: rule.endTime,
       daysOfWeek: rule.daysOfWeek,
-      price: rule.price,
+      transferPrice: rule.transferPrice,
+      cashPrice: rule.cashPrice,
+      monthlyPassPrice: rule.monthlyPassPrice,
       label: rule.label,
     })),
   };
@@ -148,6 +150,8 @@ function toCourtSlot(slot: PublicClubSlot): CourtSlot {
     endsAt: slot.endsAt,
     label: slot.label,
     price: slot.price,
+    cashPrice: slot.cashPrice,
+    monthlyPassPrice: slot.monthlyPassPrice,
     priceLabel: slot.priceLabel,
     status: "available",
   };

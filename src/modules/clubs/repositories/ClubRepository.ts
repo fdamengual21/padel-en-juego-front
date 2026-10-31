@@ -132,7 +132,9 @@ function normalizePublicPriceRule(raw: Record<string, unknown>): PublicCourtPric
     startTime: asHour(raw.startTime) ?? "",
     endTime: asHour(raw.endTime) ?? "",
     daysOfWeek: asOpenDays(raw.daysOfWeek),
-    price: asNullableNumber(raw.price) ?? 0,
+    transferPrice: asNullableNumber(raw.transferPrice) ?? 0,
+    cashPrice: asNullableNumber(raw.cashPrice),
+    monthlyPassPrice: asNullableNumber(raw.monthlyPassPrice),
     label: asNullableString(raw.label),
   };
 }
@@ -145,6 +147,8 @@ function normalizePublicSlot(raw: Record<string, unknown>): PublicClubSlot {
     endsAt: asString(raw.endsAt),
     label: asString(raw.label),
     price: asNullableNumber(raw.price) ?? 0,
+    cashPrice: asNullableNumber(raw.cashPrice),
+    monthlyPassPrice: asNullableNumber(raw.monthlyPassPrice),
     priceLabel: asNullableString(raw.priceLabel),
     status: raw.status === "free" ? "free" : "occupied",
   };
