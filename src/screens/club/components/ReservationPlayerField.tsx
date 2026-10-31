@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
-import { Plus } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Info, Plus } from "lucide-react";
 import Api from "@/api/Api";
 import { PERMISSION_CLUB_CLIENTS_WRITE } from "@/authorization";
 import { PermissionsGuard } from "@/components/guards";
@@ -13,6 +14,10 @@ import ClientFormDialog from "@/screens/club/ClubClientsScreen/components/Client
 interface ReservationPlayerFieldProps {
   value: ReservationPlayer | null;
   onChange: (player: ReservationPlayer | null) => void;
+}
+
+function playerNoteText(note: string | null | undefined): string {
+  return note?.trim() ?? "";
 }
 
 export default function ReservationPlayerField({
@@ -31,8 +36,16 @@ export default function ReservationPlayerField({
     enabled: value == null,
     searchFn,
   });
+  const selectedPlayerId = value?.id ?? "";
+  const noteQuery = useQuery({
+    queryKey: ["club-client", selectedPlayerId],
+    queryFn: () => Api.ClientService().getById(selectedPlayerId),
+    enabled: Boolean(selectedPlayerId) && !playerNoteText(value?.note),
+    retry: false,
+  });
 
   if (value) {
+    const note = playerNoteText(value.note) || playerNoteText(noteQuery.data?.note);
     return (
       <div className="space-y-1.5">
         <Label>Jugador</Label>
@@ -47,6 +60,15 @@ export default function ReservationPlayerField({
           >
             Cambiar
           </button>
+        </div>
+        <div className="space-y-1">
+          <div className="flex items-center gap-1.5">
+            <p className="text-sm font-medium">Nota</p>
+            <Info className="size-3.5 text-muted-foreground" aria-hidden />
+          </div>
+          <p className="whitespace-pre-wrap text-sm text-foreground">
+            {note || "—"}
+          </p>
         </div>
       </div>
     );
@@ -116,6 +138,7 @@ export default function ReservationPlayerField({
             firstName: saved.firstName,
             lastName: saved.lastName,
             phone: saved.phone,
+            note: saved.note,
           });
           setQuery("");
         }}

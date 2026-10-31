@@ -56,6 +56,12 @@ function asString(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
+function asNullableString(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
 function asNumber(value: unknown): number {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string" && value.trim()) {
@@ -292,6 +298,7 @@ function normalizePlayer(raw: Record<string, unknown>): ReservationPlayer {
     firstName: asString(raw.firstName),
     lastName: asString(raw.lastName),
     phone: asString(raw.phone) || null,
+    note: asNullableString(raw.note),
   };
 }
 

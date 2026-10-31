@@ -42,6 +42,7 @@ export default function PlayerReservationModal({
         firstName: user.firstName,
         lastName: user.lastName,
         phone: user.phone,
+        note: null,
       };
     }
     if (session.player) {
@@ -50,6 +51,7 @@ export default function PlayerReservationModal({
         firstName: session.player.firstName,
         lastName: session.player.lastName,
         phone: session.player.phone,
+        note: null,
       };
     }
     return null;

@@ -5,6 +5,7 @@ export interface ReservationPlayer {
   firstName: string;
   lastName: string;
   phone: string | null;
+  note: string | null;
 }
 
 export interface CourtSlotList {

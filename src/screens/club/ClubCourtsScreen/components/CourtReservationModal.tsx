@@ -289,6 +289,7 @@ export default function CourtReservationModal({
         firstName: reservation.playerFirstName ?? "",
         lastName: reservation.playerLastName ?? "",
         phone: null,
+        note: null,
       });
     } else {
       setPlayer(null);
@@ -537,6 +538,7 @@ export default function CourtReservationModal({
         firstName: reservation.playerFirstName ?? "",
         lastName: reservation.playerLastName ?? "",
         phone: null,
+        note: null,
       });
     }
   };
