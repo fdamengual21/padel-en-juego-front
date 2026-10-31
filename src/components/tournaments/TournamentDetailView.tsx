@@ -1487,7 +1487,7 @@ export default function TournamentDetailView({
                       ];
                     if (row.incomplete) {
                       playerRows.push({
-                        name: `Buscando pareja (${sidePreferenceLabel(pair.sidePreference)})`,
+                        name: seekingPartnerLabel(pair.sidePreference),
                         imageUrl: null,
                         clientId: null,
                       });
