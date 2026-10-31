@@ -20,7 +20,7 @@ import {
   type RegistrationPlayerDetail,
 } from "@/domain";
 import { formatRegisteredAtEs, formatTournamentDayEs } from "@/lib/dates";
-import { sidePreferenceLabel } from "@/lib/tournamentLabels";
+import { seekingPartnerLabel } from "@/lib/tournamentLabels";
 
 type ParticipantRow = ParticipantsBoardView["rows"][number];
 
@@ -106,8 +106,10 @@ export default function RegistrationDetailModal({
                         <p className="min-w-0 truncate text-sm font-medium">{player.name}</p>
                       </div>
                       <dl className="mt-3 space-y-1.5 text-sm">
-                        <Detail label="Categoría" value={player.category} />
-                        <Detail label="Lado" value={player.side} />
+                        {player.category !== "—" ? (
+                          <Detail label="Categoría" value={player.category} />
+                        ) : null}
+                        {player.side !== "—" ? <Detail label="Lado" value={player.side} /> : null}
                         {player.phone ? (
                           <div className="flex items-center justify-between gap-3">
                             <dt className="text-muted-foreground">Teléfono</dt>
@@ -214,10 +216,10 @@ function columnsOf(row: ParticipantRow, players: RegistrationPlayerDetail[]): Co
   if (row.incomplete || !row.pair.player2Id) {
     columns.push({
       key: `${row.pair.id}-seeking`,
-      name: "Buscando pareja",
+      name: seekingPartnerLabel(row.pair.sidePreference),
       imageUrl: null,
       category: "—",
-      side: sidePreferenceLabel(row.pair.sidePreference),
+      side: "—",
       phone: null,
     });
     return columns;

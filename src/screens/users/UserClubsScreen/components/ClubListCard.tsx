@@ -70,8 +70,8 @@ export default function ClubListCard({ club }: ClubListCardProps) {
             className={cn(
               "h-auto max-w-full truncate px-1.5 py-0.5 text-[10px] font-medium md:text-xs",
               hasSlots
-                ? "bg-success/15 text-success"
-                : "bg-warning/15 text-warning",
+                ? "bg-success-muted text-success-foreground"
+                : "bg-warning-muted text-warning-foreground",
             )}
           >
             {slots} turno{slots === 1 ? "" : "s"} hoy

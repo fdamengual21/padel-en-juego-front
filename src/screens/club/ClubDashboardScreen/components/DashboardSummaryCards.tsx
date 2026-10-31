@@ -180,21 +180,21 @@ function peakTone(percent: number | null): { bar: string; badge: string; label: 
   if (percent < 55) {
     return {
       bar: "bg-destructive",
-      badge: "border-transparent! bg-destructive/15! text-destructive",
+      badge: "border-transparent! bg-destructive-muted! text-destructive",
       label: "Baja",
     };
   }
   if (percent < 75) {
     return {
       bar: "bg-warning",
-      badge: "border-transparent! bg-warning/20! text-warning",
+      badge: "border-transparent! bg-warning-muted! text-warning-foreground",
       label: "Regular",
     };
   }
   if (percent < 90) {
     return {
       bar: "bg-success",
-      badge: "border-transparent! bg-success/15! text-success",
+      badge: "border-transparent! bg-success-muted! text-success-foreground",
       label: "Buena",
     };
   }
@@ -206,7 +206,7 @@ function peakTone(percent: number | null): { bar: string; badge: string; label: 
 }
 
 function deltaTone(delta: number): string {
-  if (delta > 0) return "text-success";
+  if (delta > 0) return "text-success-foreground";
   if (delta < 0) return "text-destructive";
   return "text-muted-foreground";
 }

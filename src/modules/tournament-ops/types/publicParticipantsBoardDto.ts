@@ -15,5 +15,6 @@ export interface PublicParticipantRowDto {
   incomplete: boolean;
   sidePreference: string | null;
   registeredAt: string | null;
+  status?: string | null;
   disqualified: boolean;
 }

@@ -14,7 +14,7 @@ export default function CourtScheduleStatusChip({ status }: CourtScheduleStatusC
         "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium",
         comingSoon
           ? "border-primary/40 bg-primary/15 text-foreground"
-          : "border-warning/50 bg-warning/15 text-foreground",
+          : "border-warning/50 bg-warning-muted text-foreground",
       )}
     >
       <Icon className="size-3" aria-hidden />

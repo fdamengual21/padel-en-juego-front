@@ -25,8 +25,13 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-destructive-muted: var(--destructive-muted);
   --color-success: var(--success);
+  --color-success-muted: var(--success-muted);
+  --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
+  --color-warning-muted: var(--warning-muted);
+  --color-warning-foreground: var(--warning-foreground);
   --color-sex-male: var(--sex-male);
   --color-sex-male-muted: var(--sex-male-muted);
   --color-sex-male-foreground: var(--sex-male-foreground);
@@ -80,8 +85,15 @@
   --accent: oklch(0.96 0.02 125);
   --accent-foreground: oklch(0.22 0.035 265);
   --destructive: oklch(0.55 0.22 25);
+  --destructive-muted: oklch(0.95 0.04 25);
+  /* Fill de barras/puntos. No usar como texto sobre canvas claro. */
   --success: oklch(0.62 0.15 145);
+  --success-muted: oklch(0.95 0.04 145);
+  --success-foreground: oklch(0.42 0.13 145);
   --warning: oklch(0.75 0.14 75);
+  --warning-muted: oklch(0.95 0.05 75);
+  /* Ámbar de texto. WCAG AA ≥ 4.5:1 vs background, card y warning-muted. */
+  --warning-foreground: oklch(0.42 0.13 75);
   --sex-male: oklch(0.62 0.13 240);
   --sex-male-muted: oklch(0.94 0.03 240);
   --sex-male-foreground: oklch(0.38 0.1 240);
@@ -125,8 +137,13 @@
   --accent: oklch(0.28 0.04 125);
   --accent-foreground: oklch(0.97 0.005 265);
   --destructive: oklch(0.65 0.2 25);
+  --destructive-muted: oklch(0.32 0.08 25);
   --success: oklch(0.7 0.14 145);
+  --success-muted: oklch(0.32 0.05 145);
+  --success-foreground: oklch(0.86 0.08 145);
   --warning: oklch(0.78 0.12 75);
+  --warning-muted: oklch(0.32 0.06 75);
+  --warning-foreground: oklch(0.88 0.08 75);
   --sex-male: oklch(0.72 0.12 240);
   --sex-male-muted: oklch(0.32 0.05 240);
   --sex-male-foreground: oklch(0.82 0.06 240);

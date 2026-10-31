@@ -29,7 +29,7 @@ const toneClasses: Record<CalendarAgendaStatusTone | "warning", string> = {
   primary: "border-l-primary bg-primary/10 text-foreground",
   success: "border-l-success bg-success/10 text-foreground",
   error: "border-l-destructive bg-destructive/10 text-foreground",
-  warning: "border-l-warning bg-warning/15 text-foreground dark:bg-warning/25",
+  warning: "border-l-warning bg-warning-muted text-foreground",
 };
 
 function eventTone(event: CalendarEventGridItemDto) {

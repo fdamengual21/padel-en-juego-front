@@ -21,7 +21,7 @@ const toneClasses = {
   error:
     "border-border bg-destructive/10 text-foreground border-l-destructive",
   warning:
-    "border-border bg-warning/15 text-foreground border-l-warning dark:bg-warning/25",
+    "border-border bg-warning-muted text-foreground border-l-warning",
 } as const;
 
 export default function CourtAgendaEventBlock({

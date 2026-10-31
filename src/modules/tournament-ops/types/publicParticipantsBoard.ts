@@ -1,6 +1,6 @@
 import type { PairSidePreference } from "@/domain";
 
-/** Tab Participantes público: aceptadas visibles, sin backoffice. */
+/** Tab Participantes público: aceptadas y, antes de empezar, pendientes. */
 export interface PublicParticipantsBoard {
   generatedAt: string;
   rows: PublicParticipantRow[];
@@ -17,5 +17,7 @@ export interface PublicParticipantRow {
   incomplete: boolean;
   sidePreference: PairSidePreference | null;
   registeredAt: string | null;
+  /** Pendiente o aceptado. Null si el listado viejo no lo manda. */
+  status: "PENDING" | "ACCEPTED" | null;
   disqualified: boolean;
 }

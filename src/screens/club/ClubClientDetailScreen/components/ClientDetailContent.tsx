@@ -49,7 +49,7 @@ export default function ClientDetailContent({
         <SummaryStat
           label="Torneos ganados"
           value={data.tournamentsWon}
-          valueClassName="text-success"
+          valueClassName="text-success-foreground"
         />
         <SummaryStat label="Torneos perdidos" value={data.tournamentsLost} />
       </div>

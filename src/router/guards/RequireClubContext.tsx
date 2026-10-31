@@ -1,13 +1,14 @@
 import { useEffect } from "react";
-import { Navigate, Outlet } from "react-router-dom";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useMockSession } from "@/app/MockSessionProvider";
-import { useUser } from "@/app/UserProvider";
 import { findUserClub } from "@/modules/auth/clubContext";
+import { useAuthSessionGate } from "@/router/guards/useAuthSessionGate";
 import { ROUTES } from "@/router/routes";
 
 /** Backoffice: exige staff, club elegido y membresía vigente en `/me`. */
 export default function RequireClubContext() {
-  const { isResolvingUser } = useUser();
+  const { isChecking } = useAuthSessionGate();
+  const location = useLocation();
   const {
     isAuthenticated,
     hasAssociatedClub,
@@ -24,12 +25,18 @@ export default function RequireClubContext() {
     }
   }, [enterClub, isClubMode, membership]);
 
-  if (isResolvingUser) {
+  if (isChecking) {
     return null;
   }
 
   if (!isAuthenticated) {
-    return <Navigate to={ROUTES.auth.login} replace />;
+    const next = `${location.pathname}${location.search}`;
+    return (
+      <Navigate
+        to={`${ROUTES.auth.login}?next=${encodeURIComponent(next)}`}
+        replace
+      />
+    );
   }
 
   if (!hasAssociatedClub) {

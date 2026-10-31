@@ -72,7 +72,7 @@ import {
 import { ROUTES } from "@/router/routes";
 import { formatTournamentDayEs } from "@/lib/dates";
 import { resolveMatchPlayStatus } from "@/lib/matchPlayStatus";
-import { sidePreferenceLabel } from "@/lib/tournamentLabels";
+import { seekingPartnerLabel } from "@/lib/tournamentLabels";
 import { ApiHttpError } from "@/lib/apiClient";
 import { toastError, toastInfo, toastSuccess } from "@/lib/toast";
 
@@ -439,7 +439,7 @@ export default function TournamentDetailView({
     for (const pair of pairs) {
       const p1 = players.find((p) => p.id === pair.player1Id)?.displayName ?? "?";
       if (!pair.player2Id) {
-        map[pair.id] = `${p1} / Buscando pareja (${sidePreferenceLabel(pair.sidePreference)})`;
+        map[pair.id] = `${p1} / ${seekingPartnerLabel(pair.sidePreference)}`;
       } else {
         const p2 = players.find((p) => p.id === pair.player2Id)?.displayName ?? "?";
         map[pair.id] = `${p1} / ${p2}`;
@@ -454,7 +454,7 @@ export default function TournamentDetailView({
       const p1 = players.find((p) => p.id === pair.player1Id)?.displayName ?? "?";
       const p2 = pair.player2Id
         ? (players.find((p) => p.id === pair.player2Id)?.displayName ?? "?")
-        : `Buscando (${sidePreferenceLabel(pair.sidePreference)})`;
+        : seekingPartnerLabel(pair.sidePreference);
       map[pair.id] = [p1, p2];
     }
     return map;
@@ -579,9 +579,9 @@ export default function TournamentDetailView({
       toastSuccess(
         "Horarios asignados",
         result.message ??
-          (result.pendingCount > 0
-            ? `No hay canchas libres dentro de los días del torneo para ${result.pendingCount} partidos.`
-            : `Se asignaron ${result.scheduledCount} partidos de ${result.phaseLabel ?? "la fase"}.`),
+        (result.pendingCount > 0
+          ? `No hay canchas libres dentro de los días del torneo para ${result.pendingCount} partidos.`
+          : `Se asignaron ${result.scheduledCount} partidos de ${result.phaseLabel ?? "la fase"}.`),
       );
       setAssignOpen(false);
       await invalidateOps();
@@ -1030,11 +1030,11 @@ export default function TournamentDetailView({
   const championPairId =
     tournament.status === "finished"
       ? resolveTournamentChampionPairId({
-          elimMatches: cuadroBoard?.elimMatches ?? [],
-          groups: zonesBoard?.groups ?? cuadroBoard?.groups ?? [],
-          standings: zonesBoard?.standings ?? [],
-          finishedGroupIds: zonesBoard?.finishedGroupIds,
-        })
+        elimMatches: cuadroBoard?.elimMatches ?? [],
+        groups: zonesBoard?.groups ?? cuadroBoard?.groups ?? [],
+        standings: zonesBoard?.standings ?? [],
+        finishedGroupIds: zonesBoard?.finishedGroupIds,
+      })
       : null;
   const championNames = championPairId
     ? championPairNames(championPairId, pairPlayerNames, pairLabels)
@@ -1055,9 +1055,9 @@ export default function TournamentDetailView({
       (knockoutStructure?.removable.length ?? 0) > 0);
   const repechageCreated = Boolean(
     repechageCreatedLocal ||
-      category?.repechageCreated ||
-      configBoard?.repechageCreated ||
-      participantsBoard?.repechageCreated,
+    category?.repechageCreated ||
+    configBoard?.repechageCreated ||
+    participantsBoard?.repechageCreated,
   );
   const showCreateRepechageButton =
     !tournamentLocked &&
@@ -1069,12 +1069,12 @@ export default function TournamentDetailView({
   const canCancelTournament = !tournamentLocked;
   const resultMatch = resultMatchId
     ? (matches.find((m) => m.id === resultMatchId) ??
-        zonesBoard?.allMatches.find((m) => m.id === resultMatchId) ??
-        cuadroBoard?.elimMatches.find((m) => m.id === resultMatchId) ??
-        repechageBoard?.allMatches.find((m) => m.id === resultMatchId) ??
-        repechageBoard?.elimMatches.find((m) => m.id === resultMatchId) ??
-        repechageBoard?.groupMatches.find((m) => m.id === resultMatchId) ??
-        null)
+      zonesBoard?.allMatches.find((m) => m.id === resultMatchId) ??
+      cuadroBoard?.elimMatches.find((m) => m.id === resultMatchId) ??
+      repechageBoard?.allMatches.find((m) => m.id === resultMatchId) ??
+      repechageBoard?.elimMatches.find((m) => m.id === resultMatchId) ??
+      repechageBoard?.groupMatches.find((m) => m.id === resultMatchId) ??
+      null)
     : null;
 
   const openAddPair = () => {
@@ -1091,15 +1091,15 @@ export default function TournamentDetailView({
 
   const formSource = configBoard
     ? {
-        tournament: configBoard.tournament,
-        category: configBoard.category,
-        ruleset: configBoard.ruleset,
-      }
+      tournament: configBoard.tournament,
+      category: configBoard.category,
+      ruleset: configBoard.ruleset,
+    }
     : {
-        tournament,
-        category,
-        ruleset,
-      };
+      tournament,
+      category,
+      ruleset,
+    };
 
   const formInitial = defaultTournamentFormValues({
     name: formSource.tournament.name,
@@ -1112,8 +1112,8 @@ export default function TournamentDetailView({
     format: formSource.tournament.format,
     matchPlayType:
       formSource.ruleset?.preset === "QUALITY" ||
-      formSource.ruleset?.preset === "CUSTOM" ||
-      formSource.ruleset?.preset === "STANDARD"
+        formSource.ruleset?.preset === "CUSTOM" ||
+        formSource.ruleset?.preset === "STANDARD"
         ? formSource.ruleset.preset
         : "QUALITY",
     equalsResolution: formSource.ruleset?.matchRules.goldenPoint
@@ -1240,21 +1240,21 @@ export default function TournamentDetailView({
                 </Button>
               ) : null}
               {isQualityPreset(ruleset?.preset) ? null : (
-              <AutoAssignButton
-                blockedReason={
-                  zonesBoard
-                    ? zonesBoard.autoAssign.blockedReason
-                    : activeTab === "grupos"
-                      ? "Cargando la fase…"
-                      : null
-                }
-                pending={
-                  scheduleMutation.isPending ||
-                  finishMutation.isPending ||
-                  cancelMutation.isPending
-                }
-                onOpen={() => setAssignOpen(true)}
-              />
+                <AutoAssignButton
+                  blockedReason={
+                    zonesBoard
+                      ? zonesBoard.autoAssign.blockedReason
+                      : activeTab === "grupos"
+                        ? "Cargando la fase…"
+                        : null
+                  }
+                  pending={
+                    scheduleMutation.isPending ||
+                    finishMutation.isPending ||
+                    cancelMutation.isPending
+                  }
+                  onOpen={() => setAssignOpen(true)}
+                />
               )}
               {canStartTournament ? (
                 <Button
@@ -1305,19 +1305,19 @@ export default function TournamentDetailView({
           { kind: "category", label: "Categoría", value: category?.name ?? "Sin categoría" },
           tournamentStarted
             ? {
-                kind: "pairs",
-                label: "En cuadro",
-                value: `${capacity.inDraw} parejas`,
-                detail: outOfDrawSummary,
-              }
+              kind: "pairs",
+              label: "En cuadro",
+              value: `${capacity.inDraw} parejas`,
+              detail: outOfDrawSummary,
+            }
             : {
-                kind: "pairs",
-                label: "Aceptados",
-                value:
-                  capacity.acceptedSoloPlayers > 0
-                    ? `${capacity.acceptedPairs} parejas · ${capacity.acceptedSoloPlayers} buscando pareja`
-                    : `${capacity.acceptedPairs} parejas`,
-              },
+              kind: "pairs",
+              label: "Aceptados",
+              value:
+                capacity.acceptedSoloPlayers > 0
+                  ? `${capacity.acceptedPairs} parejas · ${capacity.acceptedSoloPlayers} buscando pareja`
+                  : `${capacity.acceptedPairs} parejas`,
+            },
           {
             kind: "fee",
             label: "Inscripción",
@@ -1467,240 +1467,240 @@ export default function TournamentDetailView({
             />
           ) : (
             participantGroups.map((group) => (
-            <section key={group.key} className="space-y-2">
-              {group.title ? (
-                <h3 className="text-sm font-medium">{group.title}</h3>
-              ) : null}
-              <ul className="divide-y divide-border rounded-xl border border-border bg-card">
-                {group.rows.map((row) => {
-              const { pair, registration: reg } = row;
-              const playerRows: Array<{
-                name: string;
-                imageUrl: string | null;
-                clientId: string | null;
-              }> = [
-                {
-                  name: row.playerNames[0] ?? "?",
-                  imageUrl: row.playerAvatars?.[0] ?? null,
-                  clientId: row.playerClientIds?.[0] ?? null,
-                },
-              ];
-              if (row.incomplete) {
-                playerRows.push({
-                  name: `Buscando pareja (${sidePreferenceLabel(pair.sidePreference)})`,
-                  imageUrl: null,
-                  clientId: null,
-                });
-              } else {
-                playerRows.push({
-                  name: row.playerNames[1] ?? "?",
-                  imageUrl: row.playerAvatars?.[1] ?? null,
-                  clientId: row.playerClientIds?.[1] ?? null,
-                });
-              }
+              <section key={group.key} className="space-y-2">
+                {group.title ? (
+                  <h3 className="text-sm font-medium">{group.title}</h3>
+                ) : null}
+                <ul className="divide-y divide-border rounded-xl border border-border bg-card">
+                  {group.rows.map((row) => {
+                    const { pair, registration: reg } = row;
+                    const playerRows: Array<{
+                      name: string;
+                      imageUrl: string | null;
+                      clientId: string | null;
+                    }> = [
+                        {
+                          name: row.playerNames[0] ?? "?",
+                          imageUrl: row.playerAvatars?.[0] ?? null,
+                          clientId: row.playerClientIds?.[0] ?? null,
+                        },
+                      ];
+                    if (row.incomplete) {
+                      playerRows.push({
+                        name: `Buscando pareja (${sidePreferenceLabel(pair.sidePreference)})`,
+                        imageUrl: null,
+                        clientId: null,
+                      });
+                    } else {
+                      playerRows.push({
+                        name: row.playerNames[1] ?? "?",
+                        imageUrl: row.playerAvatars?.[1] ?? null,
+                        clientId: row.playerClientIds?.[1] ?? null,
+                      });
+                    }
 
-              return (
-                <li
-                  key={pair.id}
-                  data-testid="participant-card"
-                  className="flex cursor-pointer flex-col gap-2 px-4 py-3 text-sm transition-colors hover:bg-muted/40 sm:flex-row sm:items-center sm:justify-between"
-                  onClick={() => setDetailRow(row)}
-                >
-                  <div className="min-w-0 space-y-2">
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                      {playerRows.map((player, index) => {
-                        const clickable = Boolean(player.clientId);
-                        const inner = (
-                          <>
-                            <Avatar
-                              name={player.name}
-                              imageUrl={player.imageUrl}
-                              size="sm"
-                              alt={player.name}
-                            />
-                            <span className="truncate font-medium">
-                              {player.name}
-                            </span>
-                          </>
-                        );
-                        return clickable ? (
-                          <button
-                            key={`${pair.id}-p${index}`}
-                            type="button"
-                            className="flex min-w-0 items-center gap-2 rounded-md text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setClientDetailId(player.clientId);
-                            }}
-                          >
-                            {inner}
-                          </button>
-                        ) : (
-                          <div
-                            key={`${pair.id}-p${index}`}
-                            className="flex items-center gap-2 min-w-0"
-                          >
-                            {inner}
-                          </div>
-                        );
-                      })}
-                      {reg ? <StatusBadge status={reg.status} /> : null}
-                      {row.disqualified ? (
-                        <StatusBadge status="disqualified" />
-                      ) : null}
-                      {row.incomplete ? (
-                        <span className="rounded-md border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                          Incompleta
-                        </span>
-                      ) : null}
-                      {isOutOfDraw(row) ? (
-                        <TooltipProvider delay={200}>
-                          <Tooltip>
-                            <TooltipTrigger render={<span className="inline-flex" />}>
-                              <span
-                                className="rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-900"
-                                data-testid={`out-of-draw-${pair.id}`}
-                              >
-                                Fuera del cuadro
+                    return (
+                      <li
+                        key={pair.id}
+                        data-testid="participant-card"
+                        className="flex cursor-pointer flex-col gap-2 px-4 py-3 text-sm transition-colors hover:bg-muted/40 sm:flex-row sm:items-center sm:justify-between"
+                        onClick={() => setDetailRow(row)}
+                      >
+                        <div className="min-w-0 space-y-2">
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                            {playerRows.map((player, index) => {
+                              const clickable = Boolean(player.clientId);
+                              const inner = (
+                                <>
+                                  <Avatar
+                                    name={player.name}
+                                    imageUrl={player.imageUrl}
+                                    size="sm"
+                                    alt={player.name}
+                                  />
+                                  <span className="truncate font-medium">
+                                    {player.name}
+                                  </span>
+                                </>
+                              );
+                              return clickable ? (
+                                <button
+                                  key={`${pair.id}-p${index}`}
+                                  type="button"
+                                  className="flex min-w-0 items-center gap-2 rounded-md text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    setClientDetailId(player.clientId);
+                                  }}
+                                >
+                                  {inner}
+                                </button>
+                              ) : (
+                                <div
+                                  key={`${pair.id}-p${index}`}
+                                  className="flex items-center gap-2 min-w-0"
+                                >
+                                  {inner}
+                                </div>
+                              );
+                            })}
+                            {reg ? <StatusBadge status={reg.status} /> : null}
+                            {row.disqualified ? (
+                              <StatusBadge status="disqualified" />
+                            ) : null}
+                            {row.incomplete ? (
+                              <span className="rounded-md border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                Incompleta
                               </span>
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs">
-                              {row.outOfDrawReason}
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      ) : null}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {reg?.registeredAt
-                        ? formatRegisteredAtEs(reg.registeredAt)
-                        : "Sin fecha de inscripción"}
-                      {pair.user1Id || pair.user2Id
-                        ? " · equipo vinculado a usuario(s) del torneo"
-                        : " · sin usuarios vinculados"}
-                    </p>
-                    {reg?.statusNote ? (
-                      <p className="text-xs text-destructive/90">
-                        Nota: {reg.statusNote}
-                      </p>
-                    ) : null}
-                  </div>
-                  <div
-                    className="flex flex-wrap gap-2"
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    {canMutateParticipants &&
-                    (reg?.status === "PENDING" || reg?.status === "WAITLIST") ? (
-                      <>
-                        {row.incomplete || !pair.player2Id ? (
-                          <TooltipProvider delay={200}>
-                            <Tooltip>
-                              <TooltipTrigger render={<span className="inline-flex" />}>
-                                <Button type="button" size="sm" disabled>
-                                  Aceptar
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent className="max-w-xs">
-                                Asigná un compañero antes de aceptar.
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        ) : admission.allowed && !acceptedFull ? (
-                          <Button
-                            type="button"
-                            size="sm"
-                            disabled={acceptMutation.isPending}
-                            onClick={() => acceptMutation.mutate(reg.id)}
-                          >
-                            Aceptar
-                          </Button>
-                        ) : (
-                          <TooltipProvider delay={200}>
-                            <Tooltip>
-                              <TooltipTrigger render={<span className="inline-flex" />}>
-                                <Button type="button" size="sm" disabled>
-                                  Aceptar
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent className="max-w-xs">
-                                {acceptedFull
-                                  ? "El cupo de parejas aceptadas está completo."
-                                  : (admission.reason ?? "No se pueden sumar parejas en este momento.")}
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        )}
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={rejectMutation.isPending}
-                          onClick={() =>
-                            rejectMutation.mutate({ registrationId: reg.id })
-                          }
+                            ) : null}
+                            {isOutOfDraw(row) ? (
+                              <TooltipProvider delay={200}>
+                                <Tooltip>
+                                  <TooltipTrigger render={<span className="inline-flex" />}>
+                                    <span
+                                      className="rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-900"
+                                      data-testid={`out-of-draw-${pair.id}`}
+                                    >
+                                      Fuera del cuadro
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs">
+                                    {row.outOfDrawReason}
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            ) : null}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {reg?.registeredAt
+                              ? formatRegisteredAtEs(reg.registeredAt)
+                              : "Sin fecha de inscripción"}
+                            {pair.user1Id || pair.user2Id
+                              ? " · equipo vinculado a usuario(s) del torneo"
+                              : " · sin usuarios vinculados"}
+                          </p>
+                          {reg?.statusNote ? (
+                            <p className="text-xs text-destructive/90">
+                              Nota: {reg.statusNote}
+                            </p>
+                          ) : null}
+                        </div>
+                        <div
+                          className="flex flex-wrap gap-2"
+                          onClick={(event) => event.stopPropagation()}
                         >
-                          Rechazar
-                        </Button>
-                      </>
-                    ) : null}
-                    {canMutateParticipants &&
-                    !row.disqualified &&
-                    reg?.status !== "CANCELLED" &&
-                    reg?.status !== "REJECTED" ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setEditingPair(pair);
-                          setPairModalOpen(true);
-                        }}
-                      >
-                        Editar
-                      </Button>
-                    ) : null}
-                    {canMutateParticipants &&
-                    tournamentStarted &&
-                    !row.disqualified &&
-                    reg?.status === "ACCEPTED" ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => {
-                          setDqRegistrationId(reg.id);
-                          setDqNote("");
-                        }}
-                      >
-                        <Ban />
-                        Desclasificar
-                      </Button>
-                    ) : null}
-                    {canMutateParticipants &&
-                    reg &&
-                    reg.status !== "CANCELLED" &&
-                    reg.status !== "REJECTED" &&
-                    !row.disqualified &&
-                    !removeAcceptedPairBlockedReason(tournamentStarted, reg.status) ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => {
-                          setRemoveRegistrationId(reg.id);
-                          setRemoveNote("");
-                        }}
-                      >
-                        <Trash2 />
-                        Eliminar
-                      </Button>
-                    ) : null}
-                  </div>
-                </li>
-              );
-            })}
-              </ul>
-            </section>
+                          {canMutateParticipants &&
+                            (reg?.status === "PENDING" || reg?.status === "WAITLIST") ? (
+                            <>
+                              {row.incomplete || !pair.player2Id ? (
+                                <TooltipProvider delay={200}>
+                                  <Tooltip>
+                                    <TooltipTrigger render={<span className="inline-flex" />}>
+                                      <Button type="button" size="sm" disabled>
+                                        Aceptar
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-xs">
+                                      Asigná un compañero antes de aceptar.
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              ) : admission.allowed && !acceptedFull ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  disabled={acceptMutation.isPending}
+                                  onClick={() => acceptMutation.mutate(reg.id)}
+                                >
+                                  Aceptar
+                                </Button>
+                              ) : (
+                                <TooltipProvider delay={200}>
+                                  <Tooltip>
+                                    <TooltipTrigger render={<span className="inline-flex" />}>
+                                      <Button type="button" size="sm" disabled>
+                                        Aceptar
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-xs">
+                                      {acceptedFull
+                                        ? "El cupo de parejas aceptadas está completo."
+                                        : (admission.reason ?? "No se pueden sumar parejas en este momento.")}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                disabled={rejectMutation.isPending}
+                                onClick={() =>
+                                  rejectMutation.mutate({ registrationId: reg.id })
+                                }
+                              >
+                                Rechazar
+                              </Button>
+                            </>
+                          ) : null}
+                          {canMutateParticipants &&
+                            !row.disqualified &&
+                            reg?.status !== "CANCELLED" &&
+                            reg?.status !== "REJECTED" ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setEditingPair(pair);
+                                setPairModalOpen(true);
+                              }}
+                            >
+                              Editar
+                            </Button>
+                          ) : null}
+                          {canMutateParticipants &&
+                            tournamentStarted &&
+                            !row.disqualified &&
+                            reg?.status === "ACCEPTED" ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => {
+                                setDqRegistrationId(reg.id);
+                                setDqNote("");
+                              }}
+                            >
+                              <Ban />
+                              Desclasificar
+                            </Button>
+                          ) : null}
+                          {canMutateParticipants &&
+                            reg &&
+                            reg.status !== "CANCELLED" &&
+                            reg.status !== "REJECTED" &&
+                            !row.disqualified &&
+                            !removeAcceptedPairBlockedReason(tournamentStarted, reg.status) ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => {
+                                setRemoveRegistrationId(reg.id);
+                                setRemoveNote("");
+                              }}
+                            >
+                              <Trash2 />
+                              Eliminar
+                            </Button>
+                          ) : null}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
             ))
           )}
           {canMutateParticipants ? (
@@ -1829,7 +1829,7 @@ export default function TournamentDetailView({
             <p className="text-sm text-muted-foreground">{repechageBoard.notice}</p>
           ) : null}
           {repechageBoard &&
-          (repechageBoard.groups.length > 0 || repechageBoard.elimMatches.length > 0) ? (
+            (repechageBoard.groups.length > 0 || repechageBoard.elimMatches.length > 0) ? (
             <>
               <GroupZonesPanel
                 groups={repechageBoard.groups}

@@ -21,6 +21,7 @@ export function toPublicParticipantsBoard(
       incomplete: Boolean(row.incomplete),
       sidePreference: asSide(row.sidePreference),
       registeredAt: row.registeredAt ?? null,
+      status: asPublicStatus(row.status),
       disqualified: Boolean(row.disqualified),
     })),
   };
@@ -28,4 +29,8 @@ export function toPublicParticipantsBoard(
 
 function asSide(value: string | null | undefined): PairSidePreference | null {
   return value && SIDES.has(value) ? (value as PairSidePreference) : null;
+}
+
+function asPublicStatus(value: string | null | undefined): "PENDING" | "ACCEPTED" | null {
+  return value === "PENDING" || value === "ACCEPTED" ? value : null;
 }

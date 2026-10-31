@@ -31,12 +31,11 @@ interface HomeTournamentCardProps {
 const inscriptionChip: Record<string, { label: string; className: string }> = {
   ACCEPTED: {
     label: "Inscripto",
-    className: "border-transparent! bg-success/15! text-success",
+    className: "border-transparent! bg-success-muted! text-success-foreground",
   },
   PENDING: {
     label: "Pendiente",
-    className:
-      "border-transparent! bg-[color-mix(in_oklch,var(--warning)_18%,var(--card))]! text-warning",
+    className: "border-transparent! bg-warning-muted! text-warning-foreground",
   },
   WAITLIST: {
     label: "Lista de espera",

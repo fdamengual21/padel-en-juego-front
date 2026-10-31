@@ -19,7 +19,7 @@ import {
   type Match,
 } from "@/domain";
 import { formatRegisteredAtEs, formatTournamentDayEs } from "@/lib/dates";
-import { sidePreferenceLabel } from "@/lib/tournamentLabels";
+import { seekingPartnerLabel } from "@/lib/tournamentLabels";
 import { toastError } from "@/lib/toast";
 import { ROUTES } from "@/router/routes";
 import CuadroBoard from "@/screens/club/ClubTournamentDetailScreen/components/CuadroBoard";
@@ -302,64 +302,76 @@ export default function UserTournamentDetailScreen() {
         </TabsContent>
 
         <TabsContent value="participantes" className="space-y-3 pt-4">
-          <p className="text-sm text-muted-foreground">Parejas inscriptas en la categoría.</p>
+          <p className="text-sm text-muted-foreground">
+            {page.tournamentStarted
+              ? "Parejas inscriptas en la categoría."
+              : "Quién se anotó en la categoría. Pendiente: el club todavía no confirmó."}
+          </p>
           {participantsQuery.data?.notice ? (
             <p className="text-sm text-muted-foreground">{participantsQuery.data.notice}</p>
           ) : null}
           {participantsQuery.data ? (
             participantsQuery.data.rows.length ? (
-              <ul className="divide-y divide-border rounded-xl border border-border bg-card">
-                {participantsQuery.data.rows.map((row) => (
-                  <li
-                    key={row.pairId}
-                    data-testid="participant-card"
-                    className="flex cursor-pointer flex-col gap-2 px-4 py-3 text-sm transition-colors hover:bg-muted/40 sm:flex-row sm:items-center sm:justify-between"
-                    onClick={() => setDetailRow(row)}
-                  >
-                    <div className="min-w-0 space-y-2">
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                        <div className="flex min-w-0 items-center gap-2">
-                          <Avatar
-                            name={row.playerNames[0]}
-                            imageUrl={row.playerAvatars[0]}
-                            size="sm"
-                            alt={row.playerNames[0]}
-                          />
-                          <span className="truncate font-medium">{row.playerNames[0]}</span>
-                        </div>
-                        <div className="flex min-w-0 items-center gap-2">
-                          {row.incomplete ? (
-                            <span className="text-muted-foreground">
-                              Buscando pareja ({sidePreferenceLabel(row.sidePreference)})
-                            </span>
-                          ) : (
-                            <>
+              publicParticipantGroups(participantsQuery.data.rows).map((group) => (
+                <section key={group.key} className="space-y-2">
+                  {group.title ? <h3 className="text-sm font-medium">{group.title}</h3> : null}
+                  <ul className="divide-y divide-border rounded-xl border border-border bg-card">
+                    {group.rows.map((row) => (
+                      <li
+                        key={row.pairId}
+                        data-testid="participant-card"
+                        className="flex cursor-pointer flex-col gap-2 px-4 py-3 text-sm transition-colors hover:bg-muted/40 sm:flex-row sm:items-center sm:justify-between"
+                        onClick={() => setDetailRow(row)}
+                      >
+                        <div className="min-w-0 space-y-2">
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                            <div className="flex min-w-0 items-center gap-2">
                               <Avatar
-                                name={row.playerNames[1]}
-                                imageUrl={row.playerAvatars[1]}
+                                name={row.playerNames[0]}
+                                imageUrl={row.playerAvatars[0]}
                                 size="sm"
-                                alt={row.playerNames[1]}
+                                alt={row.playerNames[0]}
                               />
-                              <span className="truncate font-medium">{row.playerNames[1]}</span>
-                            </>
-                          )}
+                              <span className="truncate font-medium">{row.playerNames[0]}</span>
+                            </div>
+                            <div className="flex min-w-0 items-center gap-2">
+                              {row.incomplete ? (
+                                <span className="text-muted-foreground">
+                                  {seekingPartnerLabel(row.sidePreference)}
+                                </span>
+                              ) : (
+                                <>
+                                  <Avatar
+                                    name={row.playerNames[1]}
+                                    imageUrl={row.playerAvatars[1]}
+                                    size="sm"
+                                    alt={row.playerNames[1]}
+                                  />
+                                  <span className="truncate font-medium">{row.playerNames[1]}</span>
+                                </>
+                              )}
+                            </div>
+                            {!page.tournamentStarted && row.status ? (
+                              <StatusBadge status={row.status} />
+                            ) : null}
+                            {row.disqualified ? <StatusBadge status="disqualified" /> : null}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {row.registeredAt
+                              ? formatRegisteredAtEs(row.registeredAt)
+                              : "Sin fecha de inscripción"}
+                          </p>
                         </div>
-                        {row.disqualified ? <StatusBadge status="disqualified" /> : null}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {row.registeredAt
-                          ? formatRegisteredAtEs(row.registeredAt)
-                          : "Sin fecha de inscripción"}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))
             ) : (
               <EmptyState
                 icon={Users}
-                title="Todavía no hay parejas inscriptas"
-                description="Cuando el club acepte inscripciones, van a aparecer acá."
+                title="Todavía no hay inscripciones"
+                description="Cuando alguien se anote, va a aparecer acá."
               />
             )
           ) : (
@@ -468,4 +480,17 @@ export default function UserTournamentDetailScreen() {
       />
     </div>
   );
+}
+
+function publicParticipantGroups(rows: PublicParticipantRow[]) {
+  const seeking = rows.filter((row) => row.incomplete);
+  const complete = rows.filter((row) => !row.incomplete);
+  return [
+    { key: "seeking", title: "Buscando pareja", rows: seeking },
+    {
+      key: "pairs",
+      title: seeking.length > 0 ? "Parejas" : null,
+      rows: complete,
+    },
+  ].filter((group) => group.rows.length > 0);
 }

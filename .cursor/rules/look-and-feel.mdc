@@ -22,7 +22,9 @@ alwaysApply: false
 
 ## Tokens (`src/index.css` + Tailwind)
 
-`background` → `card` | `foreground` `muted` `border` | `primary` (+ `primary-foreground`) | `success` `warning` `destructive` | `sidebar*` | `radius-*` | spacing coherente.
+`background` → `card` | `foreground` `muted` `border` | `primary` (+ `primary-foreground`, `primary-strong`) | `success` `warning` `destructive` (fill) + `-muted` / `-foreground` para chips y texto AA | `sidebar*` | `radius-*` | spacing coherente.
+
+`--warning` y `--success` son relleno (barra, punto). Texto sobre canvas light: `text-warning-foreground` / `text-success-foreground` / `text-destructive`. No `text-warning` ni `color-mix` en componentes.
 
 Sin hex hardcodeados en screens/components. Usar clases semánticas (`bg-primary`, `text-muted-foreground`, `bg-sidebar`, …).
 

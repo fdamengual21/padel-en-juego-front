@@ -193,7 +193,7 @@ export default function CourtSummaryCard({
                   const chipClass = cn(
                     "rounded-full border px-3 py-1 text-xs font-medium",
                     pending
-                      ? "border-warning bg-warning/15 text-foreground dark:bg-warning/25"
+                      ? "border-warning bg-warning-muted text-foreground"
                       : "border-border bg-card text-muted-foreground",
                   );
                   const chip = onSelectSlot ? (
@@ -202,7 +202,7 @@ export default function CourtSummaryCard({
                       className={cn(
                         chipClass,
                         pending
-                          ? "hover:bg-warning/25 dark:hover:bg-warning/35"
+                          ? "hover:brightness-95"
                           : "transition-colors hover:bg-muted hover:text-foreground",
                       )}
                       onClick={() => onSelectSlot(slot)}

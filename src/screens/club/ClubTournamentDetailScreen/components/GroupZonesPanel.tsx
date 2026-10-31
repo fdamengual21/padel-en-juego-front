@@ -512,7 +512,7 @@ export default function GroupZonesPanel({
     return (
       <EmptyState
         icon={Users}
-        title="Todavía no hay parejas inscriptas"
+        title="Todavía no hay parejas confirmadas."
         description="Cuando los jugadores se inscriban, se generarán las zonas y se completará el cuadro del torneo."
         className={compact ? "min-h-0 py-8" : undefined}
       />
@@ -816,166 +816,166 @@ export default function GroupZonesPanel({
               ) : null
             }
           >
-                  {groupMatches.map((match, index) => {
-                    const seedA = pairIndexInGroup(group, match.pairAId);
-                    const seedB = pairIndexInGroup(group, match.pairBId);
-                    const pendingA = pendingSide(slotSource(slots, match.id, "A"));
-                    const pendingB = pendingSide(slotSource(slots, match.id, "B"));
-                    const cruce =
-                      seedA && seedB
-                        ? `${seedA} vs ${seedB}`
-                        : pendingA && pendingB
-                          ? pendingA === "Ganador"
-                            ? "G vs G"
-                            : "P vs P"
-                          : "—";
-                    const playStatus = resolveMatchPlayStatus(match, matchRules);
-                    const hasPairs = Boolean(match.pairAId && match.pairBId);
-                    const matchCancelled = match.status === "cancelled";
-                    const matchClosed =
-                      playStatus === "finished" ||
-                      match.status === "finished" ||
-                      match.status === "walkover" ||
-                      matchCancelled;
-                    const winnerSide = matchWinnerSide(match);
-                    const canOpenResult = canOpenMatchResult(match, !tournamentLocked);
-                    const canEditSchedule =
-                      hasPairs && !tournamentLocked && !matchClosed;
-                    const canEditDateTime = canEditSchedule && !disableMatchDateTime;
-                    const live = canSetLive ? matchLiveAction(match, tournamentStarted) : null;
-                    return (
-                      <TableRow key={match.id}>
-                        <TableCell className="px-2 py-1 text-xs text-muted-foreground tabular-nums whitespace-nowrap">
-                          N°{index + 1}
-                        </TableCell>
-                        <TableCell className="px-2 py-1 text-xs font-medium whitespace-nowrap">
-                          {cruce}
-                        </TableCell>
-                        <TableCell className="px-2 py-1">
-                          {showAgenda && onSaveSchedule ? (
-                            <MatchHorarioButton
-                              scheduledAt={match.scheduledAt}
-                              disabled={!canEditDateTime}
-                              onClick={() => setScheduleMatchId(match.id)}
-                            />
-                          ) : (
-                            <span className="text-xs text-muted-foreground whitespace-nowrap">
-                              {formatScheduleShortEs(match.scheduledAt)}
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell className="px-2 py-1">
-                          <MatchPlayStatusChip
-                            status={playStatus}
-                            hint={matchPlayStatusHint(match, slots, pairLabels)}
-                            className="h-4 px-1.5 text-[10px]"
-                          />
-                        </TableCell>
-                        <TableCell className="px-2 py-1 whitespace-normal">
-                          <PairVsBlock
-                            className="text-xs"
-                            pairAId={match.pairAId}
-                            pairBId={match.pairBId}
-                            pairALabel={
-                              pairLabels[match.pairAId ?? ""] ?? pendingA ?? "Por definir"
+            {groupMatches.map((match, index) => {
+              const seedA = pairIndexInGroup(group, match.pairAId);
+              const seedB = pairIndexInGroup(group, match.pairBId);
+              const pendingA = pendingSide(slotSource(slots, match.id, "A"));
+              const pendingB = pendingSide(slotSource(slots, match.id, "B"));
+              const cruce =
+                seedA && seedB
+                  ? `${seedA} vs ${seedB}`
+                  : pendingA && pendingB
+                    ? pendingA === "Ganador"
+                      ? "G vs G"
+                      : "P vs P"
+                    : "—";
+              const playStatus = resolveMatchPlayStatus(match, matchRules);
+              const hasPairs = Boolean(match.pairAId && match.pairBId);
+              const matchCancelled = match.status === "cancelled";
+              const matchClosed =
+                playStatus === "finished" ||
+                match.status === "finished" ||
+                match.status === "walkover" ||
+                matchCancelled;
+              const winnerSide = matchWinnerSide(match);
+              const canOpenResult = canOpenMatchResult(match, !tournamentLocked);
+              const canEditSchedule =
+                hasPairs && !tournamentLocked && !matchClosed;
+              const canEditDateTime = canEditSchedule && !disableMatchDateTime;
+              const live = canSetLive ? matchLiveAction(match, tournamentStarted) : null;
+              return (
+                <TableRow key={match.id}>
+                  <TableCell className="px-2 py-1 text-xs text-muted-foreground tabular-nums whitespace-nowrap">
+                    N°{index + 1}
+                  </TableCell>
+                  <TableCell className="px-2 py-1 text-xs font-medium whitespace-nowrap">
+                    {cruce}
+                  </TableCell>
+                  <TableCell className="px-2 py-1">
+                    {showAgenda && onSaveSchedule ? (
+                      <MatchHorarioButton
+                        scheduledAt={match.scheduledAt}
+                        disabled={!canEditDateTime}
+                        onClick={() => setScheduleMatchId(match.id)}
+                      />
+                    ) : (
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        {formatScheduleShortEs(match.scheduledAt)}
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell className="px-2 py-1">
+                    <MatchPlayStatusChip
+                      status={playStatus}
+                      hint={matchPlayStatusHint(match, slots, pairLabels)}
+                      className="h-4 px-1.5 text-[10px]"
+                    />
+                  </TableCell>
+                  <TableCell className="px-2 py-1 whitespace-normal">
+                    <PairVsBlock
+                      className="text-xs"
+                      pairAId={match.pairAId}
+                      pairBId={match.pairBId}
+                      pairALabel={
+                        pairLabels[match.pairAId ?? ""] ?? pendingA ?? "Por definir"
+                      }
+                      pairBLabel={
+                        pairLabels[match.pairBId ?? ""] ?? pendingB ?? "Por definir"
+                      }
+                      winnerSide={winnerSide}
+                      onOpenPair={onOpenPair}
+                    />
+                  </TableCell>
+                  <TableCell className="px-2 py-1 text-left whitespace-normal">
+                    <button
+                      type="button"
+                      data-testid={`match-result-cell-${match.id}`}
+                      disabled={!canOpenResult}
+                      className={cn(
+                        "inline-flex justify-start rounded-md text-left transition-colors",
+                        canOpenResult
+                          ? "cursor-pointer hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          : "cursor-default",
+                      )}
+                      onClick={() => {
+                        if (!canOpenResult) return;
+                        onOpenResult(match);
+                      }}
+                    >
+                      <MatchScoreBoxes
+                        sets={match.sets}
+                        slotCount={slotCount}
+                        decidingSlotIndex={decidingSlotIndex}
+                        winnerSide={winnerSide}
+                      />
+                    </button>
+                  </TableCell>
+                  {showMatchActions ? (
+                    <TableCell className="px-2 py-1 align-middle">
+                      <MatchRowActions
+                        matchId={match.id}
+                        pairingBlockedReason={
+                          canEditPairing
+                            ? matchPairingBlockedReason(match, slots, tournamentStarted)
+                            : undefined
+                        }
+                        liveKind={live?.kind}
+                        liveBlockedReason={live?.blockedReason}
+                        liveSaving={statusSavingMatchId === match.id}
+                        moveBlockedReason={
+                          canMovePairs
+                            ? matchMoveBlockedReason(
+                              match,
+                              slots,
+                              tournamentStarted,
+                              rebuildBlockedReason,
+                              scheduleMatches,
+                            )
+                            : undefined
+                        }
+                        onEditPairing={canEditPairing ? setPairingMatchId : undefined}
+                        onSetLive={
+                          canSetLive && onSetStatus
+                            ? (id, status) => {
+                              void onSetStatus({ matchId: id, status });
                             }
-                            pairBLabel={
-                              pairLabels[match.pairBId ?? ""] ?? pendingB ?? "Por definir"
-                            }
-                            winnerSide={winnerSide}
-                            onOpenPair={onOpenPair}
-                          />
-                        </TableCell>
-                        <TableCell className="px-2 py-1 text-left whitespace-normal">
-                          <button
-                            type="button"
-                            data-testid={`match-result-cell-${match.id}`}
-                            disabled={!canOpenResult}
-                            className={cn(
-                              "inline-flex justify-start rounded-md text-left transition-colors",
-                              canOpenResult
-                                ? "cursor-pointer hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                : "cursor-default",
-                            )}
-                            onClick={() => {
-                              if (!canOpenResult) return;
-                              onOpenResult(match);
-                            }}
-                          >
-                            <MatchScoreBoxes
-                              sets={match.sets}
-                              slotCount={slotCount}
-                              decidingSlotIndex={decidingSlotIndex}
-                              winnerSide={winnerSide}
-                            />
-                          </button>
-                        </TableCell>
-                        {showMatchActions ? (
-                          <TableCell className="px-2 py-1 align-middle">
-                            <MatchRowActions
-                              matchId={match.id}
-                              pairingBlockedReason={
-                                canEditPairing
-                                  ? matchPairingBlockedReason(match, slots, tournamentStarted)
-                                  : undefined
-                              }
-                              liveKind={live?.kind}
-                              liveBlockedReason={live?.blockedReason}
-                              liveSaving={statusSavingMatchId === match.id}
-                              moveBlockedReason={
-                                canMovePairs
-                                  ? matchMoveBlockedReason(
-                                      match,
-                                      slots,
-                                      tournamentStarted,
-                                      rebuildBlockedReason,
-                                      scheduleMatches,
-                                    )
-                                  : undefined
-                              }
-                              onEditPairing={canEditPairing ? setPairingMatchId : undefined}
-                              onSetLive={
-                                canSetLive && onSetStatus
-                                  ? (id, status) => {
-                                      void onSetStatus({ matchId: id, status });
-                                    }
-                                  : undefined
-                              }
-                              onMovePair={canMovePairs ? setMovingMatchId : undefined}
-                            />
-                          </TableCell>
-                        ) : null}
-                        {showAgenda && onSaveSchedule ? (
-                          <TableCell className="px-2 py-1 align-middle">
-                            <MatchCourtSelect
-                              match={match}
-                              courts={courts}
-                              pairLabels={pairLabels}
-                              allMatches={scheduleMatches}
-                              reservations={reservations}
-                              matchDurationMinutes={matchDurationMinutes}
-                              showCourtOccupancy={showCourtOccupancy}
-                              disabled={!canEditSchedule}
-                              isSaving={scheduleSavingMatchId === match.id}
-                              onSave={onSaveSchedule}
-                            />
-                          </TableCell>
-                        ) : null}
-                      </TableRow>
-                    );
-                  })}
-                  {groupMatches.length === 0 ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={matchColCount}
-                        className="px-2 py-1 text-xs text-muted-foreground"
-                      >
-                        {group.pairIds.length === 1
-                          ? `${pairLabels[group.pairIds[0]] ?? "La pareja"} pasa de fase.`
-                          : "Sin partidos en esta zona."}
-                      </TableCell>
-                    </TableRow>
+                            : undefined
+                        }
+                        onMovePair={canMovePairs ? setMovingMatchId : undefined}
+                      />
+                    </TableCell>
                   ) : null}
+                  {showAgenda && onSaveSchedule ? (
+                    <TableCell className="px-2 py-1 align-middle">
+                      <MatchCourtSelect
+                        match={match}
+                        courts={courts}
+                        pairLabels={pairLabels}
+                        allMatches={scheduleMatches}
+                        reservations={reservations}
+                        matchDurationMinutes={matchDurationMinutes}
+                        showCourtOccupancy={showCourtOccupancy}
+                        disabled={!canEditSchedule}
+                        isSaving={scheduleSavingMatchId === match.id}
+                        onSave={onSaveSchedule}
+                      />
+                    </TableCell>
+                  ) : null}
+                </TableRow>
+              );
+            })}
+            {groupMatches.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={matchColCount}
+                  className="px-2 py-1 text-xs text-muted-foreground"
+                >
+                  {group.pairIds.length === 1
+                    ? `${pairLabels[group.pairIds[0]] ?? "La pareja"} pasa de fase.`
+                    : "Sin partidos en esta zona."}
+                </TableCell>
+              </TableRow>
+            ) : null}
           </ZoneSectionFrame>
         );
       })}
@@ -1090,20 +1090,20 @@ export default function GroupZonesPanel({
                         moveBlockedReason={
                           canMovePairs
                             ? matchMoveBlockedReason(
-                                match,
-                                slots,
-                                tournamentStarted,
-                                rebuildBlockedReason,
-                                scheduleMatches,
-                              )
+                              match,
+                              slots,
+                              tournamentStarted,
+                              rebuildBlockedReason,
+                              scheduleMatches,
+                            )
                             : undefined
                         }
                         onEditPairing={canEditPairing ? setPairingMatchId : undefined}
                         onSetLive={
                           canSetLive && onSetStatus
                             ? (id, status) => {
-                                void onSetStatus({ matchId: id, status });
-                              }
+                              void onSetStatus({ matchId: id, status });
+                            }
                             : undefined
                         }
                         onMovePair={canMovePairs ? setMovingMatchId : undefined}
@@ -1167,8 +1167,8 @@ export default function GroupZonesPanel({
           roundMatches={
             pairingMatch?.phase === "GROUP" && pairingMatch.groupId
               ? scheduleMatches.filter(
-                  (item) => item.groupId === pairingMatch.groupId && item.phase === "GROUP",
-                )
+                (item) => item.groupId === pairingMatch.groupId && item.phase === "GROUP",
+              )
               : pairingMatch
                 ? scheduleMatches.filter((item) => item.phase === pairingMatch.phase)
                 : []
@@ -1191,9 +1191,9 @@ export default function GroupZonesPanel({
           onQualify={
             onQualifyPair && pairingMatch?.roundId
               ? () => {
-                  setQualifyingMatchId(pairingMatch.id);
-                  setPairingMatchId(null);
-                }
+                setQualifyingMatchId(pairingMatch.id);
+                setPairingMatchId(null);
+              }
               : undefined
           }
         />

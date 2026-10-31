@@ -15,7 +15,7 @@ export default function DashboardIconWell({
       className={cn(
         "flex size-8 shrink-0 items-center justify-center rounded-lg",
         tone === "muted" && "bg-muted text-muted-foreground",
-        tone === "warning" && "bg-warning/15 text-warning",
+        tone === "warning" && "bg-warning-muted text-warning-foreground",
         tone === "accent" && "bg-primary/40 text-primary-foreground",
       )}
     >

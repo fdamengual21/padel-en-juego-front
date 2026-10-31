@@ -11,8 +11,8 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import Api from "@/api/Api";
 import {
-  isAccessTokenExpired,
-  refreshAuthSession,
+  clearStoredAuthSession,
+  ensureFreshAccessToken,
 } from "@/config/sessionTokenRefresh";
 import { ApiHttpError } from "@/lib/apiClient";
 import type { ConfirmEmailInput, LoginInput } from "@/modules/auth";
@@ -43,7 +43,6 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const setAuthSession = useAuthStore((state) => state.setAuthSession);
   const setUserProfile = useAuthStore((state) => state.setUserProfile);
-  const clearAuth = useAuthStore((state) => state.clearAuth);
   const [isResolvingUser, setIsResolvingUser] = useState(true);
   const resolvingRef = useRef(false);
 
@@ -77,8 +76,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       if (err instanceof ApiHttpError && err.status === 401) {
         queryClient.clear();
-        clearAuth();
-        void useAuthStore.persist.clearStorage();
+        clearStoredAuthSession();
         return;
       }
       if (!useAuthStore.getState().user) {
@@ -88,7 +86,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       setIsResolvingUser(false);
       resolvingRef.current = false;
     }
-  }, [clearAuth, queryClient, setUserProfile]);
+  }, [queryClient, setUserProfile]);
 
   const applyLoginTokens = useCallback(
     async (login: {
@@ -108,12 +106,11 @@ export function UserProvider({ children }: { children: ReactNode }) {
         return me;
       } catch (err) {
         queryClient.clear();
-        clearAuth();
-        void useAuthStore.persist.clearStorage();
+        clearStoredAuthSession();
         throw err;
       }
     },
-    [clearAuth, queryClient, setAuthSession, setUserProfile],
+    [queryClient, setAuthSession, setUserProfile],
   );
 
   const loginAndResolveUser = useCallback(
@@ -136,28 +133,22 @@ export function UserProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     const run = async () => {
-      const { token, refreshToken, expiresAt } = useAuthStore.getState();
-      if (
-        refreshToken?.trim() &&
-        isAccessTokenExpired(token, expiresAt)
-      ) {
-        try {
-          await refreshAuthSession();
-        } catch {
-          if (cancelled) return;
-          queryClient.clear();
-          clearAuth();
-          void useAuthStore.persist.clearStorage();
+      try {
+        const access = await ensureFreshAccessToken();
+        if (cancelled) return;
+        if (!access) {
           setIsResolvingUser(false);
           return;
         }
-      }
-
-      if (cancelled) return;
-      if (!useAuthStore.getState().token?.trim()) {
+      } catch {
+        if (cancelled) return;
+        queryClient.clear();
+        clearStoredAuthSession();
         setIsResolvingUser(false);
         return;
       }
+
+      if (cancelled) return;
       void resolveCurrentUser();
     };
 
@@ -176,7 +167,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [clearAuth, queryClient, resolveCurrentUser]);
+  }, [queryClient, resolveCurrentUser]);
 
   const value = useMemo<UserContextValue>(
     () => ({

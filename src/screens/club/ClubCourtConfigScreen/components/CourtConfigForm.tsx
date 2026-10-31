@@ -211,6 +211,15 @@ function toFormValues(court: Court, priceRules: CourtPriceRule[]): CourtConfigFo
   };
 }
 
+function hasPriceRuleErrors(errors: unknown): boolean {
+  if (!errors) return false;
+  if (Array.isArray(errors)) return errors.some(Boolean);
+  if (typeof errors === "object" && "message" in errors) {
+    return Boolean((errors as { message?: string }).message);
+  }
+  return true;
+}
+
 function emptyRule(club: Club, basePrice: number | null): PriceRuleFormValue {
   return {
     startTime: club.openTime || "18:00",
@@ -248,6 +257,7 @@ export default function CourtConfigForm({
     setError,
     setFocus,
     setValue,
+    trigger,
     watch,
     formState: { isSubmitting, isValid, errors },
   } = form;
@@ -259,17 +269,26 @@ export default function CourtConfigForm({
 
   const watchedRules = watch("priceRules");
   const basePrice = watch("basePrice");
+  const overnight = Boolean(
+    club.openTime && club.closeTime && clubClosesNextDay(club.openTime, club.closeTime),
+  );
   const startHint = club.openTime
-    ? clubClosesNextDay(club.openTime, club.closeTime)
+    ? overnight
       ? `Conviene alinearlo con la apertura del club (${club.openTime}). La madrugada hasta ${club.closeTime} cuenta como el día en que abre.`
       : `Conviene alinearlo con la apertura del club (${club.openTime}).`
     : "Conviene alinearlo con la apertura del club.";
+  const endHint = club.closeTime
+    ? overnight
+      ? `Conviene alinearlo con el cierre del club (${club.closeTime}). Esa hora es del día en que abre.`
+      : `Conviene alinearlo con el cierre del club (${club.closeTime}).`
+    : "Conviene alinearlo con el cierre del club.";
 
   useEffect(() => {
     reset(toFormValues(court, priceRules));
     setPhotoFile(null);
     setRemovePhoto(false);
-  }, [court, priceRules, reset]);
+    void trigger();
+  }, [court, priceRules, reset, trigger]);
 
   const focusFirstError = (formErrors: typeof errors) => {
     const path = firstErrorPath(formErrors);
@@ -445,6 +464,11 @@ export default function CourtConfigForm({
                 </Button>
               ) : null}
             </div>
+            {hasPriceRuleErrors(errors.priceRules) ? (
+              <p className="text-xs text-destructive">
+                Algunas tarifas no coinciden con el horario actual del club.
+              </p>
+            ) : null}
 
             {fields.length === 0 ? (
               <p className="text-sm text-muted-foreground">
@@ -475,6 +499,7 @@ export default function CourtConfigForm({
                           label="Hasta"
                           type="time"
                           disabled={readOnly}
+                          hint={endHint}
                         />
                         <InputField
                           control={control}
@@ -541,11 +566,10 @@ export default function CourtConfigForm({
                           <p id={`${daysId}-error`} className="text-xs text-destructive">
                             {dayError}
                           </p>
-                        ) : (
-                          <FieldHint>
-                            Si el club cierra de madrugada, esa franja es del día en que abre.
-                          </FieldHint>
-                        )}
+                        ) : null}
+                        <FieldHint>
+                          Si el club cierra de madrugada, esa franja es del día en que abre.
+                        </FieldHint>
                       </div>
                     </li>
                   );

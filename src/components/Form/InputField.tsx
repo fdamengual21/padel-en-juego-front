@@ -59,11 +59,14 @@ export default function InputField<TFieldValues extends FieldValues>({
       : "password"
     : type;
   const inputId = id ?? String(field.name);
-  const describedBy = error
-    ? `${inputId}-error`
-    : hint
-      ? `${inputId}-hint`
-      : undefined;
+  const errorId = `${inputId}-error`;
+  const hintId = `${inputId}-hint`;
+  const describedBy = [
+    showHelperText && error?.message ? errorId : null,
+    hint ? hintId : null,
+  ]
+    .filter(Boolean)
+    .join(" ") || undefined;
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     const next = event.target.value;
@@ -125,12 +128,11 @@ export default function InputField<TFieldValues extends FieldValues>({
         ) : null}
       </div>
       {showHelperText && error?.message ? (
-        <p id={`${inputId}-error`} className="text-xs text-destructive">
+        <p id={errorId} className="text-xs text-destructive">
           {error.message}
         </p>
-      ) : hint ? (
-        <FieldHint id={`${inputId}-hint`}>{hint}</FieldHint>
       ) : null}
+      {hint ? <FieldHint id={hintId}>{hint}</FieldHint> : null}
     </div>
   );
 }

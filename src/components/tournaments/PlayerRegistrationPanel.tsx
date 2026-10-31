@@ -170,6 +170,8 @@ export default function PlayerRegistrationPanel({
     await qc.invalidateQueries({ queryKey: ["my-registration", categoryId] });
     await qc.invalidateQueries({ queryKey: ["categories", tournament.id] });
     await qc.invalidateQueries({ queryKey: ["participants-board", categoryId] });
+    await qc.invalidateQueries({ queryKey: ["public-participants-board", categoryId] });
+    await qc.invalidateQueries({ queryKey: ["public-tournament-view", tournament.id] });
     await qc.invalidateQueries({ queryKey: ["player-home"] });
     await qc.invalidateQueries({ queryKey: ["player-history"] });
     await qc.invalidateQueries({ queryKey: ["player-played"] });

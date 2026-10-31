@@ -39,6 +39,28 @@ export function sidePreferenceLabel(
   }
 }
 
+/** Lado que falta para completar la pareja (el opuesto al que declaró el solo). */
+export function soughtSidePreference(
+  value: "drive" | "reves" | "any" | null | undefined,
+): "drive" | "reves" | "any" {
+  if (value === "drive") return "reves";
+  if (value === "reves") return "drive";
+  return "any";
+}
+
+export function seekingPartnerLabel(
+  value: "drive" | "reves" | "any" | null | undefined,
+): string {
+  switch (soughtSidePreference(value)) {
+    case "drive":
+      return "Busca un drive";
+    case "reves":
+      return "Busca un revés";
+    default:
+      return "Busca cualquiera";
+  }
+}
+
 export function playerSidePreferenceShortLabel(
   primary: "drive" | "reves" | null | undefined,
   secondary?: "drive" | "reves" | null,

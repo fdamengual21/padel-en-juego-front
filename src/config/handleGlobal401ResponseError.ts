@@ -1,5 +1,6 @@
 import type { AxiosError, InternalAxiosRequestConfig } from "axios";
 import {
+  clearStoredAuthSession,
   isAccessTokenExpired,
   refreshAuthSession,
 } from "./sessionTokenRefresh";
@@ -40,12 +41,6 @@ export function isAnonymousAuthPath(url: unknown): boolean {
   return ANONYMOUS_AUTH_PATHS.some((path) => endsWithAuthPath(url, path));
 }
 
-function clearStoredSession(): void {
-  const { clearAuth } = useAuthStore.getState();
-  clearAuth();
-  void useAuthStore.persist.clearStorage();
-}
-
 /**
  * Maneja 401 globales: intenta refresh (single-flight) si el access venció y
  * hay refresh token, reintenta el request original una vez. Si falla, limpia
@@ -67,7 +62,7 @@ export async function handleGlobal401ResponseError(
 
   const originalConfig = error.config as RetriableRequestConfig;
   if (originalConfig._retry) {
-    clearStoredSession();
+    clearStoredAuthSession();
     return Promise.reject(error);
   }
 
@@ -82,7 +77,7 @@ export async function handleGlobal401ResponseError(
 
   if (!canAttemptRefresh) {
     if (token?.trim()) {
-      clearStoredSession();
+      clearStoredAuthSession();
     }
     return Promise.reject(error);
   }
@@ -91,7 +86,7 @@ export async function handleGlobal401ResponseError(
   try {
     session = await refreshAuthSession();
   } catch {
-    clearStoredSession();
+    clearStoredAuthSession();
     return Promise.reject(error);
   }
 

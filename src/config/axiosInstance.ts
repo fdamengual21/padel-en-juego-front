@@ -4,6 +4,10 @@ import {
   isAnonymousAuthPath,
 } from "./handleGlobal401ResponseError";
 import {
+  clearStoredAuthSession,
+  ensureFreshAccessToken,
+} from "./sessionTokenRefresh";
+import {
   ApiHttpError,
   fieldErrorsFromEnvelope,
   messageFromEnvelope,
@@ -21,22 +25,27 @@ const axiosInstance = axios.create({
   },
 });
 
-axiosInstance.interceptors.request.use((config) => {
+axiosInstance.interceptors.request.use(async (config) => {
   if (isAnonymousAuthPath(config.url)) {
     delete config.headers.Authorization;
     delete config.headers["X-Club-Id"];
     return config;
   }
 
-  const auth = useAuthStore.getState();
-  const token = auth.token?.trim();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  let accessToken: string | null = null;
+  try {
+    accessToken = await ensureFreshAccessToken();
+  } catch {
+    clearStoredAuthSession();
+  }
+
+  if (accessToken) {
+    config.headers.Authorization = `Bearer ${accessToken}`;
   } else {
     delete config.headers.Authorization;
   }
 
-  const clubId = resolveClubHeaderId(auth);
+  const clubId = resolveClubHeaderId(useAuthStore.getState());
   if (clubId) {
     config.headers["X-Club-Id"] = clubId;
   } else {

@@ -13,17 +13,15 @@ interface PlayerReservationStatusChipProps {
 const chips: Record<PlayerReservationStatus, { label: string; className: string }> = {
   pending: {
     label: "Pendiente",
-    className:
-      "border-transparent! bg-[color-mix(in_oklch,var(--warning)_18%,var(--card))]! text-warning",
+    className: "border-transparent! bg-warning-muted! text-warning-foreground",
   },
   booked: {
     label: "Confirmado",
-    className: "border-transparent! bg-success/15! text-success",
+    className: "border-transparent! bg-success-muted! text-success-foreground",
   },
   rejected: {
     label: "Rechazada",
-    className:
-      "border-transparent! bg-[color-mix(in_oklch,var(--destructive)_16%,var(--card))]! text-destructive",
+    className: "border-transparent! bg-destructive-muted! text-destructive",
   },
   completed: {
     label: "Jugado",

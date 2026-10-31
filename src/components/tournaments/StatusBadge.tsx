@@ -24,6 +24,24 @@ const labels: Record<string, string> = {
   disqualified: "Desclasificado",
 };
 
+const successTone = "border-transparent! bg-success-muted! text-success-foreground";
+const warningTone = "border-transparent! bg-warning-muted! text-warning-foreground";
+const dangerTone = "border-transparent! bg-destructive-muted! text-destructive";
+const mutedTone = "border-transparent! bg-muted! text-muted-foreground";
+
+const tones: Record<string, string> = {
+  ACCEPTED: successTone,
+  CONFIRMED: successTone,
+  PENDING: warningTone,
+  WAITLIST: mutedTone,
+  REJECTED: dangerTone,
+  DISQUALIFIED: dangerTone,
+  disqualified: dangerTone,
+  CANCELLED: mutedTone,
+  cancelled: mutedTone,
+  withdrawn: mutedTone,
+};
+
 interface StatusBadgeProps {
   status: string;
   className?: string;
@@ -39,6 +57,7 @@ export default function StatusBadge({ status, className }: StatusBadgeProps) {
       className={cn(
         "font-medium",
         isOpen && "bg-primary text-primary-foreground",
+        tones[status],
         className,
       )}
     >

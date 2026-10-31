@@ -5,6 +5,12 @@ import { useAuthStore } from "@/stores/authStore";
 
 let inFlightRefresh: Promise<LoginResponse> | null = null;
 
+/** Limpia JWT persistido. No toca la cache de queries: el caller decide. */
+export function clearStoredAuthSession(): void {
+  useAuthStore.getState().clearAuth();
+  void useAuthStore.persist.clearStorage();
+}
+
 function buildAuthRefreshUrl(): string {
   const origin = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
   return `${origin}/api/auth/refresh`;
@@ -82,4 +88,27 @@ export function isAccessTokenExpired(
     return true;
   }
   return expirationDate.getTime() <= Date.now();
+}
+
+/**
+ * Devuelve un access token usable. Si está vencido y hay refresh, rota la
+ * sesión (single-flight). Si no hay forma de renovar, retorna null.
+ *
+ * @throws Si el refresh se intenta y falla.
+ */
+export async function ensureFreshAccessToken(): Promise<string | null> {
+  const { token, refreshToken, expiresAt } = useAuthStore.getState();
+  if (!isAccessTokenExpired(token, expiresAt)) {
+    return token?.trim() ?? null;
+  }
+
+  if (!refreshToken?.trim()) {
+    if (token?.trim()) {
+      clearStoredAuthSession();
+    }
+    return null;
+  }
+
+  const session = await refreshAuthSession();
+  return session.token;
 }

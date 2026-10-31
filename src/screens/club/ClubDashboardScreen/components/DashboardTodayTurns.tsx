@@ -91,7 +91,7 @@ function TurnPill({ status }: { status: ClubTodayTurn["status"] }) {
   return (
     <Badge
       variant="secondary"
-      className="shrink-0 border-transparent! bg-success/15! text-success"
+      className="shrink-0 border-transparent! bg-success-muted! text-success-foreground"
     >
       {status === "completed" ? "Jugado" : "Ocupado"}
     </Badge>

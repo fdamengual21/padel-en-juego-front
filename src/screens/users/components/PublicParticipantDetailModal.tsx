@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import Api from "@/api/Api";
+import StatusBadge from "@/components/tournaments/StatusBadge";
 import {
   formatCategoryLevel,
   isCategoryLevel,
@@ -17,7 +18,7 @@ import {
   type RegistrationPlayerDetail,
 } from "@/domain";
 import { formatRegisteredAtEs } from "@/lib/dates";
-import { sidePreferenceLabel } from "@/lib/tournamentLabels";
+import { seekingPartnerLabel } from "@/lib/tournamentLabels";
 import type { PublicParticipantRow } from "@/modules/tournament-ops/types";
 
 interface PublicParticipantDetailModalProps {
@@ -52,7 +53,10 @@ export default function PublicParticipantDetailModal({
         data-testid="registration-detail-modal"
       >
         <DialogHeader className="shrink-0 border-b border-border px-4 py-4">
-          <DialogTitle>Inscripción</DialogTitle>
+          <DialogTitle className="flex flex-wrap items-center gap-2">
+            Inscripción
+            {row?.status ? <StatusBadge status={row.status} /> : null}
+          </DialogTitle>
           <DialogDescription>
             {categoryName ?? "Categoría del torneo"}
             {row?.registeredAt ? ` · ${formatRegisteredAtEs(row.registeredAt)}` : ""}
@@ -87,15 +91,20 @@ export default function PublicParticipantDetailModal({
                       />
                       <p className="min-w-0 truncate text-sm font-medium">{player.name}</p>
                     </div>
+                    {player.category !== "—" || player.side !== "—" || player.phone ? (
                     <dl className="mt-3 space-y-1.5 text-sm">
-                      <div className="flex items-baseline justify-between gap-3">
-                        <dt className="text-muted-foreground">Categoría</dt>
-                        <dd className="text-right">{player.category}</dd>
-                      </div>
-                      <div className="flex items-baseline justify-between gap-3">
-                        <dt className="text-muted-foreground">Lado</dt>
-                        <dd className="text-right">{player.side}</dd>
-                      </div>
+                      {player.category !== "—" ? (
+                        <div className="flex items-baseline justify-between gap-3">
+                          <dt className="text-muted-foreground">Categoría</dt>
+                          <dd className="text-right">{player.category}</dd>
+                        </div>
+                      ) : null}
+                      {player.side !== "—" ? (
+                        <div className="flex items-baseline justify-between gap-3">
+                          <dt className="text-muted-foreground">Lado</dt>
+                          <dd className="text-right">{player.side}</dd>
+                        </div>
+                      ) : null}
                       {player.phone ? (
                         <div className="flex items-center justify-between gap-3">
                           <dt className="text-muted-foreground">Teléfono</dt>
@@ -105,6 +114,7 @@ export default function PublicParticipantDetailModal({
                         </div>
                       ) : null}
                     </dl>
+                    ) : null}
                   </section>
                 ))}
               </div>
@@ -126,6 +136,7 @@ interface Column {
 }
 
 function columnsOf(row: PublicParticipantRow, players: RegistrationPlayerDetail[]): Column[] {
+  const disclosePhone = row.status !== "PENDING";
   const first = players.find((player) => player.id === row.player1Id) ?? players[0];
   const columns: Column[] = [
     {
@@ -137,16 +148,16 @@ function columnsOf(row: PublicParticipantRow, players: RegistrationPlayerDetail[
           ? formatCategoryLevel(first.categoryLevel)
           : "Sin categoría",
       side: playerSidePreferenceLabel(first?.sidePreference) ?? "Sin preferencia",
-      phone: first?.phone ?? null,
+      phone: disclosePhone ? (first?.phone ?? null) : null,
     },
   ];
   if (row.incomplete || !row.player2Id) {
     columns.push({
       key: `${row.pairId}-seeking`,
-      name: "Buscando pareja",
+      name: seekingPartnerLabel(row.sidePreference),
       imageUrl: null,
       category: "—",
-      side: sidePreferenceLabel(row.sidePreference),
+      side: "—",
       phone: null,
     });
     return columns;
@@ -161,7 +172,7 @@ function columnsOf(row: PublicParticipantRow, players: RegistrationPlayerDetail[
         ? formatCategoryLevel(second.categoryLevel)
         : "Sin categoría",
     side: playerSidePreferenceLabel(second?.sidePreference) ?? "Sin preferencia",
-    phone: second?.phone ?? null,
+    phone: disclosePhone ? (second?.phone ?? null) : null,
   });
   return columns;
 }
