@@ -16,7 +16,12 @@ import type {
   TournamentGroup,
   TournamentRound,
 } from "@/domain";
-import { canOpenMatchResult, matchWinnerSide, scoreboardSlotCount } from "@/domain";
+import {
+  canOpenMatchResult,
+  matchLiveAction,
+  matchWinnerSide,
+  scoreboardSlotCount,
+} from "@/domain";
 import "@xyflow/react/dist/style.css";
 import RoundMatchesTable, {
   type MatchTableRow,
@@ -56,6 +61,9 @@ interface BracketViewProps {
   onMovePair?: (match: Match) => void;
   /** Motivo por el que no se puede mover; null si se puede. */
   moveBlockedReason?: (match: Match) => string | null;
+  onSetStatus?: (input: { matchId: string; status: "scheduled" | "inProgress" }) => void;
+  statusSavingMatchId?: string | null;
+  tournamentStarted?: boolean;
   heightClassName?: string;
 }
 
@@ -72,6 +80,8 @@ type MatchesTableNodeData = {
   onOpenPair?: (pairId: string) => void;
   onEditPairing?: (matchId: string) => void;
   onMovePair?: (matchId: string) => void;
+  onSetStatus?: (matchId: string, status: "scheduled" | "inProgress") => void;
+  statusSavingMatchId?: string | null;
 };
 
 export function displayZoneName(name: string): string {
@@ -121,6 +131,8 @@ function MatchesTableNode({ data }: NodeProps) {
         onOpenPair={d.onOpenPair}
         onEditPairing={d.onEditPairing}
         onMovePair={d.onMovePair}
+        onSetStatus={d.onSetStatus}
+        statusSavingMatchId={d.statusSavingMatchId}
       />
     </div>
   );
@@ -180,6 +192,16 @@ const FALLBACK_RULES: MatchRules = {
 
 const EDGE_STYLE = { stroke: "#64748b", strokeWidth: 2 };
 
+function liveRowFields(
+  match: Match,
+  enabled: boolean,
+  started: boolean,
+): Pick<MatchTableRow, "liveKind" | "liveBlockedReason"> {
+  if (!enabled) return {};
+  const live = matchLiveAction(match, started);
+  return { liveKind: live.kind, liveBlockedReason: live.blockedReason };
+}
+
 function openMatchHandler(
   matches: Match[],
   onMatchClick?: (match: Match) => void,
@@ -208,6 +230,9 @@ export default function BracketView({
   pairingBlockedReason,
   onMovePair,
   moveBlockedReason,
+  onSetStatus,
+  statusSavingMatchId = null,
+  tournamentStarted = false,
   heightClassName = "h-[560px]",
 }: BracketViewProps) {
   const groupNames = useMemo(() => {
@@ -294,6 +319,7 @@ export default function BracketView({
             moveBlockedReason: onMovePair
               ? (moveBlockedReason?.(match) ?? null)
               : undefined,
+            ...liveRowFields(match, Boolean(onSetStatus), tournamentStarted),
           };
         });
         const h = tableNodeHeight(rows.length);
@@ -316,6 +342,10 @@ export default function BracketView({
             onOpenPair,
             onEditPairing: openMatchHandler(zoneMatches, onEditPairing),
             onMovePair: openMatchHandler(zoneMatches, onMovePair),
+            onSetStatus: onSetStatus
+              ? (matchId, status) => onSetStatus({ matchId, status })
+              : undefined,
+            statusSavingMatchId,
           } satisfies MatchesTableNodeData,
           sourcePosition: Position.Right,
           draggable: false,
@@ -370,6 +400,7 @@ export default function BracketView({
           ? (pairingBlockedReason?.(match) ?? null)
           : undefined,
         moveBlockedReason: onMovePair ? (moveBlockedReason?.(match) ?? null) : undefined,
+        ...liveRowFields(match, Boolean(onSetStatus), tournamentStarted),
       }));
       const h = tableNodeHeight(rows.length);
       const y = HEADER_H + Math.max(0, (referenceHeight - h) / 2);
@@ -407,6 +438,10 @@ export default function BracketView({
                 if (match) onMovePair(match);
               }
             : undefined,
+          onSetStatus: onSetStatus
+            ? (matchId, status) => onSetStatus({ matchId, status })
+            : undefined,
+          statusSavingMatchId,
         } satisfies MatchesTableNodeData,
         sourcePosition: Position.Right,
         targetPosition: Position.Left,
@@ -455,6 +490,9 @@ export default function BracketView({
     pairingBlockedReason,
     onMovePair,
     moveBlockedReason,
+    onSetStatus,
+    statusSavingMatchId,
+    tournamentStarted,
     groupNames,
   ]);
 

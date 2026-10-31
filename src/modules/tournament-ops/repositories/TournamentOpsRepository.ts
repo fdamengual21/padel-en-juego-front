@@ -43,7 +43,6 @@ import {
   type MatchResultInput,
   type MatchSlot,
   type MatchStatus,
-  type MatchesBoardView,
   type MyTournamentRegistration,
   type PageQuery,
   type PaginatedResult,
@@ -90,7 +89,6 @@ import {
 } from "@/domain";
 import type {
   PublicCuadroBoardDto,
-  PublicMatchesBoardDto,
   PublicParticipantsBoardDto,
   PublicRepechageBoardDto,
   PublicZonesBoardDto,
@@ -116,7 +114,6 @@ export interface ITournamentOpsRepository {
   getZonesBoard(categoryId: string): Promise<ZonesBoardView>;
   getParticipantsBoard(categoryId: string): Promise<ParticipantsBoardView>;
   getParticipantPlayers(categoryId: string, ids: string[]): Promise<RegistrationPlayerDetail[]>;
-  getMatchesBoard(categoryId: string): Promise<MatchesBoardView>;
   getConfigBoard(categoryId: string): Promise<ConfigBoardView>;
   getRepechageBoard(categoryId: string): Promise<RepechageBoardView>;
   listRepechageCandidates(categoryId: string): Promise<RepechageCandidate[]>;
@@ -300,7 +297,6 @@ export interface ITournamentOpsRepository {
   getPublicZonesBoard(categoryId: string): Promise<PublicZonesBoardDto>;
   getPublicParticipantsBoard(categoryId: string): Promise<PublicParticipantsBoardDto>;
   getPublicParticipantPlayers(categoryId: string, ids: string[]): Promise<RegistrationPlayerDetail[]>;
-  getPublicMatchesBoard(categoryId: string): Promise<PublicMatchesBoardDto>;
   getMyRegistration(categoryId: string): Promise<MyTournamentRegistration>;
 }
 
@@ -379,10 +375,6 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
     return this.read<RegistrationPlayerDetail[]>(
       `/club/tournaments/categories/${categoryId}/participant-players?${playerIdsQuery(ids)}`,
     );
-  }
-
-  async getMatchesBoard(categoryId: string) {
-    return this.read<MatchesBoardView>(`/club/tournaments/categories/${categoryId}/boards/matches`);
   }
 
   async getConfigBoard(categoryId: string): Promise<ConfigBoardView> {
@@ -832,12 +824,6 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
   async getPublicParticipantPlayers(categoryId: string, ids: string[]) {
     return this.read<RegistrationPlayerDetail[]>(
       `/public/tournaments/categories/${categoryId}/participant-players?${playerIdsQuery(ids)}`,
-    );
-  }
-
-  async getPublicMatchesBoard(categoryId: string) {
-    return this.read<PublicMatchesBoardDto>(
-      `/public/tournaments/categories/${categoryId}/boards/matches`,
     );
   }
 

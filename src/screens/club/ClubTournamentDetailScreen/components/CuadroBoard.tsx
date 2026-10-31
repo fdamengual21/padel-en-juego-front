@@ -38,6 +38,8 @@ interface CuadroBoardProps {
   moveSaving?: boolean;
   onQualifyPair?: (input: { matchId: string; pairId: string | null }) => Promise<void> | void;
   qualifySaving?: boolean;
+  onSetStatus?: (input: { matchId: string; status: "scheduled" | "inProgress" }) => Promise<void> | void;
+  statusSavingMatchId?: string | null;
 }
 
 export default function CuadroBoard({
@@ -54,6 +56,8 @@ export default function CuadroBoard({
   moveSaving = false,
   onQualifyPair,
   qualifySaving = false,
+  onSetStatus,
+  statusSavingMatchId = null,
 }: CuadroBoardProps) {
   const [pairingMatchId, setPairingMatchId] = useState<string | null>(null);
   const [movingMatchId, setMovingMatchId] = useState<string | null>(null);
@@ -66,6 +70,7 @@ export default function CuadroBoard({
   const canEditPairing = Boolean(onSetPairing) && !readOnly && !tournamentLocked;
   const canMovePairs =
     Boolean(onMovePair) && !readOnly && !tournamentLocked && tournamentStarted;
+  const canSetLive = Boolean(onSetStatus) && !readOnly && !tournamentLocked;
   const knockoutPhases = sortedRounds
     .map((round) => round.type)
     .filter((phase): phase is MatchPhase => phase !== "GROUP");
@@ -175,6 +180,15 @@ export default function CuadroBoard({
             board.groupMatches,
           )
         }
+        onSetStatus={
+          canSetLive
+            ? (input) => {
+                void onSetStatus?.(input);
+              }
+            : undefined
+        }
+        statusSavingMatchId={statusSavingMatchId}
+        tournamentStarted={tournamentStarted}
         heightClassName="h-[720px]"
       />
 

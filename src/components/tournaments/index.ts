@@ -8,6 +8,7 @@ export { default as MatchCard } from "./MatchCard";
 export { default as PlayerMatchCard } from "./PlayerMatchCard";
 export { default as PlayerMatchResultDialog } from "./PlayerMatchResultDialog";
 export { default as MatchPlayStatusChip } from "./MatchPlayStatusChip";
+export { default as MatchLiveButton } from "./MatchLiveButton";
 export { default as StatusBadge } from "./StatusBadge";
 export { default as Score } from "./Score";
 export { default as TournamentDetailView } from "./TournamentDetailView";

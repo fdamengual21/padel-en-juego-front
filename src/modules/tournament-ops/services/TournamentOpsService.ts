@@ -1,5 +1,4 @@
 import { toPublicCuadroBoard } from "../helpers/toPublicCuadroBoard";
-import { toPublicMatchesBoard } from "../helpers/toPublicMatchesBoard";
 import { toPublicParticipantsBoard } from "../helpers/toPublicParticipantsBoard";
 import { toPublicRepechageBoard } from "../helpers/toPublicRepechageBoard";
 import { toPublicZonesBoard } from "../helpers/toPublicZonesBoard";
@@ -64,10 +63,6 @@ export class TournamentOpsService {
 
   getParticipantPlayers(categoryId: string, ids: string[]) {
     return this.repository.getParticipantPlayers(categoryId, ids);
-  }
-
-  getMatchesBoard(categoryId: string) {
-    return this.repository.getMatchesBoard(categoryId);
   }
 
   getConfigBoard(categoryId: string) {
@@ -374,10 +369,6 @@ export class TournamentOpsService {
 
   getPublicParticipantPlayers(categoryId: string, ids: string[]) {
     return this.repository.getPublicParticipantPlayers(categoryId, ids);
-  }
-
-  async getPublicMatchesBoard(categoryId: string) {
-    return toPublicMatchesBoard(await this.repository.getPublicMatchesBoard(categoryId));
   }
 
   getMyRegistration(categoryId: string) {

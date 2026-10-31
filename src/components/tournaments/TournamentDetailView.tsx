@@ -23,7 +23,6 @@ import {
 } from "@/domain";
 import Api from "@/api/Api";
 import { EmptyState } from "@/components/EmptyState";
-import MatchCard from "@/components/tournaments/MatchCard";
 import TournamentChampionBanner from "@/components/tournaments/TournamentChampionBanner";
 import TournamentSummaryCard from "@/components/tournaments/TournamentSummaryCard";
 import RegistrationDetailModal from "@/components/tournaments/RegistrationDetailModal";
@@ -159,6 +158,7 @@ export default function TournamentDetailView({
     ParticipantsBoardView["rows"][number] | null
   >(null);
   const [requestedPairId, setRequestedPairId] = useState<string | null>(null);
+  const [pendingLiveMatchId, setPendingLiveMatchId] = useState<string | null>(null);
 
   const { data: tournament } = useQuery({
     queryKey: ["tournament", tournamentId],
@@ -199,7 +199,7 @@ export default function TournamentDetailView({
   const { data: players = [] } = useQuery({
     queryKey: ["players"],
     queryFn: () => Api.TournamentOpsService().listPlayers(),
-    enabled: activeTab === "partidos" || Boolean(resultMatchId),
+    enabled: Boolean(resultMatchId),
   });
   const { data: ruleset } = useQuery({
     queryKey: ["ruleset", categoryId],
@@ -296,13 +296,6 @@ export default function TournamentDetailView({
     enabled: Boolean(categoryId),
   });
   const {
-    data: matchesBoard,
-  } = useQuery({
-    queryKey: ["matches-board", categoryId],
-    queryFn: () => Api.TournamentOpsService().getMatchesBoard(categoryId),
-    enabled: Boolean(categoryId) && activeTab === "partidos",
-  });
-  const {
     data: configBoard,
   } = useQuery({
     queryKey: ["config-board", categoryId],
@@ -333,7 +326,6 @@ export default function TournamentDetailView({
       qc.invalidateQueries({ queryKey: ["zones-board", categoryId] }),
       qc.invalidateQueries({ queryKey: ["participants-board", categoryId] }),
       qc.invalidateQueries({ queryKey: ["cuadro", categoryId] }),
-      qc.invalidateQueries({ queryKey: ["matches-board", categoryId] }),
       qc.invalidateQueries({ queryKey: ["config-board", categoryId] }),
       qc.invalidateQueries({ queryKey: ["repechage-board", categoryId] }),
       qc.invalidateQueries({ queryKey: ["repechage-candidates", categoryId] }),
@@ -470,7 +462,6 @@ export default function TournamentDetailView({
 
   const pairLabels =
     zonesBoard?.pairLabels ??
-    matchesBoard?.pairLabels ??
     cuadroBoard?.pairLabels ??
     localPairLabels;
 
@@ -523,6 +514,17 @@ export default function TournamentDetailView({
       toastError("No se pudo actualizar el estado", err.message);
     },
   });
+
+  const requestSetStatus = async (input: {
+    matchId: string;
+    status: "scheduled" | "inProgress";
+  }) => {
+    if (input.status === "inProgress") {
+      setPendingLiveMatchId(input.matchId);
+      return;
+    }
+    await setLive.mutateAsync(input);
+  };
 
   const saveSchedule = useMutation({
     mutationFn: (input: {
@@ -1018,7 +1020,6 @@ export default function TournamentDetailView({
   const canMutateParticipants = !tournamentLocked;
   const matchRules =
     zonesBoard?.matchRules ??
-    matchesBoard?.matchRules ??
     cuadroBoard?.matchRules ??
     ruleset?.matchRules ??
     FALLBACK_MATCH_RULES;
@@ -1069,8 +1070,6 @@ export default function TournamentDetailView({
   const resultMatch = resultMatchId
     ? (matches.find((m) => m.id === resultMatchId) ??
         zonesBoard?.allMatches.find((m) => m.id === resultMatchId) ??
-        matchesBoard?.groupMatches.find((m) => m.id === resultMatchId) ??
-        matchesBoard?.elimMatches.find((m) => m.id === resultMatchId) ??
         cuadroBoard?.elimMatches.find((m) => m.id === resultMatchId) ??
         repechageBoard?.allMatches.find((m) => m.id === resultMatchId) ??
         repechageBoard?.elimMatches.find((m) => m.id === resultMatchId) ??
@@ -1378,9 +1377,6 @@ export default function TournamentDetailView({
                   Repechaje
                 </TabsTrigger>
               ) : null}
-              <TabsTrigger value="partidos" className="flex-none">
-                Partidos
-              </TabsTrigger>
               <TabsTrigger value="config" className="flex-none">
                 Configuración
               </TabsTrigger>
@@ -1753,9 +1749,7 @@ export default function TournamentDetailView({
               statusSavingMatchId={
                 setLive.isPending ? (setLive.variables?.matchId ?? null) : null
               }
-              onSetStatus={async (input) => {
-                await setLive.mutateAsync(input);
-              }}
+              onSetStatus={requestSetStatus}
               unresolvedTies={zonesBoard.unresolvedTies}
               tieSavingGroupId={
                 resolveTieMutation.isPending
@@ -1809,6 +1803,10 @@ export default function TournamentDetailView({
               onQualifyPair={async (input) => {
                 await qualifyPairMutation.mutateAsync(input);
               }}
+              statusSavingMatchId={
+                setLive.isPending ? (setLive.variables?.matchId ?? null) : null
+              }
+              onSetStatus={requestSetStatus}
             />
           ) : cuadroFetching ? (
             <p className="text-sm text-muted-foreground">Cargando cuadro…</p>
@@ -1879,9 +1877,7 @@ export default function TournamentDetailView({
                 statusSavingMatchId={
                   setLive.isPending ? (setLive.variables?.matchId ?? null) : null
                 }
-                onSetStatus={async (input) => {
-                  await setLive.mutateAsync(input);
-                }}
+                onSetStatus={requestSetStatus}
                 unresolvedTies={repechageBoard.unresolvedTies}
                 tieSavingGroupId={
                   resolveTieMutation.isPending
@@ -1939,79 +1935,6 @@ export default function TournamentDetailView({
               description="Agregá parejas eliminadas del cuadro para armar este subtorneo."
             />
           )}
-        </TabsContent>
-
-        <TabsContent value="partidos" className="space-y-3 pt-4">
-          {matchesBoard?.notice ? (
-            <p className="text-sm text-muted-foreground">{matchesBoard.notice}</p>
-          ) : null}
-          <div className="grid gap-3 md:grid-cols-2">
-            {(matchesBoard?.groupMatches ?? []).map((match) => {
-              const canEditMatch =
-                !tournamentLocked && match.status !== "cancelled";
-              const canOpen = canOpenMatchResult(match, canEditMatch);
-              return (
-              <div key={match.id} className="space-y-2">
-                <MatchCard
-                  match={match}
-                  pairALabel={
-                    (matchesBoard?.pairLabels ?? pairLabels)[match.pairAId ?? ""] ?? "A"
-                  }
-                  pairBLabel={
-                    (matchesBoard?.pairLabels ?? pairLabels)[match.pairBId ?? ""] ?? "B"
-                  }
-                  phaseLabel="Zonas"
-                  courtLabel={
-                    match.courtId
-                      ? (matchesBoard?.courtLabels[match.courtId] ?? null)
-                      : null
-                  }
-                  onOpenResult={canOpen ? () => openResult(match) : undefined}
-                  onOpenPair={(side) => {
-                    const pairId = side === "A" ? match.pairAId : match.pairBId;
-                    if (pairId) openPairDetail(pairId);
-                  }}
-                />
-                {match.status === "scheduled" &&
-                match.pairAId &&
-                match.pairBId &&
-                !tournamentLocked ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={setLive.isPending}
-                    onClick={() =>
-                      setLive.mutate({ matchId: match.id, status: "inProgress" })
-                    }
-                  >
-                    Marcar en juego
-                  </Button>
-                ) : null}
-                {match.status === "inProgress" && !tournamentLocked ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={setLive.isPending}
-                    onClick={() =>
-                      setLive.mutate({ matchId: match.id, status: "scheduled" })
-                    }
-                  >
-                    Volver a programado
-                  </Button>
-                ) : null}
-              </div>
-              );
-            })}
-          </div>
-          {!matchesBoard ? (
-            <p className="text-sm text-muted-foreground">Cargando partidos…</p>
-          ) : matchesBoard.groupMatches.length === 0 ? (
-            <EmptyState
-              icon={Trophy}
-              title="Sin partidos de zonas todavía"
-              description="Cuando se armen las zonas, los partidos van a aparecer acá."
-            />
-          ) : null}
         </TabsContent>
 
         <TabsContent value="config" className="pt-4 space-y-3">
@@ -2253,6 +2176,25 @@ export default function TournamentDetailView({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <WarningDialog
+        open={Boolean(pendingLiveMatchId)}
+        onOpenChange={(open) => {
+          if (setLive.isPending) return;
+          if (!open) setPendingLiveMatchId(null);
+        }}
+        title="¿Marcar el partido en juego?"
+        description="Queda en vivo ahora. Pasa a finalizado cuando cargás el resultado."
+        cancelLabel="Cancelar"
+        confirmLabel="Marcar en juego"
+        isConfirming={setLive.isPending}
+        onConfirm={() => {
+          if (!pendingLiveMatchId || setLive.isPending) return;
+          void setLive
+            .mutateAsync({ matchId: pendingLiveMatchId, status: "inProgress" })
+            .then(() => setPendingLiveMatchId(null));
+        }}
+      />
 
       <WarningDialog
         open={confirmCancelOpen}

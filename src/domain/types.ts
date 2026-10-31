@@ -1094,18 +1094,6 @@ export interface ClubDashboardView {
   tournaments: Tournament[];
 }
 
-/** Tab Partidos. */
-export interface MatchesBoardView {
-  categoryId: string;
-  generatedAt: string;
-  groupMatches: Match[];
-  elimMatches: Match[];
-  pairLabels: Record<string, string>;
-  courtLabels: Record<string, string>;
-  matchRules: MatchRules;
-  notice: string | null;
-}
-
 /** Tab Configuración: snapshot para el formulario. */
 export interface ConfigBoardView {
   categoryId: string;

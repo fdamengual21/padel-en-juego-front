@@ -13,6 +13,7 @@ import type {
 import {
   canOpenMatchResult,
   knockoutRebuildBlockedReason,
+  matchLiveAction,
   matchMoveBlockedReason,
   matchPairingBlockedReason,
   matchWinnerSide,
@@ -25,10 +26,10 @@ import MatchCourtSelect, {
   MatchScheduleTimeModal,
 } from "./MatchScheduleCell";
 import MatchPairingModal from "./MatchPairingModal";
-import MatchStatusModal from "./MatchStatusModal";
 import MovePairPhaseModal from "./MovePairPhaseModal";
 import ResolveTieModal from "./ResolveTieModal";
 import { EmptyState } from "@/components/EmptyState";
+import MatchLiveButton from "@/components/tournaments/MatchLiveButton";
 import MatchPlayStatusChip from "@/components/tournaments/MatchPlayStatusChip";
 import MatchScoreBoxes from "@/components/tournaments/MatchScoreBoxes";
 import PairVsBlock from "@/components/tournaments/PairVsBlock";
@@ -186,17 +187,25 @@ function pairNamesFromLabel(
 function MatchRowActions({
   matchId,
   pairingBlockedReason,
+  liveKind,
+  liveBlockedReason,
+  liveSaving,
   moveBlockedReason,
   onEditPairing,
+  onSetLive,
   onMovePair,
 }: {
   matchId: string;
   pairingBlockedReason?: string | null;
+  liveKind?: "play" | "pause";
+  liveBlockedReason?: string | null;
+  liveSaving?: boolean;
   moveBlockedReason?: string | null;
   onEditPairing?: (matchId: string) => void;
+  onSetLive?: (matchId: string, status: "scheduled" | "inProgress") => void;
   onMovePair?: (matchId: string) => void;
 }) {
-  if (!onEditPairing && !onMovePair) return null;
+  if (!onEditPairing && !onSetLive && !onMovePair) return null;
   return (
     <div className="flex flex-wrap items-center gap-1">
       {onEditPairing && pairingBlockedReason !== undefined ? (
@@ -223,6 +232,16 @@ function MatchRowActions({
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
+      ) : null}
+      {onSetLive && liveKind ? (
+        <MatchLiveButton
+          matchId={matchId}
+          kind={liveKind}
+          blockedReason={liveBlockedReason ?? null}
+          isSaving={liveSaving}
+          onPlay={(id) => onSetLive(id, "inProgress")}
+          onPause={(id) => onSetLive(id, "scheduled")}
+        />
       ) : null}
       {onMovePair && moveBlockedReason !== undefined ? (
         <TooltipProvider delay={200}>
@@ -459,7 +478,6 @@ export default function GroupZonesPanel({
   moveSaving = false,
 }: GroupZonesPanelProps) {
   const [scheduleMatchId, setScheduleMatchId] = useState<string | null>(null);
-  const [statusMatchId, setStatusMatchId] = useState<string | null>(null);
   const [tieGroupId, setTieGroupId] = useState<string | null>(null);
   const [pairingMatchId, setPairingMatchId] = useState<string | null>(null);
   const [movingMatchId, setMovingMatchId] = useState<string | null>(null);
@@ -475,7 +493,8 @@ export default function GroupZonesPanel({
   );
   const canEditPairing = Boolean(onSetPairing) && !tournamentLocked;
   const canMovePairs = Boolean(onMovePair) && !tournamentLocked && tournamentStarted;
-  const showMatchActions = canEditPairing || canMovePairs;
+  const canSetLive = Boolean(onSetStatus) && !tournamentLocked;
+  const showMatchActions = canEditPairing || canMovePairs || canSetLive;
   const rebuildBlockedReason = knockoutRebuildBlockedReason(scheduleMatches, slots);
   const groupNames: Record<string, string> = {};
   for (const group of groups) {
@@ -504,12 +523,6 @@ export default function GroupZonesPanel({
   const scheduleMatch =
     scheduleMatchId != null
       ? (scheduleMatches.find((m) => m.id === scheduleMatchId) ?? null)
-      : null;
-  const statusMatch =
-    statusMatchId != null
-      ? (scheduleMatches.find((m) => m.id === statusMatchId) ??
-          matches.find((m) => m.id === statusMatchId) ??
-          null)
       : null;
   const pairingMatch =
     pairingMatchId != null
@@ -805,11 +818,7 @@ export default function GroupZonesPanel({
                     const canEditSchedule =
                       hasPairs && !tournamentLocked && !matchClosed;
                     const canEditDateTime = canEditSchedule && !disableMatchDateTime;
-                    const canEditStatus =
-                      hasPairs &&
-                      !tournamentLocked &&
-                      !matchClosed &&
-                      Boolean(onSetStatus);
+                    const live = canSetLive ? matchLiveAction(match, tournamentStarted) : null;
                     return (
                       <TableRow key={match.id}>
                         <TableCell className="px-2 py-1 text-xs text-muted-foreground tabular-nums whitespace-nowrap">
@@ -832,27 +841,11 @@ export default function GroupZonesPanel({
                           )}
                         </TableCell>
                         <TableCell className="px-2 py-1">
-                          <button
-                            type="button"
-                            data-testid={`match-status-cell-${match.id}`}
-                            aria-disabled={!canEditStatus}
-                            className={cn(
-                              "rounded-md text-left transition-colors",
-                              canEditStatus
-                                ? "hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                : "cursor-default opacity-80",
-                            )}
-                            onClick={() => {
-                              if (!canEditStatus) return;
-                              setStatusMatchId(match.id);
-                            }}
-                          >
-                            <MatchPlayStatusChip
-                              status={playStatus}
-                              hint={matchPlayStatusHint(match, slots, pairLabels)}
-                              className="h-4 px-1.5 text-[10px]"
-                            />
-                          </button>
+                          <MatchPlayStatusChip
+                            status={playStatus}
+                            hint={matchPlayStatusHint(match, slots, pairLabels)}
+                            className="h-4 px-1.5 text-[10px]"
+                          />
                         </TableCell>
                         <TableCell className="px-2 py-1 whitespace-normal">
                           <PairVsBlock
@@ -902,6 +895,9 @@ export default function GroupZonesPanel({
                                   ? matchPairingBlockedReason(match, slots, tournamentStarted)
                                   : undefined
                               }
+                              liveKind={live?.kind}
+                              liveBlockedReason={live?.blockedReason}
+                              liveSaving={statusSavingMatchId === match.id}
                               moveBlockedReason={
                                 canMovePairs
                                   ? matchMoveBlockedReason(
@@ -914,6 +910,13 @@ export default function GroupZonesPanel({
                                   : undefined
                               }
                               onEditPairing={canEditPairing ? setPairingMatchId : undefined}
+                              onSetLive={
+                                canSetLive && onSetStatus
+                                  ? (id, status) => {
+                                      void onSetStatus({ matchId: id, status });
+                                    }
+                                  : undefined
+                              }
                               onMovePair={canMovePairs ? setMovingMatchId : undefined}
                             />
                           </TableCell>
@@ -984,8 +987,7 @@ export default function GroupZonesPanel({
               const canOpenResult = canOpenMatchResult(match, !tournamentLocked);
               const canEditSchedule = hasPairs && !tournamentLocked && !rowClosed;
               const canEditDateTime = canEditSchedule && !disableMatchDateTime;
-              const canEditStatus =
-                hasPairs && !tournamentLocked && !rowClosed && Boolean(onSetStatus);
+              const live = canSetLive ? matchLiveAction(match, tournamentStarted) : null;
               return (
                 <TableRow key={match.id}>
                   <TableCell className="px-2 py-1 text-xs text-muted-foreground tabular-nums whitespace-nowrap">
@@ -1008,27 +1010,11 @@ export default function GroupZonesPanel({
                     )}
                   </TableCell>
                   <TableCell className="px-2 py-1">
-                    <button
-                      type="button"
-                      data-testid={`match-status-cell-${match.id}`}
-                      aria-disabled={!canEditStatus}
-                      className={cn(
-                        "rounded-md text-left transition-colors",
-                        canEditStatus
-                          ? "hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                          : "cursor-default opacity-80",
-                      )}
-                      onClick={() => {
-                        if (!canEditStatus) return;
-                        setStatusMatchId(match.id);
-                      }}
-                    >
-                      <MatchPlayStatusChip
-                        status={playStatus}
-                        hint={matchPlayStatusHint(match, slots, pairLabels)}
-                        className="h-4 px-1.5 text-[10px]"
-                      />
-                    </button>
+                    <MatchPlayStatusChip
+                      status={playStatus}
+                      hint={matchPlayStatusHint(match, slots, pairLabels)}
+                      className="h-4 px-1.5 text-[10px]"
+                    />
                   </TableCell>
                   <TableCell className="px-2 py-1 whitespace-normal">
                     <PairVsBlock
@@ -1074,6 +1060,9 @@ export default function GroupZonesPanel({
                             ? matchPairingBlockedReason(match, slots, tournamentStarted)
                             : undefined
                         }
+                        liveKind={live?.kind}
+                        liveBlockedReason={live?.blockedReason}
+                        liveSaving={statusSavingMatchId === match.id}
                         moveBlockedReason={
                           canMovePairs
                             ? matchMoveBlockedReason(
@@ -1086,6 +1075,13 @@ export default function GroupZonesPanel({
                             : undefined
                         }
                         onEditPairing={canEditPairing ? setPairingMatchId : undefined}
+                        onSetLive={
+                          canSetLive && onSetStatus
+                            ? (id, status) => {
+                                void onSetStatus({ matchId: id, status });
+                              }
+                            : undefined
+                        }
                         onMovePair={canMovePairs ? setMovingMatchId : undefined}
                       />
                     </TableCell>
@@ -1130,33 +1126,6 @@ export default function GroupZonesPanel({
             if (!open) setScheduleMatchId(null);
           }}
           onSave={onSaveSchedule}
-        />
-      ) : null}
-
-      {onSetStatus ? (
-        <MatchStatusModal
-          open={Boolean(statusMatch)}
-          match={statusMatch}
-          pairALabel={
-            statusMatch
-              ? sideLabel(statusMatch, "A", slots, pairLabels, groupNames)
-              : "Pareja A"
-          }
-          pairBLabel={
-            statusMatch
-              ? sideLabel(statusMatch, "B", slots, pairLabels, groupNames)
-              : "Pareja B"
-          }
-          isSubmitting={
-            statusMatch != null && statusSavingMatchId === statusMatch.id
-          }
-          onOpenChange={(open) => {
-            if (!open) setStatusMatchId(null);
-          }}
-          onSubmit={async (status) => {
-            if (!statusMatch) return;
-            await onSetStatus({ matchId: statusMatch.id, status });
-          }}
         />
       ) : null}
 

@@ -1,5 +1,6 @@
 import { Pencil } from "lucide-react";
-import type { Match } from "@/domain";
+import type { Match, MatchLiveKind } from "@/domain";
+import MatchLiveButton from "@/components/tournaments/MatchLiveButton";
 import MatchPlayStatusChip from "@/components/tournaments/MatchPlayStatusChip";
 import MatchScoreBoxes from "@/components/tournaments/MatchScoreBoxes";
 import PairVsBlock from "@/components/tournaments/PairVsBlock";
@@ -35,6 +36,8 @@ export interface MatchTableRow {
   pairingBlockedReason?: string | null;
   /** Por qué no se puede mover una pareja de esta fila. Null si se puede. Undefined: sin la acción. */
   moveBlockedReason?: string | null;
+  liveKind?: MatchLiveKind;
+  liveBlockedReason?: string | null;
 }
 
 interface RoundMatchesTableProps {
@@ -49,6 +52,8 @@ interface RoundMatchesTableProps {
   onOpenPair?: (pairId: string) => void;
   /** Cruce manual. Si falta, no se muestra el lápiz. */
   onEditPairing?: (matchId: string) => void;
+  onSetStatus?: (matchId: string, status: "scheduled" | "inProgress") => void;
+  statusSavingMatchId?: string | null;
   /** Abrir el modal para mover una pareja de este cruce. */
   onMovePair?: (matchId: string) => void;
 }
@@ -63,9 +68,11 @@ export default function RoundMatchesTable({
   onOpenMatch,
   onOpenPair,
   onEditPairing,
+  onSetStatus,
+  statusSavingMatchId = null,
   onMovePair,
 }: RoundMatchesTableProps) {
-  const showActions = Boolean(onEditPairing || onMovePair);
+  const showActions = Boolean(onEditPairing || onSetStatus || onMovePair);
   const colCount = (showIndexColumn ? 5 : 4) + (showActions ? 1 : 0);
 
   return (
@@ -201,6 +208,16 @@ export default function RoundMatchesTable({
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
+                    ) : null}
+                    {onSetStatus && row.liveKind ? (
+                      <MatchLiveButton
+                        matchId={row.matchId}
+                        kind={row.liveKind}
+                        blockedReason={row.liveBlockedReason ?? null}
+                        isSaving={statusSavingMatchId === row.matchId}
+                        onPlay={(id) => onSetStatus(id, "inProgress")}
+                        onPause={(id) => onSetStatus(id, "scheduled")}
+                      />
                     ) : null}
                     {onMovePair && row.moveBlockedReason !== undefined ? (
                       <MovePairButton

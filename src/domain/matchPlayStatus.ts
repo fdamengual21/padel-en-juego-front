@@ -211,3 +211,27 @@ export function validateMatchStatusTransition(
 
   return { ok: false, message: "Transición de estado no permitida." };
 }
+
+export type MatchLiveKind = "play" | "pause";
+
+/**
+ * Acción Play/Pause en la fila. `blockedReason` null: se puede confirmar.
+ * Pause solo si ya está en juego; Play en cualquier otro estado (deshabilitado si no aplica).
+ */
+export function matchLiveAction(
+  match: Pick<Match, "status" | "pairAId" | "pairBId">,
+  tournamentStarted: boolean,
+): { kind: MatchLiveKind; blockedReason: string | null } {
+  if (match.status === "inProgress") {
+    return { kind: "pause", blockedReason: null };
+  }
+  if (!tournamentStarted) {
+    return {
+      kind: "play",
+      blockedReason:
+        "El torneo todavía no comenzó. Usá «Comenzar torneo» antes de marcar partidos en juego.",
+    };
+  }
+  const next = validateMatchStatusTransition(match, "inProgress");
+  return { kind: "play", blockedReason: next.ok ? null : next.message };
+}

@@ -5,7 +5,6 @@ import { CircleAlert, GitBranch, Trophy, Users } from "lucide-react";
 import Api from "@/api/Api";
 import { EmptyState } from "@/components/EmptyState";
 import Avatar from "@/components/Avatar";
-import MatchCard from "@/components/tournaments/MatchCard";
 import TournamentChampionBanner from "@/components/tournaments/TournamentChampionBanner";
 import TournamentSummaryCard from "@/components/tournaments/TournamentSummaryCard";
 import PlayerRegistrationPanel from "@/components/tournaments/PlayerRegistrationPanel";
@@ -67,11 +66,6 @@ export default function UserTournamentDetailScreen() {
     enabled:
       Boolean(categoryId) &&
       (activeTab === "cuadro" || page?.tournament.status === "finished"),
-  });
-  const matchesQuery = useQuery({
-    queryKey: ["public-matches-board", categoryId],
-    queryFn: () => Api.TournamentOpsService().getPublicMatchesBoard(categoryId),
-    enabled: Boolean(categoryId) && activeTab === "partidos",
   });
   const repechageQuery = useQuery({
     queryKey: ["public-repechage-board", categoryId],
@@ -279,9 +273,6 @@ export default function UserTournamentDetailScreen() {
                 Repechaje
               </TabsTrigger>
             ) : null}
-            <TabsTrigger value="partidos" className="flex-none">
-              Partidos
-            </TabsTrigger>
           </TabsList>
         </div>
 
@@ -442,44 +433,6 @@ export default function UserTournamentDetailScreen() {
             )}
           </TabsContent>
         ) : null}
-
-        <TabsContent value="partidos" className="space-y-3 pt-4">
-          {matchesQuery.data?.notice ? (
-            <p className="text-sm text-muted-foreground">{matchesQuery.data.notice}</p>
-          ) : null}
-          <div className="grid gap-3 md:grid-cols-2">
-            {(matchesQuery.data?.groupMatches ?? []).map((match) => {
-              const canOpen = canOpenMatchResult(match, false);
-              return (
-                <div key={match.id}>
-                  <MatchCard
-                    match={match}
-                    pairALabel={(matchesQuery.data?.pairLabels ?? {})[match.pairAId ?? ""] ?? "A"}
-                    pairBLabel={(matchesQuery.data?.pairLabels ?? {})[match.pairBId ?? ""] ?? "B"}
-                    phaseLabel="Zonas"
-                    courtLabel={
-                      match.courtId ? (matchesQuery.data?.courtLabels[match.courtId] ?? null) : null
-                    }
-                    onOpenResult={canOpen ? () => openResult(match) : undefined}
-                    onOpenPair={(side) => {
-                      const pairId = side === "A" ? match.pairAId : match.pairBId;
-                      if (pairId) openPairDetail(pairId);
-                    }}
-                  />
-                </div>
-              );
-            })}
-          </div>
-          {!matchesQuery.data ? (
-            <p className="text-sm text-muted-foreground">Cargando partidos…</p>
-          ) : matchesQuery.data.groupMatches.length === 0 ? (
-            <EmptyState
-              icon={Trophy}
-              title="Sin partidos de zonas todavía"
-              description="Cuando se armen las zonas, los partidos van a aparecer acá."
-            />
-          ) : null}
-        </TabsContent>
       </Tabs>
 
       <MatchResultModal

@@ -14,7 +14,6 @@ import type {
   Tournament,
   ZonesBoardView,
   ParticipantsBoardView,
-  MatchesBoardView,
 } from "./types";
 import type { PaginatedResult } from "./pagination";
 
@@ -179,19 +178,6 @@ export function emptyParticipantsBoard(): ParticipantsBoardView {
     notice: null,
     autoMatches: [],
     repechageCreated: false,
-  };
-}
-
-export function emptyMatchesBoard(categoryId: string): MatchesBoardView {
-  return {
-    categoryId,
-    generatedAt: new Date().toISOString(),
-    groupMatches: [],
-    elimMatches: [],
-    pairLabels: {},
-    courtLabels: {},
-    matchRules: DEFAULT_MATCH_RULES,
-    notice: null,
   };
 }
 
