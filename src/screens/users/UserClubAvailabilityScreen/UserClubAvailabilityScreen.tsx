@@ -14,6 +14,7 @@ import {
   type CourtAgendaToolbarMode,
 } from "@/components/schedule";
 import { clubClosesNextDay, parseClockMinutes } from "@/lib/clubSchedule";
+import { isCourtBookable, isCourtListedForPlayers } from "@/domain";
 import type { PublicClubSlot } from "@/modules/clubs";
 import {
   buildAgendaMonthGridDays,
@@ -61,11 +62,16 @@ export default function UserClubAvailabilityScreen() {
 
   const club = detailQuery.data;
   const requestedCourtId = params.get("courtId");
+  const listedCourts = useMemo(
+    () => (club?.courts ?? []).filter((court) => isCourtListedForPlayers(court.status)),
+    [club?.courts],
+  );
   const courtFilter =
-    club?.courts.some((court) => court.id === requestedCourtId) ? requestedCourtId : null;
-  const visibleCourts = (club?.courts ?? []).filter(
+    listedCourts.some((court) => court.id === requestedCourtId) ? requestedCourtId : null;
+  const visibleCourts = listedCourts.filter(
     (court) => !courtFilter || court.id === courtFilter,
   );
+  const bookableCourts = visibleCourts.filter((court) => isCourtBookable(court.status));
 
   const scheduleTailMinutes = useMemo(() => {
     if (!club?.openTime || !club.closeTime || !clubClosesNextDay(club.openTime, club.closeTime)) {
@@ -246,7 +252,7 @@ export default function UserClubAvailabilityScreen() {
           {intent && intent !== "browse" && isAuthenticated ? (
             <PlayerReservationModal
               clubId={club.id}
-              courts={visibleCourts}
+              courts={bookableCourts}
               slot={intent}
               freeSlots={bookableSlots}
               onClose={() => setIntent(null)}

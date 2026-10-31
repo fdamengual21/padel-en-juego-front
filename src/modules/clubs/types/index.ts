@@ -1,4 +1,4 @@
-import type { WeekdayIso } from "@/domain";
+import type { CourtStatus, WeekdayIso } from "@/domain";
 
 export type { Club, UpdateClubInput } from "@/domain";
 
@@ -82,6 +82,7 @@ export interface PublicCourtPriceRule {
 export interface PublicCourt {
   id: string;
   name: string;
+  status: CourtStatus;
   imageUrl: string | null;
   slotDurationMinutes: number;
   basePrice: number;

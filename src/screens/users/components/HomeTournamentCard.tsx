@@ -80,17 +80,15 @@ export default function HomeTournamentCard({
         )}
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-2">
-          <p className="min-w-0 truncate text-sm font-semibold tracking-tight">
-            {tournament.name}
-          </p>
-          <StatusBadge status={tournament.status} className="w-fit max-w-full shrink-0" />
-        </div>
+        <p className="min-w-0 truncate text-sm font-semibold tracking-tight">
+          {tournament.name}
+        </p>
+        <StatusBadge status={tournament.status} className="w-fit max-w-full shrink-0" />
         {tournament.clubName ? (
           <p className="truncate text-sm text-muted-foreground">{tournament.clubName}</p>
         ) : null}
-        <p className="truncate text-sm text-muted-foreground">{category}</p>
-        <div className="mt-auto flex min-w-0 items-center gap-2 pt-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <p className="min-w-0 truncate text-sm text-muted-foreground">{category}</p>
           {chip ? (
             <Badge
               variant="secondary"
@@ -98,13 +96,13 @@ export default function HomeTournamentCard({
             >
               {chip.label}
             </Badge>
-          ) : (
-            <span className="min-w-0 flex-1" />
-          )}
-          <span className="ml-auto shrink-0 text-xs font-bold text-foreground">
+          ) : null}
+        </div>
+        <div className="mt-auto flex min-w-0 items-center gap-2 pt-2">
+          <span className="min-w-0 truncate text-xs font-bold text-foreground">
             {formatRange(tournament.startDate, tournament.endDate)}
           </span>
-          <span className="inline-flex shrink-0 items-center text-xs font-medium text-primary-strong">
+          <span className="ml-auto inline-flex shrink-0 items-center text-xs font-medium text-primary-strong">
             Ver torneo
             <ChevronRight className="size-3.5" aria-hidden />
           </span>
@@ -128,9 +126,16 @@ function formatRange(startIso: string, endIso: string | null | undefined): strin
   const start = parseIsoDateOnly(startIso);
   const end = parseIsoDateOnly(endIso ?? startIso);
   if (!start) return "";
-  const sameDay = !end || dayjs(start).isSame(end, "day");
-  if (sameDay) return stamp(start, true);
-  return `${stamp(start, false)} – ${stamp(end, true)}`;
+  const endDate = end ?? start;
+  const sameDay = dayjs(start).isSame(endDate, "day");
+  const currentYear = dayjs().year();
+  const startYear = dayjs(start).year();
+  const endYear = dayjs(endDate).year();
+  const spansYears = startYear !== endYear;
+  const showYear = spansYears || startYear !== currentYear || endYear !== currentYear;
+
+  if (sameDay) return stamp(start, showYear);
+  return `${stamp(start, spansYears)} – ${stamp(endDate, showYear)}`;
 }
 
 function stamp(date: Date, withYear: boolean): string {

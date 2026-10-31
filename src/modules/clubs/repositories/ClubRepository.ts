@@ -1,8 +1,7 @@
 import type { AxiosInstance } from "axios";
 import { readData } from "@/config/axiosInstance";
 import { notConnectedError } from "@/domain";
-import type { PaginatedResult } from "@/domain";
-import type { WeekdayIso } from "@/domain";
+import type { CourtStatus, PaginatedResult, WeekdayIso } from "@/domain";
 import type { ApiEnvelope } from "@/lib/apiClient";
 import { resolveClubHeaderId } from "@/modules/auth/clubContext";
 import { useAuthStore } from "@/stores/authStore";
@@ -96,6 +95,18 @@ function normalizePublicClub(raw: Record<string, unknown>): PublicClubListItem {
   };
 }
 
+function asCourtStatus(value: unknown): CourtStatus {
+  if (
+    value === "active" ||
+    value === "inactive" ||
+    value === "comingSoon" ||
+    value === "maintenance"
+  ) {
+    return value;
+  }
+  return "active";
+}
+
 function normalizePublicCourt(raw: Record<string, unknown>): PublicCourt {
   const rules = Array.isArray(raw.priceRules)
     ? raw.priceRules
@@ -105,6 +116,7 @@ function normalizePublicCourt(raw: Record<string, unknown>): PublicCourt {
   return {
     id: asString(raw.id),
     name: asString(raw.name),
+    status: asCourtStatus(raw.status),
     imageUrl: asNullableString(raw.imageUrl),
     slotDurationMinutes:
       typeof raw.slotDurationMinutes === "number" && Number.isFinite(raw.slotDurationMinutes)

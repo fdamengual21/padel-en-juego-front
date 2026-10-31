@@ -125,7 +125,7 @@ function toAgendaCourt(clubId: string, court: PublicCourt): Court {
     id: court.id,
     clubId,
     name: court.name,
-    status: "active",
+    status: court.status,
     imageUrl: court.imageUrl,
     slotDurationMinutes: court.slotDurationMinutes,
     basePrice: court.basePrice,

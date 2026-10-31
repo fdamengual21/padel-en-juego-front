@@ -1,6 +1,7 @@
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 import CourtListingCard, { type CourtListingStatus } from "@/components/courts/CourtListingCard";
+import CourtScheduleStatusChip from "@/components/courts/CourtScheduleStatusChip";
 import type { CourtAvailableSlot, CourtDayOverviewItem, CourtLiveStatus } from "@/domain";
 import { COURT_STATUS_LABELS } from "@/domain";
 
@@ -13,6 +14,12 @@ interface CourtsOverviewCardProps {
 dayjs.locale("es");
 
 function statusOf(item: CourtDayOverviewItem): CourtListingStatus {
+  if (item.court.status === "maintenance") {
+    return { label: COURT_STATUS_LABELS.maintenance, tone: "occupied" };
+  }
+  if (item.court.status === "comingSoon") {
+    return { label: COURT_STATUS_LABELS.comingSoon, tone: "available" };
+  }
   if (item.court.status !== "active") {
     return { label: COURT_STATUS_LABELS[item.court.status], tone: "neutral" };
   }
@@ -49,6 +56,11 @@ export default function CourtsOverviewCard({
             onSelect: onSelectSlot ? () => onSelectSlot(item.court.id, slot) : undefined,
           }))}
           slotsEmptyMessage={item.message || "Sin turnos libres este día."}
+          slotsEmpty={
+            item.court.status === "comingSoon" || item.court.status === "maintenance" ? (
+              <CourtScheduleStatusChip status={item.court.status} />
+            ) : undefined
+          }
           status={statusOf(item)}
           onImageClick={() => onOpenDetail(item.court.id)}
           imageClickLabel={`Ver detalle de ${item.court.name}`}

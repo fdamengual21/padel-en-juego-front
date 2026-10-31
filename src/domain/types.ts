@@ -625,6 +625,14 @@ export const COURT_STATUS_LABELS: Record<CourtStatus, string> = {
   maintenance: "En mantenimiento",
 };
 
+export function isCourtListedForPlayers(status: CourtStatus): boolean {
+  return status !== "inactive";
+}
+
+export function isCourtBookable(status: CourtStatus): boolean {
+  return status === "active";
+}
+
 export interface Court {
   id: string;
   clubId: string;

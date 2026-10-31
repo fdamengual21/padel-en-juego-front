@@ -1,4 +1,4 @@
-import { Fragment, useState } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import { Clock3 } from "lucide-react";
 import CourtStatusChip from "@/components/courts/CourtStatusChip";
 import PendingReservationSlotTooltip from "@/components/courts/PendingReservationSlotTooltip";
@@ -35,6 +35,7 @@ interface CourtListingCardProps {
   pricesEmptyMessage?: string;
   slots: CourtListingSlot[];
   slotsEmptyMessage: string;
+  slotsEmpty?: ReactNode;
   status?: CourtListingStatus | null;
   /** Click en la foto. En el club abre el detalle; en el jugador, el visor. */
   onImageClick?: () => void;
@@ -53,6 +54,7 @@ export default function CourtListingCard({
   pricesEmptyMessage = "Sin horario de precios.",
   slots,
   slotsEmptyMessage,
+  slotsEmpty,
   status,
   onImageClick,
   imageClickLabel,
@@ -143,7 +145,9 @@ export default function CourtListingCard({
               <span className="font-medium capitalize text-muted-foreground">{dateLabel}</span>
             </p>
             {slots.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{slotsEmptyMessage}</p>
+              slotsEmpty ?? (
+                <p className="text-sm text-muted-foreground">{slotsEmptyMessage}</p>
+              )
             ) : (
               <div className="flex flex-wrap gap-1.5">
                 {slots.map((slot) => {

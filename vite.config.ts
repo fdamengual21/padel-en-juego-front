@@ -18,6 +18,10 @@ export default defineConfig({
         target: "http://localhost:5250",
         changeOrigin: true,
       },
+      "/files": {
+        target: "http://localhost:5250",
+        changeOrigin: true,
+      },
     },
   },
   preview: {

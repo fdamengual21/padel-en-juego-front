@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { CalendarClock } from "lucide-react";
 import { useMockSession } from "@/app/MockSessionProvider";
+import { isCourtBookable } from "@/domain";
 import type { PublicClubDetail, PublicClubSlot } from "@/modules/clubs";
 import { formatArs } from "@/lib/money";
 import PlayerReservationModal from "@/screens/users/components/PlayerReservationModal";
@@ -47,7 +48,7 @@ export default function TodayFreeSlots({ club }: TodayFreeSlotsProps) {
       {selected && isAuthenticated ? (
         <PlayerReservationModal
           clubId={club.id}
-          courts={club.courts}
+          courts={club.courts.filter((court) => isCourtBookable(court.status))}
           slot={selected}
           freeSlots={club.freeSlotsToday}
           onClose={() => setSelected(null)}
