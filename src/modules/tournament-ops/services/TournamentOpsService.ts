@@ -453,7 +453,9 @@ export class TournamentOpsService {
 
   updateCategory(
     id: string,
-    patch: Partial<Omit<import("@/domain").TournamentCategory, "id" | "tournamentId">>,
+    patch: Partial<Omit<import("@/domain").TournamentCategory, "id" | "tournamentId">> & {
+      confirmAcceptedOverflow?: boolean;
+    },
   ) {
     return this.repository.updateCategory(id, patch);
   }

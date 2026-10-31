@@ -283,7 +283,9 @@ export interface ITournamentOpsRepository {
   ): Promise<KnockoutPhaseResult>;
   updateCategory(
     id: string,
-    patch: Partial<Omit<TournamentCategory, "id" | "tournamentId">>,
+    patch: Partial<Omit<TournamentCategory, "id" | "tournamentId">> & {
+      confirmAcceptedOverflow?: boolean;
+    },
   ): Promise<TournamentCategory>;
   upsertRuleset(ruleset: Omit<TournamentRuleset, "id">): Promise<TournamentRuleset>;
   listPublicCategories(tournamentId: string): Promise<TournamentCategory[]>;
@@ -951,7 +953,9 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
 
   async updateCategory(
     id: string,
-    patch: Partial<Omit<TournamentCategory, "id" | "tournamentId">>,
+    patch: Partial<Omit<TournamentCategory, "id" | "tournamentId">> & {
+      confirmAcceptedOverflow?: boolean;
+    },
   ) {
     return this.read<TournamentCategory>(`/club/tournaments/categories/${id}`, "patch", patch);
   }

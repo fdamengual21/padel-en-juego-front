@@ -1,4 +1,5 @@
 import type { ReactNode } from "react"
+import { TriangleAlert } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -77,7 +78,13 @@ export default function WarningDialog({
     >
       <AlertDialogContent size={size} data-testid="warning-dialog">
         <AlertDialogHeader>
-          <AlertDialogTitle>{title}</AlertDialogTitle>
+          <AlertDialogTitle className="flex items-center gap-2">
+            <TriangleAlert
+              className="size-4 shrink-0 text-warning-foreground"
+              aria-hidden
+            />
+            {title}
+          </AlertDialogTitle>
           {description ? (
             <AlertDialogDescription>{description}</AlertDialogDescription>
           ) : null}

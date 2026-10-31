@@ -41,6 +41,10 @@ export {
   championPairNames,
 } from "./tournamentChampion";
 export {
+  acceptedOverflowSubstitutes,
+  type AcceptedOverflowCandidate,
+} from "./tournamentCapacity";
+export {
   matchPairingBlockedReason,
   qualifyChangeBlockedReason,
   matchMoveBlockedReason,

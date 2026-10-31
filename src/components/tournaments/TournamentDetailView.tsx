@@ -12,6 +12,7 @@ import {
   knockoutRebuildBlockedReason,
   resolveMatchDurationMinutes,
   FIVE_PAIR_ZONE_NOTICE,
+  acceptedOverflowSubstitutes,
   championPairNames,
   removeAcceptedPairBlockedReason,
   resolveTournamentChampionPairId,
@@ -94,6 +95,37 @@ const FALLBACK_MATCH_RULES: MatchRules = {
   superTiebreakWinByTwo: true,
 };
 
+function configSaveWarningItems(
+  maxPairs: number,
+  acceptedSpots: number,
+  overflow: boolean,
+) {
+  const items = [
+    "Al guardar, se vuelven a armar las zonas y los versus con las parejas aceptadas.",
+  ];
+  if (overflow) {
+    const extra = acceptedSpots - maxPairs;
+    items.push(
+      `El nuevo número de participantes ${maxPairs} es inferior a las parejas aceptadas ${acceptedSpots}. Si continuás, las últimas ${extra} aceptadas quedan como suplentes:`,
+    );
+  }
+  return items;
+}
+
+function overflowPairLabel(
+  pairId: string,
+  player2Id: string | null,
+  sidePreference: "drive" | "reves" | "any" | null,
+  names: Record<string, [string, string]>,
+  labels: Record<string, string>,
+) {
+  if (labels[pairId]) return labels[pairId];
+  const named = names[pairId];
+  if (!named) return "Pareja";
+  if (!player2Id) return `${named[0]} / ${seekingPartnerLabel(sidePreference)}`;
+  return `${named[0]} / ${named[1]}`;
+}
+
 function AutoAssignButton({
   blockedReason,
   pending,
@@ -132,6 +164,11 @@ export default function TournamentDetailView({
   const [pendingBanner, setPendingBanner] = useState<TournamentBannerDraft | null>(
     null,
   );
+  const [pendingConfigSave, setPendingConfigSave] = useState<{
+    values: TournamentFormValues;
+    banner: TournamentBannerDraft;
+    overflow: boolean;
+  } | null>(null);
   const [dqRegistrationId, setDqRegistrationId] = useState<string | null>(null);
   const [dqNote, setDqNote] = useState("");
   const [removeRegistrationId, setRemoveRegistrationId] = useState<string | null>(
@@ -237,7 +274,9 @@ export default function TournamentDetailView({
     queryFn: () => Api.TournamentOpsService().getParticipantsBoard(categoryId),
     enabled:
       Boolean(categoryId) &&
-      (activeTab === "participantes" || requestedPairId != null),
+      (activeTab === "participantes" ||
+        activeTab === "config" ||
+        requestedPairId != null),
   });
 
   const toastedAutoMatchKeys = useRef(new Set<string>());
@@ -782,11 +821,23 @@ export default function TournamentDetailView({
     mutationFn: async (input: {
       values: TournamentFormValues;
       banner: TournamentBannerDraft;
+      confirmAcceptedOverflow?: boolean;
     }) => {
-      const { values, banner } = input;
+      const { values, banner, confirmAcceptedOverflow } = input;
       const cfgTournament = configBoard?.tournament ?? tournament;
       const cfgCategory = configBoard?.category ?? category;
       if (!cfgTournament || !cfgCategory) throw new Error("Sin torneo");
+      await Api.TournamentOpsService().updateCategory(cfgCategory.id, {
+        name: values.categoryName,
+        gender: values.categoryGender,
+        kind: values.categoryKind,
+        level: values.categoryKind === "level" ? values.categoryLevel : null,
+        sumaTarget: values.categoryKind === "suma" ? values.sumaTarget : null,
+        maxPairs: values.maxPairs,
+        circuitType: values.circuitType,
+        status: cfgCategory.status,
+        confirmAcceptedOverflow: confirmAcceptedOverflow === true,
+      });
       await Api.TournamentOpsService().upsertRuleset({
         tournamentCategoryId: cfgCategory.id,
         preset: values.matchPlayType,
@@ -798,16 +849,6 @@ export default function TournamentDetailView({
           "GAME_DIFFERENCE",
         ],
         groupCount: null,
-      });
-      await Api.TournamentOpsService().updateCategory(cfgCategory.id, {
-        name: values.categoryName,
-        gender: values.categoryGender,
-        kind: values.categoryKind,
-        level: values.categoryKind === "level" ? values.categoryLevel : null,
-        sumaTarget: values.categoryKind === "suma" ? values.sumaTarget : null,
-        maxPairs: values.maxPairs,
-        circuitType: values.circuitType,
-        status: cfgCategory.status,
       });
       await Api.TournamentService().update(cfgTournament.id, {
         name: values.name,
@@ -825,10 +866,21 @@ export default function TournamentDetailView({
       await Api.TournamentService().applyBanner(cfgTournament.id, banner);
       return Api.TournamentOpsService().syncCategoryStructure(cfgCategory.id);
     },
-    onSuccess: async (result) => {
-      toastSuccess("Configuración guardada", result.message);
+    onSuccess: async (result, input) => {
+      toastSuccess(
+        "Configuración guardada",
+        [
+          input.confirmAcceptedOverflow
+            ? "Las parejas de más quedaron como suplentes."
+            : null,
+          result.message,
+        ]
+          .filter(Boolean)
+          .join(" ") || undefined,
+      );
       setPendingDateValues(null);
       setPendingBanner(null);
+      setPendingConfigSave(null);
       await invalidateOps();
       void qc.invalidateQueries({ queryKey: ["tournaments"] });
     },
@@ -990,6 +1042,45 @@ export default function TournamentDetailView({
   const capacity = participantsBoard?.capacity
     ? { ...localCapacity, ...participantsBoard.capacity }
     : localCapacity;
+  const overflowSubstituteLabels = useMemo(() => {
+    if (!pendingConfigSave?.overflow) return [];
+    const nextMax = pendingConfigSave.values.maxPairs;
+    const items = registrations.flatMap((registration) => {
+      const pair = pairs.find((item) => item.id === registration.pairId);
+      if (!pair) return [];
+      return [
+        {
+          pairId: pair.id,
+          player2Id: pair.player2Id,
+          pairStatus: pair.status,
+          registrationId: registration.id,
+          registrationStatus: registration.status,
+          registeredAt: registration.registeredAt,
+          statusChangedAt: registration.statusChangedAt,
+          sidePreference: pair.sidePreference,
+        },
+      ];
+    });
+    const sideByPair = new Map(
+      items.map((item) => [item.pairId, item.sidePreference] as const),
+    );
+    return acceptedOverflowSubstitutes(items, nextMax).map((item) => ({
+      pairId: item.pairId,
+      label: overflowPairLabel(
+        item.pairId,
+        item.player2Id,
+        sideByPair.get(item.pairId) ?? null,
+        pairPlayerNames,
+        pairLabels,
+      ),
+    }));
+  }, [
+    pendingConfigSave,
+    registrations,
+    pairs,
+    pairLabels,
+    pairPlayerNames,
+  ]);
   const categoryFull = category != null && capacity.full;
   const acceptedFull = Boolean(capacity.acceptedFull);
   const admission = participantsBoard?.admission ?? { allowed: true, reason: null };
@@ -1002,7 +1093,7 @@ export default function TournamentDetailView({
     tournament.status === "finished" ||
     Boolean(participantsBoard?.tournamentStarted);
   const configLocked =
-    tournamentLocked || tournamentStarted || Boolean(configBoard?.structureLocked);
+    tournamentLocked || Boolean(configBoard?.structureLocked);
   const participantsLockedReason = tournamentLocked
     ? tournament.status === "cancelled"
       ? "El torneo está cancelado. Las inscripciones no se pueden modificar."
@@ -1914,13 +2005,11 @@ export default function TournamentDetailView({
                 ? "El torneo está cancelado. La configuración no se puede editar."
                 : "El torneo ya finalizó. La configuración no se puede editar."}
             </p>
-          ) : tournamentStarted || configBoard?.structureLocked ? (
+          ) : configBoard?.structureLocked ? (
             <Alert variant="warning">
               <TriangleAlert />
               <AlertDescription>
-                {configBoard?.structureLocked && !tournamentStarted
-                  ? "Hay partidos con resultado. La configuración no se puede editar."
-                  : "El torneo ya comenzó. La configuración no se puede editar."}
+                Hay partidos con resultado. La configuración no se puede editar.
               </AlertDescription>
             </Alert>
           ) : configBoard?.notice ? (
@@ -1943,9 +2032,7 @@ export default function TournamentDetailView({
                     "No se puede guardar la configuración",
                     tournamentLocked
                       ? "El torneo ya está cerrado."
-                      : configBoard?.structureLocked && !tournamentStarted
-                        ? "Hay partidos con resultado."
-                        : "El torneo ya comenzó.",
+                      : "Hay partidos con resultado.",
                   );
                   return;
                 }
@@ -1963,6 +2050,17 @@ export default function TournamentDetailView({
                   setPendingBanner(banner);
                   return;
                 }
+                const acceptedSpots =
+                  capacity.acceptedPairs +
+                  Math.ceil(capacity.acceptedSoloPlayers / 2);
+                if (acceptedSpots > 0) {
+                  setPendingConfigSave({
+                    values,
+                    banner,
+                    overflow: values.maxPairs < acceptedSpots,
+                  });
+                  return;
+                }
                 await saveConfig.mutateAsync({ values, banner });
               }}
             />
@@ -1971,6 +2069,50 @@ export default function TournamentDetailView({
           )}
         </TabsContent>
       </Tabs>
+
+      <WarningDialog
+        open={Boolean(pendingConfigSave)}
+        onOpenChange={(open) => {
+          if (saveConfig.isPending) return;
+          if (!open) setPendingConfigSave(null);
+        }}
+        title="Guardar configuración"
+        cancelLabel="Cancelar"
+        confirmLabel="Guardar"
+        isConfirming={saveConfig.isPending}
+        onConfirm={() => {
+          if (!pendingConfigSave || saveConfig.isPending) return;
+          void saveConfig.mutateAsync({
+            values: pendingConfigSave.values,
+            banner: pendingConfigSave.banner,
+            confirmAcceptedOverflow: pendingConfigSave.overflow,
+          });
+        }}
+      >
+        {pendingConfigSave ? (
+          <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
+            {configSaveWarningItems(
+              pendingConfigSave.values.maxPairs,
+              capacity.acceptedPairs +
+                Math.ceil(capacity.acceptedSoloPlayers / 2),
+              pendingConfigSave.overflow,
+            ).map((item, index, list) => (
+              <li key={item}>
+                {item}
+                {pendingConfigSave.overflow &&
+                index === list.length - 1 &&
+                overflowSubstituteLabels.length > 0 ? (
+                  <ul className="mt-1.5 list-disc space-y-1 pl-5">
+                    {overflowSubstituteLabels.map((pair) => (
+                      <li key={pair.pairId}>{pair.label}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </WarningDialog>
 
       <Dialog
         open={Boolean(pendingDateValues)}
@@ -2193,8 +2335,8 @@ export default function TournamentDetailView({
         title="Comenzar torneo"
         description={
           capacity.acceptedSoloPlayers > 0
-            ? `Se cierra la inscripción y se arma el cuadro con las ${capacity.acceptedPairs} parejas aceptadas. Hay ${capacity.acceptedSoloPlayers} jugadores sin pareja: se emparejan entre sí por orden de inscripción aunque jueguen del mismo lado; si queda uno impar, queda afuera. Después no se puede cambiar la configuración (tipo, formato, fechas, categoría). Esta acción no se deshace.`
-            : `Se cierra la inscripción y se arma el cuadro con las ${capacity.acceptedPairs} parejas aceptadas. Después no se puede cambiar la configuración (tipo, formato, fechas, categoría). Esta acción no se deshace.`
+            ? `Se cierra la inscripción y se arma el cuadro con las ${capacity.acceptedPairs} parejas aceptadas. Hay ${capacity.acceptedSoloPlayers} jugadores sin pareja: se emparejan entre sí por orden de inscripción aunque jueguen del mismo lado; si queda uno impar, queda afuera. Si hay partidos jugados, ya no se puede cambiar la configuración (tipo, formato, fechas, categoría). Esta acción no se deshace.`
+            : `Se cierra la inscripción y se arma el cuadro con las ${capacity.acceptedPairs} parejas aceptadas. Si hay partidos jugados, ya no se puede cambiar la configuración (tipo, formato, fechas, categoría). Esta acción no se deshace.`
         }
         cancelLabel="Cancelar"
         confirmLabel="Comenzar"
