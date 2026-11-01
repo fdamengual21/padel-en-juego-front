@@ -41,6 +41,7 @@ function normalizeMember(raw: Record<string, unknown>): ClubStaffMember {
     role: asString(raw.role),
     isActive: raw.isActive === true,
     canEdit: raw.canEdit === true,
+    canDeactivate: raw.canDeactivate === true,
     avatarUrl: asNullableString(raw.avatarUrl),
     maskedEmail: asString(raw.maskedEmail),
     phone: asNullableString(raw.phone),

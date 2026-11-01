@@ -246,7 +246,7 @@ export default function UserShell() {
 
         <nav
           data-testid="player-bottom-nav"
-          className="fixed inset-x-0 bottom-0 border-t border-border bg-card/95 backdrop-blur md:hidden"
+          className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 backdrop-blur md:hidden"
         >
           <ul className={cn("mx-auto grid max-w-lg", colsClass)}>
             {browseItems.map(({ to, label, icon: Icon, end }) => (

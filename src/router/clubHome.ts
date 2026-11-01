@@ -11,9 +11,8 @@ import { ROUTES } from "./routes";
 
 /** Primera pantalla del club según lo que el staff puede ver. */
 export function clubHome(can: (permission: string) => boolean): string {
-  if (can(PERMISSION_CLUB_RESERVATIONS_READ) || can(PERMISSION_CLUB_TOURNAMENTS_READ)) {
-    return ROUTES.club.dashboard;
-  }
+  if (can(PERMISSION_CLUB_RESERVATIONS_READ)) return ROUTES.club.dashboard;
+  if (can(PERMISSION_CLUB_TOURNAMENTS_READ)) return ROUTES.club.tournaments;
   if (can(PERMISSION_CLUB_CLIENTS_READ)) return ROUTES.club.clients;
   if (can(PERMISSION_CLUB_USERS_READ)) return ROUTES.club.staff;
   if (can(PERMISSION_CLUB_COURTS_READ)) return ROUTES.club.courts;

@@ -193,7 +193,7 @@ export default function ClubStaffScreen() {
                               <TooltipContent>Editar rol</TooltipContent>
                             </Tooltip>
                           ) : null}
-                          {member.isActive && can(PERMISSION_CLUB_USERS_DEACTIVATE) ? (
+                          {member.canDeactivate && can(PERMISSION_CLUB_USERS_DEACTIVATE) ? (
                             <Tooltip>
                               <TooltipTrigger
                                 render={

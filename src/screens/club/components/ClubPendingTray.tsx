@@ -24,6 +24,8 @@ interface DashboardPendingTrayProps {
   /** Alto máximo del listado. En el resumen entra un pedido; el resto se scrollea. */
   listClassName?: string;
   className?: string;
+  /** Abierto al montar. En el resumen sí; en canchas no. */
+  defaultOpen?: boolean;
   onChanged: () => void;
 }
 
@@ -35,13 +37,15 @@ export default function DashboardPendingTray({
   viewAllTo,
   listClassName = "max-h-80",
   className,
+  defaultOpen = false,
   onChanged,
 }: DashboardPendingTrayProps) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const pendingCount = !isLoading && !isError ? reservations.length : 0;
+  const hasActions = Boolean(viewAllTo) || (canMutate && pendingCount > 0);
   const toggleOpen = () => setOpen((current) => !current);
 
   const run = async (id: string, action: () => Promise<unknown>, success: string) => {
@@ -78,7 +82,7 @@ export default function DashboardPendingTray({
       className={cn("rounded-xl border border-border bg-card p-4", className)}
       data-testid="pending-reservations-card"
     >
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-2 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
         <h3 className="min-w-0">
           <button
             type="button"
@@ -96,33 +100,36 @@ export default function DashboardPendingTray({
             ) : null}
           </button>
         </h3>
-        <div className="flex flex-wrap items-center gap-2">
-          {viewAllTo ? (
-            <Link
-              to={viewAllTo}
-              className="inline-flex items-center gap-0.5 text-sm text-muted-foreground hover:text-foreground"
-            >
-              Ver todas
-              <ChevronRight className="size-4" aria-hidden />
-            </Link>
-          ) : null}
-          {canMutate && pendingCount > 0 ? (
-            <Button type="button" size="sm" variant="outline" className="bg-card" disabled={busyId != null} onClick={acceptAll}>
-              Aceptar todas
-            </Button>
-          ) : null}
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            aria-expanded={open}
-            aria-controls="pending-tray-panel"
-            aria-label={open ? "Ocultar pendientes" : "Mostrar pendientes"}
-            onClick={toggleOpen}
-          >
-            <ChevronDown className={cn("size-4 transition-transform", open && "rotate-180")} />
-          </Button>
-        </div>
+        {hasActions ? (
+          <div className="col-span-2 flex flex-wrap items-center gap-2 sm:col-span-1 sm:col-start-2 sm:row-start-1 sm:justify-end">
+            {viewAllTo ? (
+              <Link
+                to={viewAllTo}
+                className="inline-flex items-center gap-0.5 text-sm text-muted-foreground hover:text-foreground"
+              >
+                Ver todas
+                <ChevronRight className="size-4" aria-hidden />
+              </Link>
+            ) : null}
+            {canMutate && pendingCount > 0 ? (
+              <Button type="button" size="sm" variant="outline" className="bg-card" disabled={busyId != null} onClick={acceptAll}>
+                Aceptar todas
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="col-start-2 row-start-1 sm:col-start-3"
+          aria-expanded={open}
+          aria-controls="pending-tray-panel"
+          aria-label={open ? "Ocultar pendientes" : "Mostrar pendientes"}
+          onClick={toggleOpen}
+        >
+          <ChevronDown className={cn("size-4 transition-transform", open && "rotate-180")} />
+        </Button>
       </div>
       {open ? (
         <div id="pending-tray-panel">
@@ -153,54 +160,56 @@ export default function DashboardPendingTray({
             const court = reservation.courtName || "Cancha";
             return (
               <li key={reservation.id} className="border-b border-border py-3 last:border-b-0">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch sm:gap-4">
+                <div className="flex items-stretch gap-3 sm:gap-4">
                 <CourtThumb name={court} imageUrl={reservation.courtImageUrl} />
                 <div className="grid min-w-0 flex-1 grid-cols-1 items-center gap-y-1 sm:grid-cols-[9.5rem_minmax(0,1fr)_auto] sm:gap-x-6">
-                  <p className="order-1 text-sm font-medium sm:order-0">{when.day}</p>
-                  <ClubPlayerLink
-                    className="order-4 sm:order-0"
-                    playerId={reservation.bookedByPlayerId}
-                    name={name}
-                    avatarUrl={reservation.playerAvatarUrl}
-                  />
-                  <div className="order-7 mt-1 flex flex-wrap items-center gap-2 sm:order-0 sm:row-span-3 sm:mt-0 sm:justify-end sm:self-start">
-                    {canMutate && !rejecting ? (
-                      <>
-                        <Button
-                          type="button"
-                          size="sm"
-                          disabled={busyId != null}
-                          onClick={() => {
-                            void run(
-                              reservation.id,
-                              () => Api.ReservationService().accept(reservation.id),
-                              "Pedido aceptado",
-                            );
-                          }}
-                        >
-                          Aceptar
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={busyId != null}
-                          onClick={() => {
-                            setRejectId(reservation.id);
-                            setRejectReason("");
-                          }}
-                        >
-                          Rechazar
-                        </Button>
-                      </>
-                    ) : null}
+                  <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 sm:row-span-3 sm:flex-col sm:items-start sm:gap-y-1">
+                    <p className="text-sm font-medium">{when.day}</p>
+                    <p className="text-sm text-muted-foreground">{when.time}</p>
+                    <p className="text-sm text-muted-foreground">{court}</p>
                   </div>
-                  <p className="order-2 text-sm text-muted-foreground sm:order-0">{when.time}</p>
-                  <p className="order-5 text-sm tabular-nums sm:order-0 sm:pl-11">{price ?? ""}</p>
-                  <p className="order-3 text-sm text-muted-foreground sm:order-0">{court}</p>
-                  <div className="order-6 sm:order-0 sm:pl-11">
-                    <PlayerReservationStatusChip status="pending" />
+                  <div className="flex min-w-0 items-center gap-2 sm:col-start-2 sm:row-start-1">
+                    <ClubPlayerLink
+                      className="min-w-0 flex-1"
+                      playerId={reservation.bookedByPlayerId}
+                      name={name}
+                      avatarUrl={reservation.playerAvatarUrl}
+                    />
+                    <PlayerReservationStatusChip status="pending" className="shrink-0" />
                   </div>
+                  <p className="text-sm tabular-nums sm:col-start-2 sm:row-start-2 sm:pl-11">
+                    {price ?? ""}
+                  </p>
+                  {canMutate && !rejecting ? (
+                    <div className="mt-1 flex justify-end gap-2 sm:col-start-3 sm:row-start-1 sm:row-span-3 sm:mt-0 sm:flex-col sm:self-start">
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={busyId != null}
+                        onClick={() => {
+                          void run(
+                            reservation.id,
+                            () => Api.ReservationService().accept(reservation.id),
+                            "Pedido aceptado",
+                          );
+                        }}
+                      >
+                        Aceptar
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={busyId != null}
+                        onClick={() => {
+                          setRejectId(reservation.id);
+                          setRejectReason("");
+                        }}
+                      >
+                        Rechazar
+                      </Button>
+                    </div>
+                  ) : null}
                 </div>
                 </div>
                 {rejecting ? (
@@ -265,7 +274,7 @@ function PendingTraySkeleton() {
 
 function CourtThumb({ name, imageUrl }: { name: string; imageUrl?: string | null }) {
   return (
-    <div className="relative h-20 w-full shrink-0 overflow-hidden rounded-md bg-muted sm:h-auto sm:w-16 sm:self-stretch">
+    <div className="relative min-h-20 w-16 shrink-0 self-stretch overflow-hidden rounded-md bg-muted">
       {imageUrl ? (
         <img src={imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
       ) : (

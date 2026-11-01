@@ -1,21 +1,21 @@
 import { memo, useCallback, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
-import { CalendarDays, MapPin, Plus, Users } from "lucide-react";
+import { Plus } from "lucide-react";
 import Api from "@/api/Api";
 import { useMockSession } from "@/app/MockSessionProvider";
 import {
   PERMISSION_CLUB_CLIENTS_READ,
+  PERMISSION_CLUB_CLIENTS_WRITE,
   PERMISSION_CLUB_COURTS_READ,
   PERMISSION_CLUB_RESERVATIONS_WRITE,
   PERMISSION_CLUB_SETTINGS_READ,
   usePermissions,
 } from "@/authorization";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import type { Court, CourtReservation as DomainReservation } from "@/domain";
 import type { ClubTodayTurn } from "@/modules/reservations";
+import ClientFormDialog from "@/screens/club/ClubClientsScreen/components/ClientFormDialog";
 import CourtReservationModal from "@/screens/club/ClubCourtsScreen/components/CourtReservationModal";
 import { ROUTES } from "@/router/routes";
 import { useClubSessionStore } from "@/stores/clubSessionStore";
@@ -39,10 +39,12 @@ function DashboardReservationsSection() {
   const session = useClubSessionStore((state) => state.session);
   const queryClient = useQueryClient();
   const canWrite = can(PERMISSION_CLUB_RESERVATIONS_WRITE);
+  const canWriteClients = can(PERMISSION_CLUB_CLIENTS_WRITE);
   const canCourts = can(PERMISSION_CLUB_COURTS_READ);
   const canClients = can(PERMISSION_CLUB_CLIENTS_READ);
   const canSettings = can(PERMISSION_CLUB_SETTINGS_READ);
   const [creating, setCreating] = useState(false);
+  const [creatingClient, setCreatingClient] = useState(false);
   const [view, setView] = useState<DomainReservation | null>(null);
   const [createSlot, setCreateSlot] = useState<ClubTodayTurn | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -107,6 +109,11 @@ function DashboardReservationsSection() {
 
   const openHelp = useCallback(() => setHelpOpen(true), []);
   const startCreating = useCallback(() => setCreating(true), []);
+  const startCreatingClient = useCallback(() => setCreatingClient(true), []);
+  const saveClient = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ["club-clients-count", clubId] });
+    void queryClient.invalidateQueries({ queryKey: ["club-clients", clubId] });
+  }, [clubId, queryClient]);
   const closeReservation = useCallback((open: boolean) => {
     if (open) return;
     setCreating(false);
@@ -164,35 +171,22 @@ function DashboardReservationsSection() {
 
   return (
     <>
-      <section className="space-y-3">
-        <h3 className="text-sm font-medium text-foreground">Accesos rápidos</h3>
-        <div className="flex flex-wrap gap-2">
+      {canWrite || canWriteClients ? (
+        <section className="flex justify-end gap-2">
+          {canWriteClients ? (
+            <Button type="button" variant="outline" onClick={startCreatingClient}>
+              <Plus />
+              Añadir cliente
+            </Button>
+          ) : null}
           {canWrite ? (
             <Button type="button" onClick={startCreating}>
               <Plus />
               Nueva reserva
             </Button>
           ) : null}
-          {canCourts ? (
-            <Link to={ROUTES.club.courts} className={cn(buttonVariants({ variant: "outline" }), "bg-card")}>
-              <CalendarDays />
-              Agenda
-            </Link>
-          ) : null}
-          {canClients ? (
-            <Link to={ROUTES.club.clients} className={cn(buttonVariants({ variant: "outline" }), "bg-card")}>
-              <Users />
-              Clientes
-            </Link>
-          ) : null}
-          {canCourts ? (
-            <Link to={ROUTES.club.courts} className={cn(buttonVariants({ variant: "outline" }), "bg-card")}>
-              <MapPin />
-              Canchas
-            </Link>
-          ) : null}
-        </div>
-      </section>
+        </section>
+      ) : null}
 
       <section className="grid items-stretch gap-3 xl:grid-cols-3">
         <OccupancyCardView
@@ -213,20 +207,22 @@ function DashboardReservationsSection() {
             isError={summaryQuery.isError}
           />
         </div>
-        <ClubCardView
-          session={session}
-          settings={settingsQuery.data}
-          settingsLoading={canSettings && settingsQuery.isLoading}
-          settingsError={settingsQuery.isError}
-          canSeeSettings={canSettings}
-          courts={courtsStat}
-          clients={clientsStat}
-          fixed={fixedStat}
-          tournament={null}
-          tournamentLoading={false}
-          tournamentError={false}
-          showTournament={false}
-        />
+        <div className="order-first h-full xl:order-none">
+          <ClubCardView
+            session={session}
+            settings={settingsQuery.data}
+            settingsLoading={canSettings && settingsQuery.isLoading}
+            settingsError={settingsQuery.isError}
+            canSeeSettings={canSettings}
+            courts={courtsStat}
+            clients={clientsStat}
+            fixed={fixedStat}
+            tournament={null}
+            tournamentLoading={false}
+            tournamentError={false}
+            showTournament={false}
+          />
+        </div>
       </section>
 
       <section className="grid items-start gap-3 xl:grid-cols-3">
@@ -237,6 +233,7 @@ function DashboardReservationsSection() {
             isError={pendingQuery.isError}
             canMutate={canWrite}
             viewAllTo={agendaTo}
+            defaultOpen
             onChanged={refresh}
           />
         </div>
@@ -251,6 +248,13 @@ function DashboardReservationsSection() {
         onOpen={openTurn}
       />
       <OccupancyDetailDialog open={helpOpen} onOpenChange={setHelpOpen} />
+
+      <ClientFormDialog
+        open={creatingClient}
+        clientId={null}
+        onOpenChange={setCreatingClient}
+        onSaved={saveClient}
+      />
 
       <CourtReservationModal
         open={creating || createSlot != null || view != null}

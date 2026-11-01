@@ -31,6 +31,7 @@ import AccountDrawerMenu, {
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
@@ -56,12 +57,11 @@ interface NavItem {
 const items: NavItem[] = [
   {
     to: ROUTES.club.dashboard,
-    label: "Resumen",
+    label: "Inicio",
     icon: LayoutDashboard,
     end: true,
     feature: "clubDashboard",
-    permissions: [PERMISSION_CLUB_RESERVATIONS_READ, PERMISSION_CLUB_TOURNAMENTS_READ],
-    permissionMode: "any",
+    permission: PERMISSION_CLUB_RESERVATIONS_READ,
   },
   {
     to: ROUTES.club.tournaments,
@@ -163,6 +163,9 @@ export default function ClubShell() {
   };
 
   const displayName = player?.displayName ?? "Jugador";
+  const greeting = player?.firstName?.trim()
+    ? `¡Hola, ${player.firstName.trim()}!`
+    : "¡Hola!";
   const accountActions = (placement: "sidebar" | "sheet") => [
     ...(placement === "sheet" && showSettings
       ? [
@@ -261,7 +264,7 @@ export default function ClubShell() {
         </main>
         <nav
           data-testid="club-bottom-nav"
-          className="fixed inset-x-0 bottom-0 border-t border-sidebar-border bg-sidebar text-sidebar-foreground md:hidden"
+          className="fixed inset-x-0 bottom-0 z-30 border-t border-sidebar-border bg-sidebar text-sidebar-foreground md:hidden"
         >
           <ul className={cn("mx-auto grid max-w-lg", colsClass)}>
             {bottomItems.map(({ to, label, icon: Icon, end }) => (
@@ -326,6 +329,7 @@ export default function ClubShell() {
           <SheetContent side="bottom" className="rounded-t-2xl">
             <SheetHeader>
               <SheetTitle>Más</SheetTitle>
+              <SheetDescription>{greeting}</SheetDescription>
             </SheetHeader>
             <div className="px-3 pb-6">
               <AccountActionSections

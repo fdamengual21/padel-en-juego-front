@@ -6,6 +6,7 @@ export interface ClubStaffMember {
   role: string;
   isActive: boolean;
   canEdit: boolean;
+  canDeactivate: boolean;
   avatarUrl: string | null;
   maskedEmail: string;
   phone: string | null;
