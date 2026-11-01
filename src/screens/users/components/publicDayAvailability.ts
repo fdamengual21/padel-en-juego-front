@@ -1,12 +1,59 @@
 import dayjs, { type Dayjs } from "dayjs";
 import { isoWeekdayFromDate } from "@/domain";
+import { clubClosesNextDay, parseClockMinutes } from "@/lib/clubSchedule";
 import { formatArs } from "@/lib/money";
 import type { PublicClubSlot } from "@/modules/clubs";
 import {
   agendaJornadaColumnDay,
   type AgendaJornadaSchedule,
+  type CalendarAgendaRange,
   type CalendarEventGridItemDto,
 } from "@/modules/schedule";
+
+export interface PublicClubHours {
+  openHour: number | undefined;
+  closeHour: number | undefined;
+  jornada: AgendaJornadaSchedule | undefined;
+}
+
+/** Misma key en la ficha y en la pantalla de disponibilidad: comparten cache. */
+export function publicAvailabilityQueryKey(
+  clubId: string,
+  range: CalendarAgendaRange,
+  courtId: string | null,
+) {
+  return ["public-club-availability", clubId, range.from, range.to, courtId] as const;
+}
+
+/** Minutos después de medianoche que se suman al rango si el club cierra al día siguiente. */
+export function scheduleTailMinutes(
+  openTime: string | null | undefined,
+  closeTime: string | null | undefined,
+): number {
+  if (!openTime || !closeTime || !clubClosesNextDay(openTime, closeTime)) return 0;
+  return parseClockMinutes(closeTime) ?? 0;
+}
+
+/** Horas de la grilla y jornada del club. Sin horario, todo undefined. */
+export function publicClubHours(
+  openTime: string | null | undefined,
+  closeTime: string | null | undefined,
+  openDays: readonly number[],
+): PublicClubHours {
+  if (!openTime || !closeTime) {
+    return { openHour: undefined, closeHour: undefined, jornada: undefined };
+  }
+  const openHour = Number(openTime.slice(0, 2)) || 0;
+  const closeHour = Number(closeTime.slice(0, 2)) || 0;
+  const openMinutes = parseClockMinutes(openTime) ?? openHour * 60;
+  const closeMinutes = parseClockMinutes(closeTime) ?? closeHour * 60;
+  const closesNextDay = closeMinutes < openMinutes;
+  return {
+    openHour,
+    closeHour: closesNextDay ? 24 + closeHour + (closeMinutes % 60 > 0 ? 1 : 0) : closeHour,
+    jornada: { openMinutes, closeMinutes, openDays },
+  };
+}
 
 export interface PublicDaySummary {
   dateKey: string;

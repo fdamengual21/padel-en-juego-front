@@ -24,6 +24,12 @@ export interface RankingStandingsQuery {
   pageSize?: number;
 }
 
+export interface PublicClubRankingQuery {
+  scope?: "live" | "finished";
+  /** 1 a 10: cada circuito trae sus primeros puestos en `topStandings`. */
+  top?: number;
+}
+
 export interface IRankingRepository {
   listClub(scope?: "live" | "finished" | "all"): Promise<ClubRankingCircuit[]>;
   getClub(id: string): Promise<ClubRankingCircuit>;
@@ -34,7 +40,7 @@ export interface IRankingRepository {
   uploadFlyer(id: string, file: File): Promise<ClubRankingCircuit>;
   deleteFlyer(id: string): Promise<ClubRankingCircuit>;
   listPublic(query?: PublicRankingListQuery): Promise<ClubRankingCircuit[]>;
-  listPublicByClub(clubId: string, scope?: "live" | "finished"): Promise<ClubRankingCircuit[]>;
+  listPublicByClub(clubId: string, query?: PublicClubRankingQuery): Promise<ClubRankingCircuit[]>;
   getPublic(id: string): Promise<ClubRankingCircuit>;
   applyFlyer(id: string, banner: RankingBannerDraft): Promise<void>;
 }
@@ -141,11 +147,11 @@ export class RankingRepository implements IRankingRepository {
 
   async listPublicByClub(
     clubId: string,
-    scope: "live" | "finished" = "live",
+    query: PublicClubRankingQuery = {},
   ): Promise<ClubRankingCircuit[]> {
     const response = await this.http.get<ApiEnvelope<ClubRankingCircuit[]>>(
       `/public/clubs/${clubId}/rankings`,
-      { params: { scope } },
+      { params: { scope: query.scope ?? "live", top: query.top ?? undefined } },
     );
     return asList(readData(response));
   }

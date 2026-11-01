@@ -15,7 +15,7 @@ export default function UserClubRankingScreen() {
   const [scope, setScope] = useState<Scope>("live");
   const { data = [], isLoading, isError } = useQuery({
     queryKey: ["public-club-rankings", clubId, scope],
-    queryFn: () => Api.RankingService().listPublicByClub(clubId, scope),
+    queryFn: () => Api.RankingService().listPublicByClub(clubId, { scope }),
     enabled: Boolean(clubId),
   });
 

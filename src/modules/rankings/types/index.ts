@@ -88,6 +88,8 @@ export interface ClubRankingCircuit {
   /** Fechas no canceladas. Solo en el detalle. */
   totalDates?: number;
   events?: ClubRankingEvent[];
+  /** Primeros puestos de la tabla. Solo en el listado público del club pedido con `top`. */
+  topStandings?: ClubRankingStanding[] | null;
 }
 
 export interface CreateClubRankingRequest {

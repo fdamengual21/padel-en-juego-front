@@ -123,8 +123,9 @@ export interface PublicClubDetail {
   openTime: string | null;
   closeTime: string | null;
   openDays: WeekdayIso[];
+  /** En este momento (hora de Argentina) el predio está dentro de su jornada. */
+  isOpenNow: boolean;
   courts: PublicCourt[];
-  freeSlotsToday: PublicClubSlot[];
 }
 
 export interface PublicClubAvailability {

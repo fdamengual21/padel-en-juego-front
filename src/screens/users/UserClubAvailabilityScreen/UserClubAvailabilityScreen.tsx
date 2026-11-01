@@ -13,7 +13,6 @@ import {
   CourtAgendaToolbar,
   type CourtAgendaToolbarMode,
 } from "@/components/schedule";
-import { clubClosesNextDay, parseClockMinutes } from "@/lib/clubSchedule";
 import { isCourtBookable, isCourtListedForPlayers } from "@/domain";
 import type { PublicClubSlot } from "@/modules/clubs";
 import {
@@ -24,17 +23,20 @@ import {
 } from "@/modules/schedule";
 import { ROUTES } from "@/router/routes";
 import PlayerReservationModal from "@/screens/users/components/PlayerReservationModal";
-import ReserveIntentPanel from "@/screens/users/components/ReserveIntentPanel";
-import PublicCourtCard from "./components/PublicCourtCard";
-import DayFreeSlotsDialog from "./components/DayFreeSlotsDialog";
+import PublicCourtCard from "@/screens/users/components/PublicCourtCard";
 import {
+  publicAvailabilityQueryKey,
+  publicClubHours,
+  scheduleTailMinutes,
   summarizeOpenDays,
   toDaySummaryEvent,
   toFreeSlotBlock,
   toFreeSlotListItem,
   slotEventId,
   slotsAtSameStart,
-} from "./publicDayAvailability";
+} from "@/screens/users/components/publicDayAvailability";
+import ReserveIntentPanel from "@/screens/users/components/ReserveIntentPanel";
+import DayFreeSlotsDialog from "./components/DayFreeSlotsDialog";
 
 dayjs.locale("es");
 
@@ -73,25 +75,20 @@ export default function UserClubAvailabilityScreen() {
   );
   const bookableCourts = visibleCourts.filter((court) => isCourtBookable(court.status));
 
-  const scheduleTailMinutes = useMemo(() => {
-    if (!club?.openTime || !club.closeTime || !clubClosesNextDay(club.openTime, club.closeTime)) {
-      return 0;
-    }
-    return parseClockMinutes(club.closeTime) ?? 0;
-  }, [club]);
+  const tailMinutes = scheduleTailMinutes(club?.openTime, club?.closeTime);
 
   const range = useMemo(
-    () => rangeForAgendaView(mode, cursorDate, { tailMinutes: scheduleTailMinutes }),
-    [mode, cursorDate, scheduleTailMinutes],
+    () => rangeForAgendaView(mode, cursorDate, { tailMinutes }),
+    [mode, cursorDate, tailMinutes],
   );
 
   const dayRange = useMemo(
-    () => rangeForAgendaView("day", cursorDate, { tailMinutes: scheduleTailMinutes }),
-    [cursorDate, scheduleTailMinutes],
+    () => rangeForAgendaView("day", cursorDate, { tailMinutes }),
+    [cursorDate, tailMinutes],
   );
 
   const availabilityQuery = useQuery({
-    queryKey: ["public-club-availability", clubId, range.from, range.to, courtFilter],
+    queryKey: publicAvailabilityQueryKey(clubId, range, courtFilter),
     queryFn: () =>
       Api.ClubService().listPublicAvailability(clubId, {
         from: range.from,
@@ -106,7 +103,10 @@ export default function UserClubAvailabilityScreen() {
     setSlotList(null);
   }, [cursorDate, mode, courtFilter]);
 
-  const openHours = useMemo(() => openHoursOf(club?.openTime, club?.closeTime, club?.openDays ?? []), [club]);
+  const openHours = useMemo(
+    () => publicClubHours(club?.openTime, club?.closeTime, club?.openDays ?? []),
+    [club],
+  );
 
   const visibleDays = useMemo(() => {
     if (mode === "month") return buildAgendaMonthGridDays(cursorDate);
@@ -342,32 +342,4 @@ export default function UserClubAvailabilityScreen() {
       ) : null}
     </div>
   );
-}
-
-function openHoursOf(
-  openTime: string | null | undefined,
-  closeTime: string | null | undefined,
-  openDays: readonly number[],
-) {
-  if (!openTime || !closeTime) {
-    return {
-      openHour: undefined as number | undefined,
-      closeHour: undefined as number | undefined,
-      jornada: undefined,
-    };
-  }
-  const openHour = Number(openTime.slice(0, 2)) || 0;
-  const closeHour = Number(closeTime.slice(0, 2)) || 0;
-  const openMinutes = parseClockMinutes(openTime) ?? openHour * 60;
-  const closeMinutes = parseClockMinutes(closeTime) ?? closeHour * 60;
-  const closesNextDay = closeMinutes < openMinutes;
-  return {
-    openHour,
-    closeHour: closesNextDay ? 24 + closeHour + (closeMinutes % 60 > 0 ? 1 : 0) : closeHour,
-    jornada: {
-      openMinutes,
-      closeMinutes,
-      openDays,
-    },
-  };
 }

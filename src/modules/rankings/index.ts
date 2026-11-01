@@ -13,6 +13,7 @@ export { nextRankingEvent, rankingScheduleLabel, rankingWeekdayLabel } from "./h
 export { RankingRepository } from "./repositories/RankingRepository";
 export type {
   IRankingRepository,
+  PublicClubRankingQuery,
   PublicRankingListQuery,
   RankingStandingsQuery,
 } from "./repositories/RankingRepository";

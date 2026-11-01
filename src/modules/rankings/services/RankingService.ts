@@ -1,5 +1,6 @@
 import type {
   IRankingRepository,
+  PublicClubRankingQuery,
   PublicRankingListQuery,
   RankingStandingsQuery,
 } from "../repositories/RankingRepository";
@@ -44,8 +45,8 @@ export class RankingService {
     return this.repository.listPublic(query);
   }
 
-  listPublicByClub(clubId: string, scope?: "live" | "finished") {
-    return this.repository.listPublicByClub(clubId, scope);
+  listPublicByClub(clubId: string, query?: PublicClubRankingQuery) {
+    return this.repository.listPublicByClub(clubId, query);
   }
 
   getPublic(id: string) {

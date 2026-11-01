@@ -179,8 +179,8 @@ function normalizePublicClubDetail(raw: Record<string, unknown>): PublicClubDeta
     openTime: asHour(raw.openTime),
     closeTime: asHour(raw.closeTime),
     openDays: asOpenDays(raw.openDays),
+    isOpenNow: raw.isOpenNow === true,
     courts: asRecordList(raw.courts).map(normalizePublicCourt),
-    freeSlotsToday: asRecordList(raw.freeSlotsToday).map(normalizePublicSlot),
   };
 }
 
