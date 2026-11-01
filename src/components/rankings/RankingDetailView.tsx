@@ -19,7 +19,7 @@ interface RankingDetailViewProps {
   tournamentTo: (eventId: string) => string;
   activeTab: RankingDetailTab;
   onTabChange: (tab: RankingDetailTab) => void;
-  /** Solo club con permiso de edición. Sin esto no hay tab Configuración. */
+  /** Solo club con permiso de edición y ranking abierto. Sin esto no hay tab Configuración. */
   configTab?: ReactNode;
 }
 
@@ -66,7 +66,12 @@ export default function RankingDetailView({
         </TabsList>
 
         <TabsContent value="ranking" className="pt-2">
-          <RankingStandingsTable key={circuit.id} circuitId={circuit.id} source={standingsSource} />
+          <RankingStandingsTable
+            key={circuit.id}
+            circuitId={circuit.id}
+            source={standingsSource}
+            finished={circuit.status === "finished"}
+          />
         </TabsContent>
 
         <TabsContent value="fechas" className="pt-2">

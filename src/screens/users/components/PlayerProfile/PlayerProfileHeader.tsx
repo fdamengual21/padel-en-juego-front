@@ -11,6 +11,7 @@ import {
   playerSidePreferenceLabel,
   type PublicPlayerProfile,
 } from "@/domain";
+import { useShareLink } from "@/hooks/useShareLink";
 import { formatLocationEs } from "@/lib/dates";
 import { toastError, toastSuccess } from "@/lib/toast";
 import { cn } from "@/lib/utils";
@@ -28,28 +29,15 @@ const chipClass =
 const darkButtonClass =
   "border border-white/15 bg-white/10 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground sm:border-0 sm:bg-sidebar sm:hover:bg-sidebar-accent";
 
-async function shareProfile(name: string, userId: string) {
-  const url = `${window.location.origin}${ROUTES.player.playerProfile(userId)}`;
-  if (typeof navigator.share === "function") {
-    try {
-      await navigator.share({ title: name, url });
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") return;
-      toastError("No se pudo compartir el perfil");
-    }
-    return;
-  }
-  try {
-    await navigator.clipboard.writeText(url);
-    toastSuccess("Link del perfil copiado");
-  } catch {
-    toastError("No se pudo copiar el link");
-  }
-}
-
 export default function PlayerProfileHeader({ data, isOwner }: PlayerProfileHeaderProps) {
   const { player } = data;
   const queryClient = useQueryClient();
+  const { share } = useShareLink({
+    title: player.displayName,
+    path: ROUTES.player.playerProfile(player.userId),
+    imageUrl: player.avatarUrl ?? player.coverUrl,
+    copiedLabel: "Link del perfil copiado",
+  });
   const setUserProfile = useAuthStore((state) => state.setUserProfile);
   const location = formatLocationEs(data.city, data.province);
   const side = playerSidePreferenceLabel(player.sidePreference);
@@ -134,7 +122,7 @@ export default function PlayerProfileHeader({ data, isOwner }: PlayerProfileHead
                   className={darkButtonClass}
                   aria-label="Compartir perfil"
                   title="Compartir perfil"
-                  onClick={() => void shareProfile(player.displayName, player.userId)}
+                  onClick={() => void share()}
                 >
                   <Share2 className="size-5" />
                 </Button>

@@ -27,9 +27,13 @@ import {
   type MatchResultInput,
   type MatchRules,
   type ParticipantsBoardView,
+  type RankingClosure,
 } from "@/domain";
+import { isLastPendingRankingEvent, rankingChampionsLabel } from "@/modules/rankings";
 import Api from "@/api/Api";
 import { EmptyState } from "@/components/EmptyState";
+import ShareButton from "@/components/ShareButton";
+import { ROUTES } from "@/router/routes";
 import TournamentChampionBanner from "@/components/tournaments/TournamentChampionBanner";
 import TournamentSummaryCard, {
   type TournamentSummaryStat,
@@ -37,10 +41,11 @@ import TournamentSummaryCard, {
 import PairResultChips from "@/components/tournaments/PairResultChips";
 import RegistrationDetailModal from "@/components/tournaments/RegistrationDetailModal";
 import StatusBadge from "@/components/tournaments/StatusBadge";
+import TournamentStatusChip from "@/components/tournaments/TournamentStatusChip";
 import TournamentRulesDialog from "@/components/tournaments/TournamentRulesDialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -207,6 +212,7 @@ export default function TournamentDetailView({
   const [finishPhase, setFinishPhase] = useState<"confirm" | "pending" | "done">("confirm");
   const [finishOk, setFinishOk] = useState(false);
   const [finishDetail, setFinishDetail] = useState("");
+  const [rankingClosure, setRankingClosure] = useState<RankingClosure | null>(null);
   const [activeTab, setActiveTab] = useState("grupos");
   const [repechagePairsOpen, setRepechagePairsOpen] = useState(false);
   const [repechageModalMode, setRepechageModalMode] = useState<"create" | "edit">("edit");
@@ -230,6 +236,7 @@ export default function TournamentDetailView({
     queryFn: () => Api.RankingService().getClub(rankingCircuitId),
     enabled: Boolean(clubId && rankingCircuitId),
   });
+  const isLastRankingDate = isLastPendingRankingEvent(rankingCircuit?.events, tournamentId);
   const invalidateFlowQueries = () =>
     Promise.all(flow.relatedQueries.map((queryKey) => qc.invalidateQueries({ queryKey })));
   const { data: clubCourts = [] } = useQuery({
@@ -665,11 +672,14 @@ export default function TournamentDetailView({
   const finishMutation = useMutation({
     mutationFn: () => Api.TournamentOpsService().finishTournament(tournamentId),
     onSuccess: async (result) => {
+      const closure = result.rankingClosure ?? null;
       setFinishOk(true);
       setFinishDetail(result.message);
+      setRankingClosure(closure);
       setFinishPhase("done");
       toastSuccess("Torneo finalizado", result.message);
-      await invalidateOps();
+      if (closure) toastSuccess("Ranking finalizado", rankingChampionsLabel(closure.champions) || closure.name);
+      await Promise.all([invalidateOps(), invalidateFlowQueries()]);
     },
     onError: (err: Error) => {
       const logic = err instanceof ApiHttpError && err.status === 422;
@@ -729,6 +739,12 @@ export default function TournamentDetailView({
     onSuccess: async (result) => {
       setConfirmCancelOpen(false);
       toastSuccess(flow.copy.cancelSuccess, result.message);
+      if (result.rankingClosure) {
+        toastSuccess(
+          "Ranking finalizado",
+          rankingChampionsLabel(result.rankingClosure.champions) || result.rankingClosure.name,
+        );
+      }
       await Promise.all([
         invalidateOps(),
         qc.invalidateQueries({ queryKey: ["tournaments"] }),
@@ -1426,7 +1442,7 @@ export default function TournamentDetailView({
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <h2 className="text-2xl font-semibold tracking-tight">{tournament.name}</h2>
             {tournamentLocked ? null : (
-              <StatusBadge status={statusView.status} label={statusView.label} />
+              <TournamentStatusChip view={statusView} />
             )}
             {tournament.weekIndex && tournament.rankingWeekCount ? (
               <span className="text-sm text-muted-foreground">
@@ -1438,16 +1454,19 @@ export default function TournamentDetailView({
               matchRules={matchRules}
               categoryName={category?.name}
             />
+            <ShareButton
+              title={tournament.name}
+              path={ROUTES.player.tournamentDetail(tournament.id)}
+              imageUrl={tournament.bannerUrl ?? tournament.clubCoverUrl ?? tournament.clubAvatarUrl}
+              copiedLabel="Link del torneo copiado"
+              testId="tournament-share-button"
+            />
             {statusView.hint && !tournamentLocked && !tournament.rankingCircuitId ? (
               <span className="text-sm text-muted-foreground">{statusView.hint}</span>
             ) : null}
           </div>
           {tournamentLocked ? (
-            <StatusBadge
-              status={statusView.status}
-              label={statusView.label}
-              className="ml-auto h-8 px-3 text-sm"
-            />
+            <TournamentStatusChip view={statusView} className="ml-auto h-8 px-3 text-sm" />
           ) : (
             <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
               {isQualityPreset(ruleset?.preset) ? null : (
@@ -1502,6 +1521,7 @@ export default function TournamentDetailView({
                       setFinishPhase("confirm");
                       setFinishOk(false);
                       setFinishDetail("");
+                      setRankingClosure(null);
                       setFinishOpen(true);
                     }}
                   >
@@ -1747,6 +1767,7 @@ export default function TournamentDetailView({
                         onClick={() => setDetailRow(row)}
                       >
                         <div className="min-w-0 flex-1 space-y-2">
+                          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3">
                           <div className="flex min-w-0 items-center gap-3">
                             {playerRows.map((player, index) => {
                               const clickable = Boolean(player.clientId);
@@ -1815,6 +1836,7 @@ export default function TournamentDetailView({
                               ) : null}
                             </div>
                           )}
+                          </div>
                           <PairResultChips
                             result={resultByPair.get(pair.id)}
                             scoring={categoryResults?.scoring ?? false}
@@ -2503,7 +2525,11 @@ export default function TournamentDetailView({
           setConfirmCancelOpen(open);
         }}
         title={flow.copy.cancelTitle}
-        description={flow.copy.cancelDescription}
+        description={
+          isLastRankingDate
+            ? "La fecha queda cancelada y no suma puntos. Es la última fecha pendiente: el ranking se cierra con la tabla actual y su configuración deja de poder editarse. Esta acción no se deshace."
+            : flow.copy.cancelDescription
+        }
         cancelLabel="Volver"
         confirmLabel={flow.copy.cancelButton}
         confirmVariant="destructive"
@@ -2566,6 +2592,15 @@ export default function TournamentDetailView({
               </DialogDescription>
             ) : null}
           </DialogHeader>
+          {finishPhase === "confirm" && isLastRankingDate ? (
+            <Alert variant="info" data-testid="finish-last-ranking-date">
+              <Trophy />
+              <AlertDescription>
+                Es la última fecha del ranking. Al finalizarla, el ranking se cierra: queda la tabla
+                final con su campeón y la configuración deja de poder editarse.
+              </AlertDescription>
+            </Alert>
+          ) : null}
           {finishPhase === "confirm" && finishBlockedByRepechage ? (
             <Alert variant="warning" data-testid="finish-repechage-pending">
               <TriangleAlert />
@@ -2585,7 +2620,25 @@ export default function TournamentDetailView({
           ) : null}
           {finishPhase === "done" ? (
             finishOk ? (
-              <p>{finishDetail}</p>
+              <div className="space-y-3">
+                <p>{finishDetail}</p>
+                {rankingClosure ? (
+                  <div
+                    className="flex gap-3 rounded-xl border border-primary/40 bg-primary/10 p-3"
+                    data-testid="finish-ranking-closed"
+                  >
+                    <Trophy className="mt-0.5 size-5 shrink-0 text-primary-strong" />
+                    <div className="min-w-0 space-y-0.5 text-sm">
+                      <p className="font-semibold text-foreground">
+                        Era la última fecha: el ranking «{rankingClosure.name}» quedó cerrado.
+                      </p>
+                      {rankingClosure.champions.length > 0 ? (
+                        <p className="text-foreground">{rankingChampionsLabel(rankingClosure.champions)}</p>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             ) : (
               <ul className="list-disc space-y-1 pl-5">
                 {finishDetail
@@ -2617,6 +2670,15 @@ export default function TournamentDetailView({
                 >
                   Ir al repechaje
                 </Button>
+              ) : null}
+              {finishPhase === "done" && rankingClosure ? (
+                <Link
+                  to={ROUTES.club.rankingDetail(rankingClosure.circuitId)}
+                  className={buttonVariants({ variant: "outline" })}
+                  data-testid="finish-go-to-ranking"
+                >
+                  Ver ranking
+                </Link>
               ) : null}
               <Button
                 type="button"

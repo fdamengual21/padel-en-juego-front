@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import { StatusChip, type StatusTone } from "@/components/StatusChip";
-import StatusBadge from "@/components/tournaments/StatusBadge";
+import TournamentStatusChip from "@/components/tournaments/TournamentStatusChip";
 import type { Tournament } from "@/domain";
 import { formatDateRangeShortEs } from "@/lib/dates";
 import { tournamentStatusView } from "@/modules/tournaments/flows";
@@ -88,9 +88,8 @@ export default function HomeTournamentCard({
           {chip ? <StatusChip tone={chip.tone} label={chip.label} /> : null}
         </div>
         <div className="mt-auto flex min-w-0 items-center gap-2">
-          <StatusBadge
-            status={statusView.status}
-            label={statusView.label}
+          <TournamentStatusChip
+            view={statusView}
             className="min-w-0 w-fit max-w-full shrink"
           />
           <span className="ml-auto shrink-0 text-xs font-bold text-foreground">

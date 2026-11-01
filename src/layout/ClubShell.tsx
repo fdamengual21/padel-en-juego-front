@@ -221,8 +221,8 @@ export default function ClubShell() {
         <div className="flex items-center gap-3 border-b border-sidebar-border px-4 py-5">
           <AppLogo className="size-10" />
           <div className="min-w-0">
-            <p className="text-xs font-medium uppercase tracking-wide text-sidebar-foreground/55">
-              Start Point
+            <p className="text-xs font-bold uppercase tracking-wide text-sidebar-foreground/55">
+              Start <span className="text-sidebar-primary">Point</span>
             </p>
             <h1
               className="mt-0.5 line-clamp-2 text-xl font-semibold leading-snug tracking-tight text-sidebar-foreground"
@@ -267,8 +267,8 @@ export default function ClubShell() {
         <header className="flex items-center gap-3 border-b border-border bg-card px-4 py-3 md:hidden">
           <AppLogo className="size-9" />
           <div className="min-w-0">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Start Point
+            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+              Start <span className="text-primary-strong">Point</span>
             </p>
             <h1 className="truncate text-lg font-semibold tracking-tight">
               {clubName}

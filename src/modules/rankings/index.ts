@@ -9,7 +9,13 @@ export type {
   RankingBannerDraft,
   UpdateClubRankingRequest,
 } from "./types";
-export { nextRankingEvent, rankingScheduleLabel, rankingWeekdayLabel } from "./helpers/rankingLabels";
+export {
+  isLastPendingRankingEvent,
+  nextRankingEvent,
+  rankingChampionsLabel,
+  rankingScheduleLabel,
+  rankingWeekdayLabel,
+} from "./helpers/rankingLabels";
 export { RankingRepository } from "./repositories/RankingRepository";
 export type {
   IRankingRepository,

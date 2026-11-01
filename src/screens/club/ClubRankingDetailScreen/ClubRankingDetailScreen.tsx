@@ -96,7 +96,7 @@ export default function ClubRankingDetailScreen() {
           setSearchParams(next, { replace: true });
         }}
         configTab={
-          canEdit ? (
+          canEdit && circuit.status !== "finished" && circuit.status !== "cancelled" ? (
             <RankingForm
               key={circuit.updatedAt}
               mode="edit"

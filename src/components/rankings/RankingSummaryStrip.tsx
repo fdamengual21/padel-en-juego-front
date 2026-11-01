@@ -8,7 +8,7 @@ import {
   UsersRound,
   type LucideIcon,
 } from "lucide-react";
-import StatusBadge from "@/components/tournaments/StatusBadge";
+import TournamentStatusChip from "@/components/tournaments/TournamentStatusChip";
 import { formatWeekdayShortEs } from "@/lib/dates";
 import { formatArs } from "@/lib/money";
 import { cn } from "@/lib/utils";
@@ -45,9 +45,13 @@ export default function RankingSummaryStrip({ circuit }: RankingSummaryStripProp
       key: "next",
       icon: CalendarClock,
       label: "Próxima fecha",
-      value: next ? `Fecha ${next.weekIndex ?? "—"} · ${formatWeekdayShortEs(next.startDate)}` : "Sin fechas pendientes",
+      value: next
+        ? `Fecha ${next.weekIndex ?? "—"} · ${formatWeekdayShortEs(next.startDate)}`
+        : circuit.status === "finished"
+          ? "Ranking finalizado"
+          : "Sin fechas pendientes",
       detail: nextStatus ? (
-        <StatusBadge status={nextStatus.status} label={nextStatus.label} />
+        <TournamentStatusChip view={nextStatus} />
       ) : null,
     },
     {

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { CircleAlert, Info, Medal } from "lucide-react";
+import { CircleAlert, Info, Medal, Trophy } from "lucide-react";
 import Api from "@/api/Api";
 import Avatar from "@/components/Avatar";
 import { EmptyState } from "@/components/EmptyState";
@@ -8,6 +8,7 @@ import ListPagination from "@/components/ListPagination";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import type { ClubRankingStanding } from "@/modules/rankings";
+import RankingPodiumBanner from "./RankingPodiumBanner";
 import RankingPlayerDialog from "./RankingPlayerDialog";
 
 const PAGE_SIZE = 20;
@@ -26,29 +27,43 @@ interface RankingStandingsTableProps {
   circuitId: string;
   /** `club` usa la sesión del club; `public` la ficha pública. */
   source: RankingStandingsSource;
+  /** Ya se jugaron todas las fechas: se muestra el podio y se destaca al campeón. */
+  finished?: boolean;
 }
 
 /** Tabla del circuito, paginada de a 20. Solo jugadores con puntos de fechas finalizadas. Sin título: la tab ya lo indica. */
-export default function RankingStandingsTable({ circuitId, source }: RankingStandingsTableProps) {
+export default function RankingStandingsTable({ circuitId, source, finished = false }: RankingStandingsTableProps) {
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<ClubRankingStanding | null>(null);
+  const standingsKey = (p: number) => [source === "club" ? "club-ranking" : "public-ranking", circuitId, "standings", p];
+  const fetchPage = (p: number) =>
+    source === "club"
+      ? Api.RankingService().getClubStandings(circuitId, { page: p, pageSize: PAGE_SIZE })
+      : Api.RankingService().getPublicStandings(circuitId, { page: p, pageSize: PAGE_SIZE });
   const query = useQuery({
-    queryKey: [source === "club" ? "club-ranking" : "public-ranking", circuitId, "standings", page],
-    queryFn: () =>
-      source === "club"
-        ? Api.RankingService().getClubStandings(circuitId, { page, pageSize: PAGE_SIZE })
-        : Api.RankingService().getPublicStandings(circuitId, { page, pageSize: PAGE_SIZE }),
+    queryKey: standingsKey(page),
+    queryFn: () => fetchPage(page),
     enabled: Boolean(circuitId),
     placeholderData: keepPreviousData,
   });
   const data = query.data;
+  const podiumQuery = useQuery({
+    queryKey: standingsKey(1),
+    queryFn: () => fetchPage(1),
+    enabled: Boolean(circuitId) && finished,
+  });
+  const podium = finished ? (podiumQuery.data?.items.filter((row) => row.place <= 3) ?? []) : [];
 
   return (
     <div className="space-y-3" data-testid="ranking-standings">
-      <Alert variant="info">
-        <Info />
-        <AlertDescription>El ranking se actualiza solo cuando se finaliza cada fecha.</AlertDescription>
-      </Alert>
+      {podium.length > 0 ? (
+        <RankingPodiumBanner rows={podium} onOpen={setSelected} />
+      ) : !finished ? (
+        <Alert variant="info">
+          <Info />
+          <AlertDescription>El ranking se actualiza solo cuando se finaliza cada fecha.</AlertDescription>
+        </Alert>
+      ) : null}
 
       {query.isLoading ? <p className="text-sm text-muted-foreground">Cargando tabla…</p> : null}
       {query.isError ? (
@@ -92,14 +107,15 @@ export default function RankingStandingsTable({ circuitId, source }: RankingStan
               {data.items.map((row) => {
                 const name = `${row.player.firstName} ${row.player.lastName}`.trim();
                 const dates = `${row.datesPlayed}/${data.totalDates}`;
+                const champion = finished && row.place === 1;
                 return (
                   <li
                     key={row.player.id}
-                    className={cn(ROW_GRID, "px-3 py-2.5 text-sm sm:px-4")}
+                    className={cn(ROW_GRID, "px-3 py-2.5 text-sm sm:px-4", champion && "bg-primary/10")}
                     data-testid={`ranking-row-${row.player.id}`}
                   >
                     <span className="flex justify-center">
-                      <Place place={row.place} />
+                      <Place place={row.place} champion={champion} />
                     </span>
                     <button
                       type="button"
@@ -148,7 +164,17 @@ export default function RankingStandingsTable({ circuitId, source }: RankingStan
   );
 }
 
-function Place({ place }: { place: number }) {
+function Place({ place, champion }: { place: number; champion: boolean }) {
+  if (champion) {
+    return (
+      <span
+        className="inline-flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground"
+        aria-label={`${place}° · Campeón`}
+      >
+        <Trophy className="size-3.5" />
+      </span>
+    );
+  }
   const podium = PODIUM[place];
   if (!podium) return <span className="font-medium tabular-nums text-foreground">{place}</span>;
   return (

@@ -176,10 +176,10 @@ export default function UserShell() {
         <div className="flex items-center gap-3 border-b border-border px-4 py-5">
           <AppLogo className="size-10" />
           <div className="min-w-0">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Start Point
+            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+              Start <span className="text-primary-strong">Point</span>
             </p>
-            <h1 className="mt-0.5 text-xl font-semibold tracking-tight">Jugador</h1>
+            <h1 className="mt-0.5 text-base font-semibold tracking-tight">Jugador</h1>
           </div>
         </div>
         <nav className="space-y-1 p-3">
@@ -235,8 +235,8 @@ export default function UserShell() {
         <header className="flex items-center justify-between gap-3 border-b border-border bg-card px-4 py-3 md:hidden">
           <div className="flex items-center gap-2">
             <AppLogo className="size-7" />
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Start Point
+            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+              Start <span className="text-primary-strong">Point</span>
             </p>
           </div>
           {isAuthenticated ? null : (

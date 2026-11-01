@@ -13,12 +13,21 @@ export type TournamentStatus =
   | "finished"
   | "cancelled";
 
+/** El ranking quedó cerrado porque era su última fecha pendiente. */
+export interface RankingClosure {
+  circuitId: string;
+  name: string;
+  /** Puesto 1 de la tabla final; varios si empataron. */
+  champions: string[];
+}
+
 /** Respuesta al cerrar un torneo. */
 export interface FinishTournamentResult {
   status: string;
   pointsAwarded: boolean;
   reason: "scoring" | "belowMinimum" | "overMaximum" | "notScoring";
   message: string;
+  rankingClosure?: RankingClosure | null;
 }
 
 /** Respuesta de «Comenzar torneo». */
@@ -35,6 +44,7 @@ export interface StartTournamentResult {
 export interface CancelTournamentResult {
   status: string;
   message: string;
+  rankingClosure?: RankingClosure | null;
 }
 
 export type TournamentFormat =

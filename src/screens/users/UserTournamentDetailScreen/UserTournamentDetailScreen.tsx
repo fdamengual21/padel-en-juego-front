@@ -5,11 +5,13 @@ import { CircleAlert, GitBranch, Trophy, Users } from "lucide-react";
 import Api from "@/api/Api";
 import { EmptyState } from "@/components/EmptyState";
 import Avatar from "@/components/Avatar";
+import ShareButton from "@/components/ShareButton";
 import TournamentChampionBanner from "@/components/tournaments/TournamentChampionBanner";
 import TournamentSummaryCard from "@/components/tournaments/TournamentSummaryCard";
 import PairResultChips from "@/components/tournaments/PairResultChips";
 import PlayerRegistrationPanel from "@/components/tournaments/PlayerRegistrationPanel";
 import StatusBadge from "@/components/tournaments/StatusBadge";
+import TournamentStatusChip from "@/components/tournaments/TournamentStatusChip";
 import TournamentRulesDialog from "@/components/tournaments/TournamentRulesDialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -191,7 +193,7 @@ export default function UserTournamentDetailScreen() {
         <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <h2 className="text-2xl font-semibold tracking-tight">{tournament.name}</h2>
-            <StatusBadge status={statusView.status} label={statusView.label} />
+            <TournamentStatusChip view={statusView} />
             {tournament.weekIndex && tournament.rankingWeekCount ? (
               <Badge variant="secondary">
                 Fecha {tournament.weekIndex} de {tournament.rankingWeekCount}
@@ -201,6 +203,13 @@ export default function UserTournamentDetailScreen() {
               format={tournament.format}
               matchRules={page.matchRules}
               categoryName={category.name}
+            />
+            <ShareButton
+              title={tournament.name}
+              path={ROUTES.player.tournamentDetail(tournament.id)}
+              imageUrl={tournament.bannerUrl}
+              copiedLabel="Link del torneo copiado"
+              testId="tournament-share-button"
             />
             {page.categories.length > 1 ? (
               <select

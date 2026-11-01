@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { CalendarDays, Image as ImageIcon, MapPin, Phone, Tag } from "lucide-react";
 import ImageViewerDialog from "@/components/ImageViewerDialog";
+import ShareButton from "@/components/ShareButton";
 import WhatsAppIcon from "@/components/WhatsAppIcon";
 import { Button } from "@/components/ui/button";
 import { formatTournamentDayEs } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 import { whatsappUrl } from "@/lib/whatsapp";
 import { rankingScheduleLabel, type ClubRankingCircuit } from "@/modules/rankings";
+import { ROUTES } from "@/router/routes";
 import RankingPrizesDialog from "./RankingPrizesDialog";
 import RankingRulesDialog from "./RankingRulesDialog";
 
@@ -99,6 +101,14 @@ export default function RankingHero({ circuit }: RankingHeroProps) {
         <div className="flex shrink-0 flex-wrap gap-2">
           <RankingPrizesDialog prizes={circuit.prizes ?? []} triggerClassName={heroButton} />
           <RankingRulesDialog categoryName={circuit.categoryName} triggerClassName={heroButton} />
+          <ShareButton
+            title={circuit.name}
+            path={ROUTES.player.clubRankingDetail(circuit.clubId, circuit.id)}
+            imageUrl={circuit.flyerUrl ?? circuit.clubCoverUrl ?? circuit.clubAvatarUrl}
+            copiedLabel="Link del ranking copiado"
+            className={heroButton}
+            testId="ranking-share-button"
+          />
           {circuit.flyerUrl ? (
             <Button
               type="button"

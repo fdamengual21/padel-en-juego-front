@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import type { Tournament } from "@/domain";
-import StatusBadge from "@/components/tournaments/StatusBadge";
+import TournamentStatusChip from "@/components/tournaments/TournamentStatusChip";
 import { buttonVariants } from "@/components/ui/button";
 import { parseIsoDateOnly } from "@/lib/dates";
 import { cn } from "@/lib/utils";
@@ -37,7 +37,7 @@ export default function TournamentCard({
             )}
           </p>
         </div>
-        <StatusBadge status={tournament.status} />
+        <TournamentStatusChip view={{ status: tournament.status }} />
       </div>
       <p className="text-sm text-muted-foreground">
         {categoryLabel ?? embedded ?? "Sin categoría"}
