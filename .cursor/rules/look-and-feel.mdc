@@ -18,7 +18,7 @@ alwaysApply: false
 - **Canvas light** (`--background` gris muy claro, `--card` blanco): contenido siempre light.
 - **Sidebar club navy** (`--sidebar*`): solo el aside del modo club. No convertir toda la app a dark.
 - Marca = **acento** — no pintar fondos de página enteros de lima.
-- Tipografía: **Geist** (ya en `index.css`). Evitar Inter/Roboto/Arial por defecto. Score más fuerte/condensado que el texto.
+- Tipografía: **Inter** (`@fontsource-variable/inter` en `index.css`). Evitar Roboto/Arial por defecto. Score más fuerte/condensado que el texto.
 
 ## Tokens (`src/index.css` + Tailwind)
 

@@ -101,7 +101,12 @@ export default function CourtListingCard({
           ) : (
             media
           )}
-          {status ? <CourtStatusChip status={status} /> : null}
+          {status ? (
+            <CourtStatusChip
+              status={status}
+              className="pointer-events-none absolute top-3 left-3 z-10"
+            />
+          ) : null}
           <div className="pointer-events-none absolute bottom-3 left-3 z-10 inline-flex items-center rounded-full bg-sidebar/80 px-2.5 py-1 text-xs font-medium text-sidebar-foreground backdrop-blur-sm">
             {name}
           </div>

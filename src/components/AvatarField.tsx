@@ -17,9 +17,13 @@ interface AvatarFieldProps {
   onSave?: (file: File) => void | Promise<unknown>;
   onDelete?: () => void | Promise<unknown>;
   testId?: string;
+  /** `rounded`: cuadrada con esquinas redondeadas (perfil del jugador). */
+  shape?: "circle" | "rounded";
   className?: string;
   avatarClassName?: string;
 }
+
+const shapeClass = { circle: "rounded-full", rounded: "rounded-xl" } as const;
 
 export default function AvatarField({
   name,
@@ -34,6 +38,7 @@ export default function AvatarField({
   onSave,
   onDelete,
   testId,
+  shape = "circle",
   className,
   avatarClassName,
 }: AvatarFieldProps) {
@@ -46,7 +51,8 @@ export default function AvatarField({
       <button
         type="button"
         className={cn(
-          "group relative shrink-0 cursor-pointer rounded-full",
+          "group relative shrink-0 cursor-pointer",
+          shapeClass[shape],
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white",
           className,
         )}
@@ -59,10 +65,10 @@ export default function AvatarField({
           imageUrl={imageUrl}
           size={size}
           alt={alt ?? name}
-          className={cn("pointer-events-none ring-2 ring-white/80", avatarClassName)}
+          className={cn("pointer-events-none ring-2 ring-white/80", shapeClass[shape], avatarClassName)}
         />
         {canMutate ? (
-          <ImageEditOverlay size="sm" persistOnTouch={false} className="rounded-full" />
+          <ImageEditOverlay size="sm" persistOnTouch={false} className={shapeClass[shape]} />
         ) : null}
       </button>
       <ImageViewerDialog

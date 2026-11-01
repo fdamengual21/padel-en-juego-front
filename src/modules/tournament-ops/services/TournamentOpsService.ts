@@ -231,6 +231,28 @@ export class TournamentOpsService {
     return this.repository.getPlayerHome(playerId);
   }
 
+  getPublicPlayerProfile(userId: string) {
+    return this.repository.getPublicPlayerProfile(userId);
+  }
+
+  getPublicPlayerCompetitions(
+    ...args: Parameters<ITournamentOpsRepository["getPublicPlayerCompetitions"]>
+  ) {
+    return this.repository.getPublicPlayerCompetitions(...args);
+  }
+
+  getPublicPlayerPairMatches(
+    ...args: Parameters<ITournamentOpsRepository["getPublicPlayerPairMatches"]>
+  ) {
+    return this.repository.getPublicPlayerPairMatches(...args);
+  }
+
+  getPublicPlayerCircuitDates(
+    ...args: Parameters<ITournamentOpsRepository["getPublicPlayerCircuitDates"]>
+  ) {
+    return this.repository.getPublicPlayerCircuitDates(...args);
+  }
+
   getPlayerHistory(...args: Parameters<ITournamentOpsRepository["getPlayerHistory"]>) {
     return this.repository.getPlayerHistory(...args);
   }

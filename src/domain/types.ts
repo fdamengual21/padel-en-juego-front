@@ -843,6 +843,107 @@ export interface PlayerDashboard {
   recentMatches: PlayerMatchView[];
 }
 
+/** Perfil que ve cualquiera: ficha, temporada y compañero habitual. Sin email, reservas ni próximo partido. */
+export interface PublicPlayerProfile {
+  player: {
+    userId: string;
+    displayName: string;
+    categoryLevel: import("./categories").CategoryLevel | null;
+    avatarUrl: string | null;
+    coverUrl: string | null;
+    sidePreference: import("./playerSidePreference").PlayerSidePreference | null;
+    /** E.164. Solo si el jugador decidió compartirlo. */
+    phone: string | null;
+  };
+  city: string | null;
+  province: string | null;
+  season: PublicPlayerSeason;
+  frequentPartner: PublicPlayerPartner | null;
+}
+
+/** Partidos de torneo terminados en el año calendario. */
+export interface PublicPlayerSeason {
+  year: number;
+  /** Torneos con al menos un partido terminado en el año. */
+  tournamentsPlayed: number;
+  matchesPlayed: number;
+  matchesWon: number;
+  matchesLost: number;
+  /** Los partidos por W.O. no suman sets. */
+  setsWon: number;
+  setsLost: number;
+  matchesPerWeek: number;
+  /** Semanas seguidas con al menos un partido. */
+  weekStreak: number;
+}
+
+export interface PublicPlayerPartner {
+  /** Null si es una ficha del club sin cuenta. */
+  userId: string | null;
+  displayName: string;
+  avatarUrl: string | null;
+  tournamentsTogether: number;
+  matchesPlayed: number;
+  matchesWon: number;
+}
+
+/** Hasta dónde llegó la pareja. `playing`: el torneo sigue y no quedó afuera. */
+export type PublicPlayerTournamentResult =
+  | "champion"
+  | "finalist"
+  | "semi"
+  | "quarter"
+  | "r16"
+  | "r32"
+  | "group"
+  | "playing";
+
+/** Participación en un torneo suelto o en una fecha de circuito. */
+export interface PublicPlayerTournament {
+  tournamentId: string;
+  name: string;
+  status: string;
+  startDate: string;
+  endDate: string;
+  clubName: string;
+  imageUrl: string | null;
+  categoryName: string;
+  pairId: string;
+  partnerName: string | null;
+  partnerUserId: string | null;
+  matchesWon: number;
+  matchesLost: number;
+  result: PublicPlayerTournamentResult;
+  /** Null si el torneo no reparte puntos. */
+  points: number | null;
+  rankingCircuitId: string | null;
+  rankingCircuitName: string | null;
+  weekIndex: number | null;
+  rankingWeekCount: number | null;
+}
+
+/** Circuito terminado, con el puesto final del jugador. */
+export interface PublicPlayerCircuit {
+  circuitId: string;
+  name: string;
+  clubName: string;
+  imageUrl: string | null;
+  categoryName: string;
+  startDate: string;
+  endDate: string;
+  /** Null si no sumó puntos. */
+  place: number | null;
+  rankedPlayers: number;
+  points: number;
+  datesPlayed: number;
+  weekCount: number;
+  prizeLabel: string | null;
+}
+
+export type PublicPlayerCompetition =
+  | { kind: "tournament"; tournament: PublicPlayerTournament }
+  | { kind: "circuit"; circuit: PublicPlayerCircuit };
+
 /** Reserva próxima enriquecida para el inicio del jugador. */
 export interface PlayerUpcomingReservation {
   reservation: CourtReservation;
@@ -1020,6 +1121,8 @@ export interface CategoryCapacity {
 /** Jugador de una inscripción, para el detalle de la tarjeta. */
 export interface RegistrationPlayerDetail {
   id: string;
+  /** Cuenta app. Null si la ficha es solo del club. */
+  userId: string | null;
   displayName: string;
   phone: string | null;
   categoryLevel: import("./categories").CategoryLevel | null;

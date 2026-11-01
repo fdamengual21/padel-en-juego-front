@@ -1,7 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { LoaderCircle } from "lucide-react";
-import Avatar from "@/components/Avatar";
-import PhoneWhatsApp from "@/components/PhoneWhatsApp";
+import RegistrationPlayerCard, {
+  type RegistrationPlayerColumn,
+} from "@/components/tournaments/RegistrationPlayerCard";
+import StatusBadge from "@/components/tournaments/StatusBadge";
 import {
   Dialog,
   DialogContent,
@@ -10,7 +12,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import Api from "@/api/Api";
-import StatusBadge from "@/components/tournaments/StatusBadge";
 import {
   formatCategoryLevel,
   isCategoryLevel,
@@ -40,7 +41,7 @@ export default function PublicParticipantDetailModal({
     ? [row.player1Id, row.player2Id].filter((id): id is string => Boolean(id))
     : [];
   const playersQuery = useQuery({
-    queryKey: ["participant-players", categoryId, playerIds.join(",")],
+    queryKey: ["public-participant-players", categoryId, playerIds.join(",")],
     queryFn: () => Api.TournamentOpsService().getPublicParticipantPlayers(categoryId, playerIds),
     enabled: open && Boolean(categoryId) && playerIds.length > 0,
   });
@@ -78,44 +79,7 @@ export default function PublicParticipantDetailModal({
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">
                 {columnsOf(row, loadedPlayers).map((player) => (
-                  <section
-                    key={player.key}
-                    className="rounded-xl border border-border bg-card p-3"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Avatar
-                        name={player.name}
-                        imageUrl={player.imageUrl}
-                        size="sm"
-                        alt={player.name}
-                      />
-                      <p className="min-w-0 truncate text-sm font-medium">{player.name}</p>
-                    </div>
-                    {player.category !== "—" || player.side !== "—" || player.phone ? (
-                    <dl className="mt-3 space-y-1.5 text-sm">
-                      {player.category !== "—" ? (
-                        <div className="flex items-baseline justify-between gap-3">
-                          <dt className="text-muted-foreground">Categoría</dt>
-                          <dd className="text-right">{player.category}</dd>
-                        </div>
-                      ) : null}
-                      {player.side !== "—" ? (
-                        <div className="flex items-baseline justify-between gap-3">
-                          <dt className="text-muted-foreground">Lado</dt>
-                          <dd className="text-right">{player.side}</dd>
-                        </div>
-                      ) : null}
-                      {player.phone ? (
-                        <div className="flex items-center justify-between gap-3">
-                          <dt className="text-muted-foreground">Teléfono</dt>
-                          <dd className="min-w-0 text-right">
-                            <PhoneWhatsApp phone={player.phone} />
-                          </dd>
-                        </div>
-                      ) : null}
-                    </dl>
-                    ) : null}
-                  </section>
+                  <RegistrationPlayerCard key={player.key} player={player} />
                 ))}
               </div>
             )}
@@ -126,23 +90,18 @@ export default function PublicParticipantDetailModal({
   );
 }
 
-interface Column {
-  key: string;
-  name: string;
-  imageUrl: string | null;
-  category: string;
-  side: string;
-  phone: string | null;
-}
-
-function columnsOf(row: PublicParticipantRow, players: RegistrationPlayerDetail[]): Column[] {
+function columnsOf(
+  row: PublicParticipantRow,
+  players: RegistrationPlayerDetail[],
+): RegistrationPlayerColumn[] {
   const disclosePhone = row.status !== "PENDING";
   const first = players.find((player) => player.id === row.player1Id) ?? players[0];
-  const columns: Column[] = [
+  const columns: RegistrationPlayerColumn[] = [
     {
       key: first?.id ?? `${row.pairId}-1`,
       name: first?.displayName || row.playerNames[0] || "Jugador",
       imageUrl: row.playerAvatars[0],
+      userId: first?.userId ?? null,
       category:
         first && isCategoryLevel(first.categoryLevel)
           ? formatCategoryLevel(first.categoryLevel)
@@ -156,6 +115,7 @@ function columnsOf(row: PublicParticipantRow, players: RegistrationPlayerDetail[
       key: `${row.pairId}-seeking`,
       name: seekingPartnerLabel(row.sidePreference),
       imageUrl: null,
+      userId: null,
       category: "—",
       side: "—",
       phone: null,
@@ -167,6 +127,7 @@ function columnsOf(row: PublicParticipantRow, players: RegistrationPlayerDetail[
     key: second?.id ?? `${row.pairId}-2`,
     name: second?.displayName || row.playerNames[1] || "Jugador",
     imageUrl: row.playerAvatars[1],
+    userId: second?.userId ?? null,
     category:
       second && isCategoryLevel(second.categoryLevel)
         ? formatCategoryLevel(second.categoryLevel)

@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { LoaderCircle } from "lucide-react";
-import Avatar from "@/components/Avatar";
-import PhoneWhatsApp from "@/components/PhoneWhatsApp";
+import RegistrationPlayerCard, {
+  type RegistrationPlayerColumn,
+} from "@/components/tournaments/RegistrationPlayerCard";
 import StatusBadge from "@/components/tournaments/StatusBadge";
 import {
   Dialog,
@@ -92,34 +93,7 @@ export default function RegistrationDetailModal({
               <>
                 <div className="grid gap-3 sm:grid-cols-2">
                   {columnsOf(row, loadedPlayers).map((player) => (
-                    <section
-                      key={player.key}
-                      className="rounded-xl border border-border bg-card p-3"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Avatar
-                          name={player.name}
-                          imageUrl={player.imageUrl}
-                          size="sm"
-                          alt={player.name}
-                        />
-                        <p className="min-w-0 truncate text-sm font-medium">{player.name}</p>
-                      </div>
-                      <dl className="mt-3 space-y-1.5 text-sm">
-                        {player.category !== "—" ? (
-                          <Detail label="Categoría" value={player.category} />
-                        ) : null}
-                        {player.side !== "—" ? <Detail label="Lado" value={player.side} /> : null}
-                        {player.phone ? (
-                          <div className="flex items-center justify-between gap-3">
-                            <dt className="text-muted-foreground">Teléfono</dt>
-                            <dd className="min-w-0 text-right">
-                              <PhoneWhatsApp phone={player.phone} />
-                            </dd>
-                          </div>
-                        ) : null}
-                      </dl>
-                    </section>
+                    <RegistrationPlayerCard key={player.key} player={player} />
                   ))}
                 </div>
 
@@ -179,34 +153,20 @@ function cancelledByLabel(
   return name ? `La canceló ${name}.` : "La canceló un jugador de la pareja.";
 }
 
-function Detail({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="text-right">{value}</dd>
-    </div>
-  );
-}
-
-interface Column {
-  key: string;
-  name: string;
-  imageUrl: string | null;
-  category: string;
-  side: string;
-  phone: string | null;
-}
-
-function columnsOf(row: ParticipantRow, players: RegistrationPlayerDetail[]): Column[] {
+function columnsOf(
+  row: ParticipantRow,
+  players: RegistrationPlayerDetail[],
+): RegistrationPlayerColumn[] {
   const first = players.find((player) => player.id === row.pair.player1Id) ?? players[0];
   const second = row.pair.player2Id
     ? players.find((player) => player.id === row.pair.player2Id)
     : undefined;
-  const columns: Column[] = [
+  const columns: RegistrationPlayerColumn[] = [
     {
       key: first?.id ?? `${row.pair.id}-1`,
       name: first?.displayName || row.playerNames[0] || "Jugador",
       imageUrl: row.playerAvatars?.[0] ?? null,
+      userId: first?.userId ?? null,
       category: categoryLabel(first?.categoryLevel),
       side: playerSidePreferenceLabel(first?.sidePreference) ?? "Sin preferencia",
       phone: first?.phone ?? null,
@@ -218,6 +178,7 @@ function columnsOf(row: ParticipantRow, players: RegistrationPlayerDetail[]): Co
       key: `${row.pair.id}-seeking`,
       name: seekingPartnerLabel(row.pair.sidePreference),
       imageUrl: null,
+      userId: null,
       category: "—",
       side: "—",
       phone: null,
@@ -229,6 +190,7 @@ function columnsOf(row: ParticipantRow, players: RegistrationPlayerDetail[]): Co
     key: second?.id ?? `${row.pair.id}-2`,
     name: second?.displayName || row.playerNames[1] || "Jugador",
     imageUrl: row.playerAvatars?.[1] ?? null,
+    userId: second?.userId ?? null,
     category: categoryLabel(second?.categoryLevel),
     side: playerSidePreferenceLabel(second?.sidePreference) ?? "Sin preferencia",
     phone: second?.phone ?? null,

@@ -1429,9 +1429,9 @@ export default function TournamentDetailView({
               <StatusBadge status={statusView.status} label={statusView.label} />
             )}
             {tournament.weekIndex && tournament.rankingWeekCount ? (
-              <Badge variant="secondary">
+              <span className="text-sm text-muted-foreground">
                 Fecha {tournament.weekIndex} de {tournament.rankingWeekCount}
-              </Badge>
+              </span>
             ) : null}
             <TournamentRulesDialog
               format={tournament.format}

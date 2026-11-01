@@ -6,6 +6,11 @@ import type { PlayerReservation } from "@/modules/reservations";
 import { normalizeMine, normalizeReservation } from "@/modules/reservations/repositories/ReservationRepository";
 import { toPlayerPlayedPage } from "../helpers/toPlayerPlayedPage";
 import { toPlayerMatchView } from "../helpers/toPlayerMatchView";
+import {
+  toPublicPlayerCompetitionPage,
+  toPublicPlayerProfile,
+  toPublicPlayerTournament,
+} from "../helpers/toPublicPlayer";
 import type { PlayerPlayedItem } from "../types/playerPlayedItem";
 import {
   PLAYER_COVER_PATHS,
@@ -52,6 +57,9 @@ import {
   type Player,
   type RegisteredPlayerSearchItem,
   type PlayerDashboard,
+  type PublicPlayerProfile,
+  type PublicPlayerCompetition,
+  type PublicPlayerTournament,
   type PlayerMatchView,
   type TournamentCard,
   type PlayerFeed,
@@ -199,6 +207,13 @@ export interface ITournamentOpsRepository {
   getDashboard(clubId: string): Promise<ClubDashboardView>;
   getRanking(categoryId?: string): Promise<GroupStanding[]>;
   getPlayerHome(playerId: string): Promise<PlayerDashboard>;
+  getPublicPlayerProfile(userId: string): Promise<PublicPlayerProfile>;
+  getPublicPlayerCompetitions(
+    userId: string,
+    query: PageQuery,
+  ): Promise<PaginatedResult<PublicPlayerCompetition>>;
+  getPublicPlayerPairMatches(userId: string, pairId: string): Promise<PlayerMatchView[]>;
+  getPublicPlayerCircuitDates(userId: string, circuitId: string): Promise<PublicPlayerTournament[]>;
   getPlayerHistory(query: PageQuery): Promise<PaginatedResult<TournamentCard>>;
   getPlayerPlayed(query: PageQuery): Promise<PaginatedResult<PlayerPlayedItem>>;
   getPlayerPairMatches(pairId: string): Promise<PlayerMatchView[]>;
@@ -586,6 +601,35 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
         .map((item) => toPlayerMatchView(item))
         .filter((item): item is NonNullable<typeof item> => item !== null),
     };
+  }
+
+  async getPublicPlayerProfile(userId: string) {
+    const raw = await this.read<unknown>(`/public/players/${userId}`);
+    return toPublicPlayerProfile(raw);
+  }
+
+  async getPublicPlayerCompetitions(userId: string, query: PageQuery) {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 10;
+    const response = await this.http.get<ApiEnvelope<unknown>>(
+      `/public/players/${userId}/competitions`,
+      { params: { page, pageSize } },
+    );
+    return toPublicPlayerCompetitionPage(readData(response), { page, pageSize });
+  }
+
+  async getPublicPlayerPairMatches(userId: string, pairId: string) {
+    const raw = await this.read<unknown[]>(`/public/players/${userId}/pairs/${pairId}/matches`);
+    return raw
+      .map((item) => toPlayerMatchView(item))
+      .filter((item): item is NonNullable<typeof item> => item !== null);
+  }
+
+  async getPublicPlayerCircuitDates(userId: string, circuitId: string) {
+    const raw = await this.read<unknown[]>(`/public/players/${userId}/circuits/${circuitId}/dates`);
+    return raw
+      .map((item) => toPublicPlayerTournament(item))
+      .filter((item): item is PublicPlayerTournament => item !== null);
   }
 
   async getPlayerHistory(query: PageQuery) {

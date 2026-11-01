@@ -1,51 +1,28 @@
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { StatusChip, type StatusTone } from "@/components/StatusChip";
 
-const labels: Record<string, string> = {
-  scheduled: "Programado",
-  live: "En curso",
-  inProgress: "En vivo",
-  finished: "Finalizado",
-  walkover: "Walkover",
-  cancelled: "Cancelado",
-  booked: "Reservada",
-  completed: "Completada",
-  draft: "Borrador",
-  upcoming: "Próximamente",
-  registrationOpen: "Inscripciones abiertas",
-  draftTournament: "Borrador",
-  DISQUALIFIED: "Desclasificado",
-  CONFIRMED: "Aceptado",
-  ACCEPTED: "Aceptado",
-  REJECTED: "Rechazado",
-  PENDING: "Pendiente",
-  WAITLIST: "Lista de espera",
-  CANCELLED: "Cancelado",
-  active: "Activo",
-  withdrawn: "Retirado",
-  disqualified: "Desclasificado",
-};
-
-const successTone = "border-transparent! bg-success-muted! text-success-foreground";
-const warningTone = "border-transparent! bg-warning-muted! text-warning-foreground";
-const dangerTone = "border-transparent! bg-destructive-muted! text-destructive";
-const mutedTone = "border-transparent! bg-muted! text-muted-foreground";
-
-const upcomingTone = "border-transparent! bg-primary/20! text-foreground";
-
-const tones: Record<string, string> = {
-  upcoming: upcomingTone,
-  ACCEPTED: successTone,
-  CONFIRMED: successTone,
-  live: successTone,
-  PENDING: warningTone,
-  WAITLIST: mutedTone,
-  REJECTED: dangerTone,
-  DISQUALIFIED: dangerTone,
-  disqualified: dangerTone,
-  CANCELLED: mutedTone,
-  cancelled: mutedTone,
-  withdrawn: mutedTone,
+const chips: Record<string, { label: string; tone: StatusTone }> = {
+  scheduled: { label: "Programado", tone: "scheduled" },
+  live: { label: "En curso", tone: "active" },
+  inProgress: { label: "En vivo", tone: "live" },
+  finished: { label: "Finalizado", tone: "done" },
+  walkover: { label: "Walkover", tone: "done" },
+  cancelled: { label: "Cancelado", tone: "neutral" },
+  booked: { label: "Reservada", tone: "success" },
+  completed: { label: "Completada", tone: "done" },
+  draft: { label: "Borrador", tone: "neutral" },
+  upcoming: { label: "Próximamente", tone: "upcoming" },
+  registrationOpen: { label: "Inscripciones abiertas", tone: "open" },
+  draftTournament: { label: "Borrador", tone: "neutral" },
+  DISQUALIFIED: { label: "Desclasificado", tone: "danger" },
+  CONFIRMED: { label: "Aceptado", tone: "success" },
+  ACCEPTED: { label: "Aceptado", tone: "success" },
+  REJECTED: { label: "Rechazado", tone: "danger" },
+  PENDING: { label: "Pendiente", tone: "warning" },
+  WAITLIST: { label: "Lista de espera", tone: "neutral" },
+  CANCELLED: { label: "Cancelado", tone: "neutral" },
+  active: { label: "Activo", tone: "success" },
+  withdrawn: { label: "Retirado", tone: "neutral" },
+  disqualified: { label: "Desclasificado", tone: "danger" },
 };
 
 interface StatusBadgeProps {
@@ -56,23 +33,12 @@ interface StatusBadgeProps {
 }
 
 export default function StatusBadge({ status, label, className }: StatusBadgeProps) {
-  const isLive = status === "inProgress";
-  const isOpen = status === "registrationOpen";
-
+  const chip = chips[status];
   return (
-    <Badge
-      variant={isLive ? "destructive" : isOpen ? "default" : "secondary"}
-      className={cn(
-        "font-medium",
-        isOpen && "bg-primary text-primary-foreground",
-        tones[status],
-        className,
-      )}
-    >
-      {isLive ? (
-        <span className="size-1.5 shrink-0 animate-pulse rounded-full bg-current" aria-hidden />
-      ) : null}
-      {label ?? labels[status] ?? status}
-    </Badge>
+    <StatusChip
+      tone={chip?.tone ?? "neutral"}
+      label={label ?? chip?.label ?? status}
+      className={className}
+    />
   );
 }

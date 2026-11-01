@@ -14,6 +14,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useMockSession } from "@/app/MockSessionProvider";
+import AppLogo from "@/components/AppLogo";
 import AccountDrawerMenu, {
   AccountActionSections,
   type AccountDrawerAction,
@@ -95,7 +96,10 @@ export default function UserShell() {
   );
   const bottomCount = browseItems.length + 1;
   const colsClass = gridColsClass[bottomCount] ?? "grid-cols-5";
-  const moreActive = moreOpen || pathname === ROUTES.player.profile;
+  const moreActive =
+    moreOpen ||
+    pathname === ROUTES.player.profile ||
+    pathname.startsWith(`${ROUTES.player.profile}/`);
   const displayName = player?.displayName ?? "Jugador";
 
   const goToClub = () => {
@@ -169,11 +173,14 @@ export default function UserShell() {
         data-testid="player-sidebar"
         className="sticky top-0 hidden h-svh w-56 shrink-0 flex-col border-r border-border bg-card text-foreground md:flex"
       >
-        <div className="border-b border-border px-4 py-5">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Start Point
-          </p>
-          <h1 className="mt-1 text-xl font-semibold tracking-tight">Jugador</h1>
+        <div className="flex items-center gap-3 border-b border-border px-4 py-5">
+          <AppLogo className="size-10" />
+          <div className="min-w-0">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Start Point
+            </p>
+            <h1 className="mt-0.5 text-xl font-semibold tracking-tight">Jugador</h1>
+          </div>
         </div>
         <nav className="space-y-1 p-3">
           {browseItems.map(({ to, label, icon: Icon, end }) => (
@@ -226,9 +233,12 @@ export default function UserShell() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-between gap-3 border-b border-border bg-card px-4 py-3 md:hidden">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Start Point
-          </p>
+          <div className="flex items-center gap-2">
+            <AppLogo className="size-7" />
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Start Point
+            </p>
+          </div>
           {isAuthenticated ? null : (
             <Link
               to={ROUTES.auth.login}

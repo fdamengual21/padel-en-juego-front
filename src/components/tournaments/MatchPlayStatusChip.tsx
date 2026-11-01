@@ -1,4 +1,4 @@
-import { Badge } from "@/components/ui/badge";
+import { StatusChip, type StatusTone } from "@/components/StatusChip";
 import {
   Tooltip,
   TooltipContent,
@@ -9,7 +9,6 @@ import {
   matchPlayStatusLabel,
   type MatchPlayStatus,
 } from "@/lib/matchPlayStatus";
-import { cn } from "@/lib/utils";
 
 interface MatchPlayStatusChipProps {
   status: MatchPlayStatus;
@@ -18,14 +17,11 @@ interface MatchPlayStatusChipProps {
   className?: string;
 }
 
-const variantByStatus: Record<
-  MatchPlayStatus,
-  "outline" | "default" | "secondary"
-> = {
-  pending: "outline",
-  started: "default",
-  finished: "secondary",
-  qualified: "secondary",
+const toneByStatus: Record<MatchPlayStatus, StatusTone> = {
+  pending: "scheduled",
+  started: "live",
+  finished: "done",
+  qualified: "success",
 };
 
 export default function MatchPlayStatusChip({
@@ -34,19 +30,12 @@ export default function MatchPlayStatusChip({
   className,
 }: MatchPlayStatusChipProps) {
   const badge = (
-    <Badge
-      variant={variantByStatus[status]}
-      className={cn(
-        "font-semibold",
-        status === "started" && "bg-amber-500 text-white border-transparent",
-        status === "finished" && "bg-emerald-100 text-emerald-900 border-transparent",
-        status === "qualified" && "bg-primary/25 text-primary-strong border-transparent",
-        className,
-      )}
+    <StatusChip
+      tone={toneByStatus[status]}
+      label={matchPlayStatusLabel(status)}
+      className={className}
       data-testid={`match-play-status-${status}`}
-    >
-      {matchPlayStatusLabel(status)}
-    </Badge>
+    />
   );
   if (!hint) return badge;
   return (

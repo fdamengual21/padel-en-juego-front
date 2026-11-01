@@ -44,6 +44,8 @@ import UserTournamentDetailScreen from "@/screens/users/UserTournamentDetailScre
 import UserRankingScreen from "@/screens/users/UserRankingScreen";
 import UserHistoryScreen from "@/screens/users/UserHistoryScreen";
 import UserProfileScreen from "@/screens/users/UserProfileScreen";
+import UserAccountScreen from "@/screens/users/UserAccountScreen";
+import PublicPlayerProfileScreen from "@/screens/users/PublicPlayerProfileScreen";
 import RequireFeature from "@/router/guards/RequireFeature";
 import RedirectIfAuthenticated from "@/router/guards/RedirectIfAuthenticated";
 import RequireAuth from "@/router/guards/RequireAuth";
@@ -145,6 +147,8 @@ const router = createBrowserRouter(
           element={<RequireFeature feature="profile" redirectTo={ROUTES.home} />}
         >
           <Route path="perfil" element={<UserProfileScreen />} />
+          <Route path="perfil/cuenta" element={<UserAccountScreen />} />
+          <Route path="jugadores/:userId" element={<PublicPlayerProfileScreen />} />
         </Route>
       </Route>
 

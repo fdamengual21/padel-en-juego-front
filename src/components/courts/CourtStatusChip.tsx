@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { StatusChip, type StatusTone } from "@/components/StatusChip";
 
 export interface CourtStatusChipStatus {
   label: string;
@@ -7,31 +7,18 @@ export interface CourtStatusChipStatus {
 
 interface CourtStatusChipProps {
   status: CourtStatusChipStatus;
+  className?: string;
 }
 
-export default function CourtStatusChip({ status }: CourtStatusChipProps) {
+const toneByCourtTone: Record<CourtStatusChipStatus["tone"], StatusTone> = {
+  available: "open",
+  occupied: "warning",
+  closed: "neutral",
+  neutral: "neutral",
+};
+
+export default function CourtStatusChip({ status, className }: CourtStatusChipProps) {
   return (
-    <span
-      className={cn(
-        "pointer-events-none absolute top-3 left-3 z-10 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium backdrop-blur-sm",
-        status.tone === "available" && "border-primary/40 bg-card/90 text-foreground",
-        status.tone === "occupied" && "border-warning/50 bg-card/90 text-foreground",
-        status.tone === "closed" && "border-border bg-card/90 text-muted-foreground",
-        status.tone === "neutral" && "border-border bg-card/90 text-muted-foreground",
-      )}
-    >
-      {status.tone !== "neutral" ? (
-        <span
-          className={cn(
-            "size-1.5 rounded-full",
-            status.tone === "available" && "bg-primary",
-            status.tone === "occupied" && "bg-warning",
-            status.tone === "closed" && "bg-muted-foreground",
-          )}
-          aria-hidden
-        />
-      ) : null}
-      {status.label}
-    </span>
+    <StatusChip tone={toneByCourtTone[status.tone]} label={status.label} className={className} />
   );
 }

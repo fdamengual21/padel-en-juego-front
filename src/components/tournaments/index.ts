@@ -11,6 +11,10 @@ export { default as PlayerMatchResultDialog } from "./PlayerMatchResultDialog";
 export { default as MatchPlayStatusChip } from "./MatchPlayStatusChip";
 export { default as MatchLiveButton } from "./MatchLiveButton";
 export { default as StatusBadge } from "./StatusBadge";
+export {
+  default as RegistrationPlayerCard,
+  type RegistrationPlayerColumn,
+} from "./RegistrationPlayerCard";
 export { default as Score } from "./Score";
 export { default as TournamentDetailView } from "./TournamentDetailView";
 export { default as ParticipantPairLine } from "./ParticipantPairLine";

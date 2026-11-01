@@ -23,6 +23,8 @@ export const ROUTES = {
     ranking: "/ranking",
     history: "/historial",
     profile: "/perfil",
+    account: "/perfil/cuenta",
+    playerProfile: (userId: string) => `/jugadores/${userId}`,
     clubs: "/clubes",
     clubDetail: (id: string) => `/clubes/${id}`,
     clubAvailability: (id: string) => `/clubes/${id}/disponibilidad`,

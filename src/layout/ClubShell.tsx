@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useMockSession } from "@/app/MockSessionProvider";
 import { usePermissions } from "@/authorization";
+import AppLogo from "@/components/AppLogo";
 import {
   PERMISSION_CLUB_COURTS_READ,
   PERMISSION_CLUB_CLIENTS_READ,
@@ -217,16 +218,19 @@ export default function ClubShell() {
         data-testid="club-sidebar"
         className="sticky top-0 hidden h-svh w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:flex"
       >
-        <div className="border-b border-sidebar-border px-4 py-5">
-          <p className="text-xs font-medium uppercase tracking-wide text-sidebar-foreground/55">
-            Start Point
-          </p>
-          <h1
-            className="mt-1 line-clamp-2 text-xl font-semibold leading-snug tracking-tight text-sidebar-foreground"
-            title={clubName}
-          >
-            {clubName}
-          </h1>
+        <div className="flex items-center gap-3 border-b border-sidebar-border px-4 py-5">
+          <AppLogo className="size-10" />
+          <div className="min-w-0">
+            <p className="text-xs font-medium uppercase tracking-wide text-sidebar-foreground/55">
+              Start Point
+            </p>
+            <h1
+              className="mt-0.5 line-clamp-2 text-xl font-semibold leading-snug tracking-tight text-sidebar-foreground"
+              title={clubName}
+            >
+              {clubName}
+            </h1>
+          </div>
         </div>
         <nav className="space-y-1 p-3">
           {visibleItems.map(({ to, label, icon: Icon, end }) => (
@@ -260,13 +264,16 @@ export default function ClubShell() {
         </div>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="border-b border-border bg-card px-4 py-3 md:hidden">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Start Point
-          </p>
-          <h1 className="truncate text-lg font-semibold tracking-tight">
-            {clubName}
-          </h1>
+        <header className="flex items-center gap-3 border-b border-border bg-card px-4 py-3 md:hidden">
+          <AppLogo className="size-9" />
+          <div className="min-w-0">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Start Point
+            </p>
+            <h1 className="truncate text-lg font-semibold tracking-tight">
+              {clubName}
+            </h1>
+          </div>
         </header>
         <main className="flex-1 overflow-auto p-4 pb-20 md:p-6 md:pb-6">
           <Outlet />

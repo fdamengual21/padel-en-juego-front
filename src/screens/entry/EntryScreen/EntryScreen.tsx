@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useMockSession } from "@/app/MockSessionProvider";
 import { useUser } from "@/app/UserProvider";
+import AppLogo from "@/components/AppLogo";
 import Avatar from "@/components/Avatar";
 import { buttonVariants } from "@/components/ui/button";
 import { clubRoleLabel, findUserClub } from "@/modules/auth/clubContext";
@@ -51,6 +52,7 @@ export default function EntryScreen() {
     <div className="flex min-h-svh items-center justify-center bg-background p-6">
       <div className="w-full max-w-lg space-y-8 text-center">
         <div>
+          <AppLogo className="mx-auto mb-4 block size-20" />
           <p className="mb-2 text-sm text-muted-foreground">Start Point</p>
           <h1 className="text-4xl font-semibold tracking-tight">
             {isAuthenticated ? "¿Cómo querés entrar?" : "Torneos de pádel"}

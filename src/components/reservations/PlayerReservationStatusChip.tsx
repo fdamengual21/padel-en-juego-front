@@ -1,6 +1,5 @@
 import { Check, X } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { StatusChip, type StatusTone } from "@/components/StatusChip";
 import type { PlayerReservationStatus } from "@/modules/reservations";
 
 interface PlayerReservationStatusChipProps {
@@ -10,23 +9,11 @@ interface PlayerReservationStatusChipProps {
   className?: string;
 }
 
-const chips: Record<PlayerReservationStatus, { label: string; className: string }> = {
-  pending: {
-    label: "Pendiente",
-    className: "border-transparent! bg-warning-muted! text-warning-foreground",
-  },
-  booked: {
-    label: "Confirmado",
-    className: "border-transparent! bg-success-muted! text-success-foreground",
-  },
-  rejected: {
-    label: "Rechazada",
-    className: "border-transparent! bg-destructive-muted! text-destructive",
-  },
-  completed: {
-    label: "Jugado",
-    className: "border-transparent! bg-muted! text-muted-foreground",
-  },
+const chips: Record<PlayerReservationStatus, { label: string; tone: StatusTone }> = {
+  pending: { label: "Pendiente", tone: "warning" },
+  booked: { label: "Confirmado", tone: "success" },
+  rejected: { label: "Rechazada", tone: "danger" },
+  completed: { label: "Jugado", tone: "done" },
 };
 
 export default function PlayerReservationStatusChip({
@@ -36,15 +23,20 @@ export default function PlayerReservationStatusChip({
   className,
 }: PlayerReservationStatusChipProps) {
   const chip = chips[status];
+  const icon = !withIcon
+    ? null
+    : status === "booked" && !isFixed
+      ? Check
+      : status === "rejected"
+        ? X
+        : undefined;
   return (
-    <Badge
-      variant="secondary"
-      className={cn("h-auto max-w-full gap-1 px-1.5 py-0.5 text-xs font-medium", chip.className, className)}
+    <StatusChip
+      tone={chip.tone}
+      label={isFixed ? "Fijo" : chip.label}
+      icon={icon}
+      className={className}
       data-testid="player-reservation-status"
-    >
-      {withIcon && status === "booked" && !isFixed ? <Check aria-hidden /> : null}
-      {withIcon && status === "rejected" ? <X aria-hidden /> : null}
-      <span className="truncate">{isFixed ? "Fijo" : chip.label}</span>
-    </Badge>
+    />
   );
 }

@@ -7,6 +7,8 @@ import { EmptyState } from "@/components/EmptyState";
 import ListPagination from "@/components/ListPagination";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
+import type { ClubRankingStanding } from "@/modules/rankings";
+import RankingPlayerDialog from "./RankingPlayerDialog";
 
 const PAGE_SIZE = 20;
 
@@ -29,6 +31,7 @@ interface RankingStandingsTableProps {
 /** Tabla del circuito, paginada de a 20. Solo jugadores con puntos de fechas finalizadas. Sin título: la tab ya lo indica. */
 export default function RankingStandingsTable({ circuitId, source }: RankingStandingsTableProps) {
   const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState<ClubRankingStanding | null>(null);
   const query = useQuery({
     queryKey: [source === "club" ? "club-ranking" : "public-ranking", circuitId, "standings", page],
     queryFn: () =>
@@ -98,13 +101,18 @@ export default function RankingStandingsTable({ circuitId, source }: RankingStan
                     <span className="flex justify-center">
                       <Place place={row.place} />
                     </span>
-                    <span className="flex min-w-0 items-center gap-2.5">
+                    <button
+                      type="button"
+                      className="-mx-1.5 -my-1 flex min-w-0 cursor-pointer items-center gap-2.5 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                      onClick={() => setSelected(row)}
+                      data-testid={`ranking-player-${row.player.id}`}
+                    >
                       <Avatar name={name} imageUrl={row.player.avatarUrl} size="xs" />
                       <span className="min-w-0">
                         <span className="block truncate font-medium text-foreground">{name}</span>
                         <span className="block text-xs text-muted-foreground sm:hidden">{dates} fechas</span>
                       </span>
-                    </span>
+                    </button>
                     <span className="hidden text-center tabular-nums text-muted-foreground sm:block">
                       {dates}
                     </span>
@@ -127,6 +135,15 @@ export default function RankingStandingsTable({ circuitId, source }: RankingStan
           />
         </>
       ) : null}
+
+      <RankingPlayerDialog
+        row={selected}
+        totalDates={data?.totalDates ?? 0}
+        source={source}
+        onOpenChange={(open) => {
+          if (!open) setSelected(null);
+        }}
+      />
     </div>
   );
 }

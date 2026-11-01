@@ -20,7 +20,7 @@ import { ROUTES } from "@/router/routes";
 import { cn } from "@/lib/utils";
 import HomeTournamentCard from "@/components/tournaments/HomeTournamentCard";
 import PlayerReservationCard from "../UserHomeScreen/components/PlayerReservationCard";
-import PlayerReservationDetailModal from "../UserHomeScreen/components/PlayerReservationDetailModal";
+import PlayerReservationDetailModal from "@/screens/users/components/PlayerReservationDetailModal";
 import HistoryPagination from "./components/HistoryPagination";
 
 const PAGE_SIZE = 10;

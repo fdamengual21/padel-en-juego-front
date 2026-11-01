@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { useState } from "react";
+import { StatusChip, type StatusTone } from "@/components/StatusChip";
 import StatusBadge from "@/components/tournaments/StatusBadge";
-import { Badge } from "@/components/ui/badge";
 import type { Tournament } from "@/domain";
 import { formatDateRangeShortEs } from "@/lib/dates";
 import { tournamentStatusView } from "@/modules/tournaments/flows";
@@ -33,19 +33,10 @@ interface HomeTournamentCardProps {
   to: string;
 }
 
-const inscriptionChip: Record<string, { label: string; className: string }> = {
-  ACCEPTED: {
-    label: "Inscripto",
-    className: "border-transparent! bg-success-muted! text-success-foreground",
-  },
-  PENDING: {
-    label: "Pendiente",
-    className: "border-transparent! bg-warning-muted! text-warning-foreground",
-  },
-  WAITLIST: {
-    label: "Lista de espera",
-    className: "border-transparent! bg-muted! text-muted-foreground",
-  },
+const inscriptionChip: Record<string, { label: string; tone: StatusTone }> = {
+  ACCEPTED: { label: "Inscripto", tone: "success" },
+  PENDING: { label: "Pendiente", tone: "warning" },
+  WAITLIST: { label: "Lista de espera", tone: "neutral" },
 };
 
 export default function HomeTournamentCard({
@@ -58,7 +49,11 @@ export default function HomeTournamentCard({
     : (tournament.bannerUrl ?? tournament.clubCoverUrl ?? tournament.clubAvatarUrl);
   const category =
     tournament.categories?.map((item) => item.name).filter(Boolean).join(" · ") || "Sin categoría";
-  const meta = tournament.clubName ? `${tournament.clubName} · ${category}` : category;
+  const week =
+    tournament.weekIndex && tournament.rankingWeekCount
+      ? `Fecha ${tournament.weekIndex} de ${tournament.rankingWeekCount}`
+      : null;
+  const meta = [tournament.clubName, category, week].filter(Boolean).join(" · ");
   const chip = tournament.myRegistrationStatus
     ? inscriptionChip[tournament.myRegistrationStatus]
     : undefined;
@@ -90,19 +85,7 @@ export default function HomeTournamentCard({
         </p>
         <div className="flex min-w-0 items-center gap-2">
           <p className="min-w-0 truncate text-sm text-muted-foreground">{meta}</p>
-          {tournament.weekIndex && tournament.rankingWeekCount ? (
-            <Badge variant="secondary" className="h-auto shrink-0 px-1.5 py-0.5 text-xs font-medium">
-              Fecha {tournament.weekIndex} de {tournament.rankingWeekCount}
-            </Badge>
-          ) : null}
-          {chip ? (
-            <Badge
-              variant="secondary"
-              className={`h-auto shrink-0 px-1.5 py-0.5 text-xs font-medium ${chip.className}`}
-            >
-              {chip.label}
-            </Badge>
-          ) : null}
+          {chip ? <StatusChip tone={chip.tone} label={chip.label} /> : null}
         </div>
         <div className="mt-auto flex min-w-0 items-center gap-2">
           <StatusBadge

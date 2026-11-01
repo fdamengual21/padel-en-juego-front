@@ -4,6 +4,7 @@ import { FormProvider, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
 import Api from "@/api/Api";
+import AppLogo from "@/components/AppLogo";
 import TurnstileField from "@/components/auth/TurnstileField";
 import { InputField } from "@/components/Form";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -76,6 +77,7 @@ export default function ForgotPasswordScreen() {
       <div className="w-full max-w-md space-y-6">
         <ExploreWithoutAccountLink />
         <div className="text-center">
+          <AppLogo className="mx-auto mb-3 block size-14" />
           <p className="text-sm text-muted-foreground">Start Point</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">
             Recuperar contraseña

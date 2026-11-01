@@ -15,9 +15,16 @@ export interface ClubRankingStanding {
   datesPlayed: number;
   player: {
     id: string;
+    /** Cuenta del jugador. Null si es una ficha del club sin cuenta. */
+    userId?: string | null;
+    /** Con cuenta, el nombre del perfil; si no, el de la ficha. */
     firstName: string;
     lastName: string;
     avatarUrl?: string | null;
+    categoryLevel?: number | null;
+    sidePreference?: string | null;
+    /** El club lo ve siempre; en público solo si el jugador lo publicó. */
+    phone?: string | null;
   };
 }
 

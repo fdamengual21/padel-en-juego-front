@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as yup from "yup";
 import {
   CATEGORY_LEVELS,
@@ -110,6 +110,7 @@ interface ApiPlayerAccountFormProps {
 
 export default function ApiPlayerAccountForm({ user }: ApiPlayerAccountFormProps) {
   const setUserProfile = useAuthStore((state) => state.setUserProfile);
+  const queryClient = useQueryClient();
   const hasPlayer = Boolean(user.playerId);
   const {
     control,
@@ -173,6 +174,7 @@ export default function ApiPlayerAccountForm({ user }: ApiPlayerAccountFormProps
     },
     onSuccess: (updated) => {
       setUserProfile(updated);
+      void queryClient.invalidateQueries({ queryKey: ["public-player-profile", user.id] });
       toastSuccess("Perfil actualizado");
     },
     onError: (err: Error) => {

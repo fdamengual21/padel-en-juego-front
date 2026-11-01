@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import Api from "@/api/Api";
+import AppLogo from "@/components/AppLogo";
 import LegalMarkdown from "@/components/legal/LegalMarkdown";
 import { formatPublishedDateEs } from "@/lib/dates";
 import type { LegalDocumentType } from "@/modules/legal";
@@ -27,7 +28,10 @@ export default function LegalPublicView({ documentType }: LegalPublicViewProps) 
   return (
     <div className="min-h-svh bg-background">
       <div className="mx-auto w-full max-w-2xl space-y-6 px-6 py-10">
-        <p className="text-sm text-muted-foreground">Start Point</p>
+        <div className="flex items-center gap-2">
+          <AppLogo className="size-8" />
+          <p className="text-sm text-muted-foreground">Start Point</p>
+        </div>
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Cargando documento…</p>
         ) : null}

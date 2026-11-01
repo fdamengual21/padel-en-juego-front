@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import StatusBadge from "@/components/tournaments/StatusBadge";
-import { Badge } from "@/components/ui/badge";
 import { formatDateRangeShortEs } from "@/lib/dates";
 import type { ClubRankingCircuit } from "@/modules/rankings";
 
@@ -21,10 +20,13 @@ export default function RankingCircuitCard({
   const photo = failed
     ? null
     : (circuit.flyerUrl ?? circuit.clubCoverUrl ?? circuit.clubAvatarUrl);
-  const meta =
-    showClub && circuit.clubName
-      ? `${circuit.clubName} · ${circuit.categoryName}`
-      : circuit.categoryName;
+  const meta = [
+    showClub ? circuit.clubName : null,
+    circuit.categoryName,
+    `${circuit.weekCount} fechas`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <Link
@@ -48,12 +50,7 @@ export default function RankingCircuitCard({
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <p className="min-w-0 truncate text-sm font-semibold tracking-tight">{circuit.name}</p>
-        <div className="flex min-w-0 items-center gap-2">
-          <p className="min-w-0 truncate text-sm text-muted-foreground">{meta}</p>
-          <Badge variant="secondary" className="h-auto shrink-0 px-1.5 py-0.5 text-xs font-medium">
-            {circuit.weekCount} fechas
-          </Badge>
-        </div>
+        <p className="min-w-0 truncate text-sm text-muted-foreground">{meta}</p>
         <div className="mt-auto flex min-w-0 items-center gap-2">
           <StatusBadge status={circuit.status} className="min-w-0 w-fit max-w-full shrink" />
           <span className="ml-auto shrink-0 text-xs font-bold text-foreground">
