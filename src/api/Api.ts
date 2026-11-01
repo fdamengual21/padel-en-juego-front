@@ -8,6 +8,7 @@ import { ReservationRepository, ReservationService } from '@/modules/reservation
 import { GeographyRepository, GeographyService } from '@/modules/geography'
 import { LegalRepository, LegalService } from '@/modules/legal'
 import { SexRepository, SexService } from '@/modules/sexes'
+import { RankingRepository, RankingService } from '@/modules/rankings'
 import { TournamentRepository, TournamentService } from '@/modules/tournaments'
 import { TournamentOpsRepository, TournamentOpsService } from '@/modules/tournament-ops'
 import { UserRepository, UserService } from '@/modules/users'
@@ -18,6 +19,7 @@ let clientService: ClientService | null = null
 let clubUserService: ClubUserService | null = null
 let reservationService: ReservationService | null = null
 let tournamentService: TournamentService | null = null
+let rankingService: RankingService | null = null
 let tournamentOpsService: TournamentOpsService | null = null
 let authService: AuthService | null = null
 let geographyService: GeographyService | null = null
@@ -55,6 +57,12 @@ const Api = {
       tournamentService = new TournamentService(new TournamentRepository(axiosInstance))
     }
     return tournamentService
+  },
+  RankingService() {
+    if (!rankingService) {
+      rankingService = new RankingService(new RankingRepository(axiosInstance))
+    }
+    return rankingService
   },
   TournamentOpsService() {
     if (!tournamentOpsService) {

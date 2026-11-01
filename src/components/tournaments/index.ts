@@ -1,5 +1,6 @@
 export { default as ScoringTournamentInfoDialog } from "./ScoringTournamentInfoDialog";
 export { default as TournamentCard } from "./TournamentCard";
+export { default as HomeTournamentCard } from "./HomeTournamentCard";
 export { default as BracketView } from "./BracketView";
 export { default as RoundMatchesTable } from "./RoundMatchesTable";
 export { default as PairVsBlock } from "./PairVsBlock";
@@ -13,4 +14,5 @@ export { default as StatusBadge } from "./StatusBadge";
 export { default as Score } from "./Score";
 export { default as TournamentDetailView } from "./TournamentDetailView";
 export { default as ParticipantPairLine } from "./ParticipantPairLine";
+export { default as PairResultChips, awardRoundLabel } from "./PairResultChips";
 export { default as TournamentSummaryCard } from "./TournamentSummaryCard";

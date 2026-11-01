@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { Ban, GitBranch, LoaderCircle, Trash2, TriangleAlert, Trophy, Users } from "lucide-react";
+import { Ban, GitBranch, Info, LoaderCircle, Trash2, TriangleAlert, Trophy, Users } from "lucide-react";
 import { PERMISSION_CLUB_TOURNAMENTS_WRITE } from "@/authorization";
+import { useMockSession } from "@/app/MockSessionProvider";
 import { PermissionsGuard } from "@/components/guards";
+import { cn } from "@/lib/utils";
 import {
   OCCUPYING_REGISTRATION_STATUSES,
   canOpenMatchResult,
@@ -19,6 +21,7 @@ import {
   removeAcceptedPairBlockedReason,
   resolveTournamentChampionPairId,
   startTournamentDescription,
+  type CreateRepechageInput,
   type Match,
   type MatchPhase,
   type MatchResultInput,
@@ -28,7 +31,10 @@ import {
 import Api from "@/api/Api";
 import { EmptyState } from "@/components/EmptyState";
 import TournamentChampionBanner from "@/components/tournaments/TournamentChampionBanner";
-import TournamentSummaryCard from "@/components/tournaments/TournamentSummaryCard";
+import TournamentSummaryCard, {
+  type TournamentSummaryStat,
+} from "@/components/tournaments/TournamentSummaryCard";
+import PairResultChips from "@/components/tournaments/PairResultChips";
 import RegistrationDetailModal from "@/components/tournaments/RegistrationDetailModal";
 import StatusBadge from "@/components/tournaments/StatusBadge";
 import TournamentRulesDialog from "@/components/tournaments/TournamentRulesDialog";
@@ -74,7 +80,11 @@ import {
   type TournamentBannerDraft,
   type TournamentFormValues,
 } from "@/modules/tournaments/types";
-import { ROUTES } from "@/router/routes";
+import {
+  rankingEventCalendar,
+  resolveTournamentFlow,
+  tournamentStatusView,
+} from "@/modules/tournaments/flows";
 import { formatTournamentDayEs } from "@/lib/dates";
 import { resolveMatchPlayStatus } from "@/lib/matchPlayStatus";
 import { seekingPartnerLabel } from "@/lib/tournamentLabels";
@@ -134,14 +144,16 @@ function AutoAssignButton({
   blockedReason,
   pending,
   onOpen,
+  className,
 }: {
   blockedReason: string | null;
   pending: boolean;
   onOpen: () => void;
+  className?: string;
 }) {
   const disabled = pending || Boolean(blockedReason);
   const button = (
-    <Button type="button" size="sm" disabled={disabled} onClick={onOpen}>
+    <Button type="button" size="sm" disabled={disabled} onClick={onOpen} className={className}>
       {pending ? "Asignando…" : "Autoasignar horarios y canchas"}
     </Button>
   );
@@ -149,7 +161,7 @@ function AutoAssignButton({
   return (
     <TooltipProvider delay={200}>
       <Tooltip>
-        <TooltipTrigger render={<span className="inline-flex" />}>
+        <TooltipTrigger render={<span className={cn("inline-flex", className)} />}>
           {button}
         </TooltipTrigger>
         <TooltipContent>{blockedReason}</TooltipContent>
@@ -172,6 +184,10 @@ export default function TournamentDetailView({
     values: TournamentFormValues;
     banner: TournamentBannerDraft;
     overflow: boolean;
+    /** Avisos del flujo (fecha de ranking: día, ventana de inscripción, cupo). */
+    notices: string[];
+    /** Hay aceptadas: al guardar se rearma el cuadro. */
+    rebuild: boolean;
   } | null>(null);
   const [dqRegistrationId, setDqRegistrationId] = useState<string | null>(null);
   const [dqNote, setDqNote] = useState("");
@@ -193,6 +209,7 @@ export default function TournamentDetailView({
   const [finishDetail, setFinishDetail] = useState("");
   const [activeTab, setActiveTab] = useState("grupos");
   const [repechagePairsOpen, setRepechagePairsOpen] = useState(false);
+  const [repechageModalMode, setRepechageModalMode] = useState<"create" | "edit">("edit");
   const [repechageCreatedLocal, setRepechageCreatedLocal] = useState(false);
   const [clientDetailId, setClientDetailId] = useState<string | null>(null);
   const [detailRow, setDetailRow] = useState<
@@ -205,6 +222,16 @@ export default function TournamentDetailView({
     queryKey: ["tournament", tournamentId],
     queryFn: () => Api.TournamentService().getById(tournamentId),
   });
+  const flow = resolveTournamentFlow(tournament);
+  const { clubId } = useMockSession();
+  const rankingCircuitId = tournament?.rankingCircuitId ?? "";
+  const { data: rankingCircuit } = useQuery({
+    queryKey: ["club-ranking", clubId, rankingCircuitId],
+    queryFn: () => Api.RankingService().getClub(rankingCircuitId),
+    enabled: Boolean(clubId && rankingCircuitId),
+  });
+  const invalidateFlowQueries = () =>
+    Promise.all(flow.relatedQueries.map((queryKey) => qc.invalidateQueries({ queryKey })));
   const { data: clubCourts = [] } = useQuery({
     queryKey: ["courts", "tournament-form"],
     queryFn: () => Api.CourtService().list(),
@@ -282,6 +309,14 @@ export default function TournamentDetailView({
         activeTab === "config" ||
         requestedPairId != null),
   });
+  const { data: categoryResults } = useQuery({
+    queryKey: ["category-results", categoryId],
+    queryFn: () => Api.TournamentOpsService().getCategoryResults(categoryId),
+    enabled:
+      Boolean(categoryId) &&
+      activeTab === "participantes" &&
+      tournament?.status === "finished",
+  });
 
   const toastedAutoMatchKeys = useRef(new Set<string>());
 
@@ -351,7 +386,10 @@ export default function TournamentDetailView({
   } = useQuery({
     queryKey: ["repechage-board", categoryId],
     queryFn: () => Api.TournamentOpsService().getRepechageBoard(categoryId),
-    enabled: Boolean(categoryId) && activeTab === "repechaje",
+    enabled:
+      Boolean(categoryId) &&
+      (activeTab === "repechaje" ||
+        (finishOpen && Boolean(category?.repechageCreated || repechageCreatedLocal))),
   });
   const {
     data: repechageCandidates = [],
@@ -368,6 +406,7 @@ export default function TournamentDetailView({
       qc.invalidateQueries({ queryKey: ["matches", categoryId] }),
       qc.invalidateQueries({ queryKey: ["zones-board", categoryId] }),
       qc.invalidateQueries({ queryKey: ["participants-board", categoryId] }),
+      qc.invalidateQueries({ queryKey: ["category-results", categoryId] }),
       qc.invalidateQueries({ queryKey: ["cuadro", categoryId] }),
       qc.invalidateQueries({ queryKey: ["config-board", categoryId] }),
       qc.invalidateQueries({ queryKey: ["repechage-board", categoryId] }),
@@ -689,18 +728,19 @@ export default function TournamentDetailView({
     mutationFn: () => Api.TournamentOpsService().cancelTournament(tournamentId),
     onSuccess: async (result) => {
       setConfirmCancelOpen(false);
-      toastSuccess("Torneo cancelado", result.message);
+      toastSuccess(flow.copy.cancelSuccess, result.message);
       await Promise.all([
         invalidateOps(),
         qc.invalidateQueries({ queryKey: ["tournaments"] }),
         qc.invalidateQueries({ queryKey: ["player-history"] }),
         qc.invalidateQueries({ queryKey: ["player-played"] }),
+        invalidateFlowQueries(),
       ]);
     },
     onError: (err: Error) => {
       const logic = err instanceof ApiHttpError && err.status === 422;
       toastError(
-        logic ? "No se puede cancelar" : "No se pudo cancelar el torneo",
+        logic ? "No se puede cancelar" : flow.copy.cancelError,
         logic ? err.message : undefined,
       );
     },
@@ -742,8 +782,10 @@ export default function TournamentDetailView({
   });
 
   const createRepechageMutation = useMutation({
-    mutationFn: () => Api.TournamentOpsService().createRepechage(categoryId),
+    mutationFn: (input: CreateRepechageInput) =>
+      Api.TournamentOpsService().createRepechage(categoryId, input),
     onSuccess: async (result) => {
+      setRepechagePairsOpen(false);
       setRepechageCreatedLocal(true);
       setActiveTab("repechaje");
       toastSuccess("Repechaje creado", result.message);
@@ -885,6 +927,7 @@ export default function TournamentDetailView({
       setPendingConfigSave(null);
       await invalidateOps();
       void qc.invalidateQueries({ queryKey: ["tournaments"] });
+      void invalidateFlowQueries();
     },
     onError: (err: Error) => {
       toastError("No se pudo guardar la configuración", err.message);
@@ -983,6 +1026,17 @@ export default function TournamentDetailView({
     }
     return ids.size;
   }, [repechageBoard]);
+
+  const repechagePendingCount = useMemo(
+    () =>
+      (repechageBoard?.allMatches ?? []).filter(
+        (match) =>
+          (match.status === "scheduled" || match.status === "inProgress") &&
+          Boolean(match.pairAId) &&
+          Boolean(match.pairBId),
+      ).length,
+    [repechageBoard],
+  );
 
   const overflowSubstituteLabels = useMemo(() => {
     if (!pendingConfigSave?.overflow) return [];
@@ -1165,11 +1219,13 @@ export default function TournamentDetailView({
   const showCreateRepechageButton =
     !tournamentLocked &&
     tournamentStarted &&
-    (ruleset?.preset === "QUALITY" || ruleset?.preset === "CUSTOM") &&
+    isQualityPreset(ruleset?.preset) &&
     !repechageCreated;
+  const finishBlockedByRepechage = repechageCreated && repechagePendingCount > 0;
   const canStartTournament =
     tournament.status === "draft" || tournament.status === "registrationOpen";
   const canCancelTournament = !tournamentLocked;
+  const canFinishTournament = tournament.status === "inProgress";
   const resultMatch = resultMatchId
     ? (matches.find((m) => m.id === resultMatchId) ??
       zonesBoard?.allMatches.find((m) => m.id === resultMatchId) ??
@@ -1259,28 +1315,82 @@ export default function TournamentDetailView({
       match.status === "inProgress",
   );
   const dqWouldLeaveFive = Boolean(dqRegistrationId) && liveAcceptedCount - 1 === 5;
-  const visibleParticipantRows = participantsBoard?.rows ?? [];
-  const isOutOfDraw = (row: ParticipantsBoardView["rows"][number]) =>
+  const resultItems = categoryResults?.finished ? categoryResults.items : [];
+  const resultByPair = new Map(resultItems.map((item) => [item.pairId, item]));
+  const resultRank = new Map(resultItems.map((item, index) => [item.pairId, index]));
+  const visibleParticipantRows = [...(participantsBoard?.rows ?? [])].sort(
+    (a, b) =>
+      (resultRank.get(a.pair.id) ?? Number.MAX_SAFE_INTEGER) -
+      (resultRank.get(b.pair.id) ?? Number.MAX_SAFE_INTEGER),
+  );
+  type ParticipantRow = ParticipantsBoardView["rows"][number];
+  const isOutOfDraw = (row: ParticipantRow) =>
     row.outOfDrawReason != null && row.registration?.cancelledBy !== "club";
-  const participantGroups = [
-    {
-      key: "active",
-      title: null as string | null,
-      rows: visibleParticipantRows.filter(
-        (row) => row.registration?.cancelledBy !== "club" && !isOutOfDraw(row),
-      ),
-    },
-    {
-      key: "out-of-draw",
-      title: "Aceptadas fuera del cuadro",
-      rows: visibleParticipantRows.filter(isOutOfDraw),
-    },
-    {
-      key: "removed",
-      title: "Eliminadas por el club",
-      rows: visibleParticipantRows.filter((row) => row.registration?.cancelledBy === "club"),
-    },
-  ].filter((group) => group.rows.length > 0);
+  const showFinalSections = tournament.status === "finished" && resultItems.length > 0;
+  const isRemovedOrDisqualified = (row: ParticipantRow) =>
+    row.registration?.cancelledBy === "club" || row.disqualified;
+  const finalSectionNote = (row: ParticipantRow): string | null => {
+    if (row.disqualified) return "Desclasificada";
+    if (row.registration?.cancelledBy === "club") return "Eliminada por el club";
+    if (resultByPair.has(row.pair.id)) return null;
+    if (row.incomplete) return "Sin pareja";
+    if (isOutOfDraw(row)) return "Fuera del cuadro";
+    switch (row.registration?.status) {
+      case "PENDING":
+        return "Pendiente";
+      case "WAITLIST":
+        return "Lista de espera";
+      case "REJECTED":
+        return "Rechazada";
+      case "CANCELLED":
+        return "Cancelada por la pareja";
+      default:
+        return null;
+    }
+  };
+  const participantGroups = (
+    showFinalSections
+      ? [
+        {
+          key: "played",
+          title: "Jugaron" as string | null,
+          rows: visibleParticipantRows.filter(
+            (row) => !isRemovedOrDisqualified(row) && resultByPair.has(row.pair.id),
+          ),
+        },
+        {
+          key: "not-played",
+          title: "No llegaron a jugar",
+          rows: visibleParticipantRows.filter(
+            (row) => !isRemovedOrDisqualified(row) && !resultByPair.has(row.pair.id),
+          ),
+        },
+        {
+          key: "removed",
+          title: "Eliminadas y desclasificadas",
+          rows: visibleParticipantRows.filter(isRemovedOrDisqualified),
+        },
+      ]
+      : [
+        {
+          key: "active",
+          title: null as string | null,
+          rows: visibleParticipantRows.filter(
+            (row) => row.registration?.cancelledBy !== "club" && !isOutOfDraw(row),
+          ),
+        },
+        {
+          key: "out-of-draw",
+          title: "Aceptadas fuera del cuadro",
+          rows: visibleParticipantRows.filter(isOutOfDraw),
+        },
+        {
+          key: "removed",
+          title: "Eliminadas por el club",
+          rows: visibleParticipantRows.filter((row) => row.registration?.cancelledBy === "club"),
+        },
+      ]
+  ).filter((group) => group.rows.length > 0);
   // Resumen para la card: aceptadas que no entraron al cuadro, separando completas y solos.
   const outOfDrawSummary = (() => {
     if (!tournamentStarted) return null;
@@ -1298,6 +1408,7 @@ export default function TournamentDetailView({
       capacity.acceptedPairs + capacity.acceptedSoloPlayers - capacity.inDraw;
     return outside > 0 ? `${outside} ${outside === 1 ? "aceptada" : "aceptadas"} fuera del cuadro` : null;
   })();
+  const statusView = tournamentStatusView(tournament);
 
   return (
     <div
@@ -1306,44 +1417,42 @@ export default function TournamentDetailView({
     >
       <div>
         <Link
-          to={ROUTES.club.tournaments}
+          to={flow.backTo}
           className="text-sm text-sidebar hover:underline"
         >
-          ← Volver a torneos
+          {flow.copy.backLabel}
         </Link>
         <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <h2 className="text-2xl font-semibold tracking-tight">{tournament.name}</h2>
             {tournamentLocked ? null : (
-              <StatusBadge status={tournament.status} />
+              <StatusBadge status={statusView.status} label={statusView.label} />
             )}
+            {tournament.weekIndex && tournament.rankingWeekCount ? (
+              <Badge variant="secondary">
+                Fecha {tournament.weekIndex} de {tournament.rankingWeekCount}
+              </Badge>
+            ) : null}
             <TournamentRulesDialog
               format={tournament.format}
               matchRules={matchRules}
               categoryName={category?.name}
             />
+            {statusView.hint && !tournamentLocked && !tournament.rankingCircuitId ? (
+              <span className="text-sm text-muted-foreground">{statusView.hint}</span>
+            ) : null}
           </div>
           {tournamentLocked ? (
             <StatusBadge
-              status={tournament.status}
-              className="h-8 px-3 text-sm"
+              status={statusView.status}
+              label={statusView.label}
+              className="ml-auto h-8 px-3 text-sm"
             />
           ) : (
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              {canCancelTournament ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={cancelMutation.isPending}
-                  onClick={() => setConfirmCancelOpen(true)}
-                  data-testid="cancel-tournament-button"
-                >
-                  Cancelar torneo
-                </Button>
-              ) : null}
+            <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
               {isQualityPreset(ruleset?.preset) ? null : (
                 <AutoAssignButton
+                  className="w-full sm:w-auto"
                   blockedReason={
                     zonesBoard
                       ? zonesBoard.autoAssign.blockedReason
@@ -1359,33 +1468,47 @@ export default function TournamentDetailView({
                   onOpen={() => setAssignOpen(true)}
                 />
               )}
-              {canStartTournament ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={startMutation.isPending || cancelMutation.isPending}
-                  onClick={() => setConfirmStartOpen(true)}
-                  data-testid="start-tournament-button"
-                >
-                  Comenzar torneo
-                </Button>
-              ) : null}
-              {canCancelTournament ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="destructive"
-                  disabled={finishMutation.isPending || cancelMutation.isPending}
-                  onClick={() => {
-                    setFinishPhase("confirm");
-                    setFinishOk(false);
-                    setFinishDetail("");
-                    setFinishOpen(true);
-                  }}
-                >
-                  Finalizar torneo
-                </Button>
-              ) : null}
+              <div className="grid w-full auto-cols-fr grid-flow-col gap-2 sm:flex sm:w-auto sm:items-center">
+                {canCancelTournament ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={cancelMutation.isPending}
+                    onClick={() => setConfirmCancelOpen(true)}
+                    data-testid="cancel-tournament-button"
+                  >
+                    {flow.copy.cancelButton}
+                  </Button>
+                ) : null}
+                {canStartTournament ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={startMutation.isPending || cancelMutation.isPending}
+                    onClick={() => setConfirmStartOpen(true)}
+                    data-testid="start-tournament-button"
+                  >
+                    Comenzar torneo
+                  </Button>
+                ) : null}
+                {canFinishTournament ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="destructive"
+                    disabled={finishMutation.isPending || cancelMutation.isPending}
+                    onClick={() => {
+                      setFinishPhase("confirm");
+                      setFinishOk(false);
+                      setFinishDetail("");
+                      setFinishOpen(true);
+                    }}
+                  >
+                    Finalizar torneo
+                  </Button>
+                ) : null}
+              </div>
             </div>
           )}
         </div>
@@ -1405,6 +1528,14 @@ export default function TournamentDetailView({
         description={tournament.description}
         contactPhone={tournament.clubPhone}
         stats={[
+          {
+            kind: "dates",
+            label: "Fechas",
+            value:
+              tournament.endDate && tournament.endDate !== tournament.startDate
+                ? `${formatTournamentDayEs(tournament.startDate)} → ${formatTournamentDayEs(tournament.endDate)}`
+                : formatTournamentDayEs(tournament.startDate),
+          },
           { kind: "category", label: "Categoría", value: category?.name ?? "Sin categoría" },
           tournamentStarted
             ? {
@@ -1429,11 +1560,31 @@ export default function TournamentDetailView({
                 ? `$ ${tournament.registrationFee.toLocaleString("es-AR")}`
                 : "Sin cargo",
           },
-          {
-            kind: "circuit",
-            label: "Circuito",
-            value: category?.circuitType === "CICUPA" ? "CICUPA" : "Sin circuito",
-          },
+          ...(tournament.rankingCircuitId
+            ? [
+              {
+                kind: "ranking",
+                label: "Ranking",
+                value:
+                  rankingCircuit?.name ??
+                  (tournament.weekIndex && tournament.rankingWeekCount
+                    ? `Fecha ${tournament.weekIndex} de ${tournament.rankingWeekCount}`
+                    : "Ranking del club"),
+              } satisfies TournamentSummaryStat,
+              {
+                kind: "registrationOpens",
+                label: "Apertura de inscripción",
+                value: formatTournamentDayEs(rankingEventCalendar(tournament).opens),
+                detail: statusView.status === "scheduled" ? statusView.hint : null,
+              } satisfies TournamentSummaryStat,
+            ]
+            : [
+              {
+                kind: "circuit",
+                label: "Circuito",
+                value: category?.circuitType === "CICUPA" ? "CICUPA" : "Sin circuito",
+              } satisfies TournamentSummaryStat,
+            ]),
           {
             kind: "zones",
             label: "Zonas",
@@ -1447,14 +1598,6 @@ export default function TournamentDetailView({
             kind: "matches",
             label: "Partidos",
             value: `${liveCount} en juego · ${finishedCount} finalizados`,
-          },
-          {
-            kind: "dates",
-            label: "Fechas",
-            value:
-              tournament.endDate && tournament.endDate !== tournament.startDate
-                ? `${formatTournamentDayEs(tournament.startDate)} → ${formatTournamentDayEs(tournament.endDate)}`
-                : formatTournamentDayEs(tournament.startDate),
           },
         ]}
       />
@@ -1494,7 +1637,10 @@ export default function TournamentDetailView({
                   variant="outline"
                   data-testid="create-repechage-button"
                   disabled={createRepechageMutation.isPending}
-                  onClick={() => createRepechageMutation.mutate()}
+                  onClick={() => {
+                    setRepechageModalMode("create");
+                    setRepechagePairsOpen(true);
+                  }}
                 >
                   {createRepechageMutation.isPending ? "Creando…" : "Crear repechaje"}
                 </Button>
@@ -1591,6 +1737,7 @@ export default function TournamentDetailView({
                         clientId: row.playerClientIds?.[1] ?? null,
                       });
                     }
+                    const finalNote = showFinalSections ? finalSectionNote(row) : null;
 
                     return (
                       <li
@@ -1599,8 +1746,8 @@ export default function TournamentDetailView({
                         className="flex cursor-pointer flex-col gap-2 px-4 py-3 text-sm transition-colors hover:bg-muted/40 sm:flex-row sm:items-center sm:justify-between"
                         onClick={() => setDetailRow(row)}
                       >
-                        <div className="min-w-0 space-y-2">
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                        <div className="min-w-0 flex-1 space-y-2">
+                          <div className="flex min-w-0 items-center gap-3">
                             {playerRows.map((player, index) => {
                               const clickable = Boolean(player.clientId);
                               const inner = (
@@ -1620,7 +1767,7 @@ export default function TournamentDetailView({
                                 <button
                                   key={`${pair.id}-p${index}`}
                                   type="button"
-                                  className="flex min-w-0 items-center gap-2 rounded-md text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                                  className="flex min-w-0 flex-1 items-center gap-2 rounded-md text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 sm:flex-none"
                                   onClick={(event) => {
                                     event.stopPropagation();
                                     setClientDetailId(player.clientId);
@@ -1631,47 +1778,61 @@ export default function TournamentDetailView({
                               ) : (
                                 <div
                                   key={`${pair.id}-p${index}`}
-                                  className="flex items-center gap-2 min-w-0"
+                                  className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none"
                                 >
                                   {inner}
                                 </div>
                               );
                             })}
-                            {reg ? <StatusBadge status={reg.status} /> : null}
-                            {row.disqualified ? (
-                              <StatusBadge status="disqualified" />
-                            ) : null}
-                            {row.incomplete ? (
-                              <span className="rounded-md border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                                Incompleta
-                              </span>
-                            ) : null}
-                            {isOutOfDraw(row) ? (
-                              <TooltipProvider delay={200}>
-                                <Tooltip>
-                                  <TooltipTrigger render={<span className="inline-flex" />}>
-                                    <span
-                                      className="rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-900"
-                                      data-testid={`out-of-draw-${pair.id}`}
-                                    >
-                                      Fuera del cuadro
-                                    </span>
-                                  </TooltipTrigger>
-                                  <TooltipContent className="max-w-xs">
-                                    {row.outOfDrawReason}
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            ) : null}
                           </div>
-                          <p className="text-xs text-muted-foreground">
-                            {reg?.registeredAt
-                              ? formatRegisteredAtEs(reg.registeredAt)
-                              : "Sin fecha de inscripción"}
-                            {pair.user1Id || pair.user2Id
-                              ? " · equipo vinculado a usuario(s) del torneo"
-                              : " · sin usuarios vinculados"}
-                          </p>
+                          {showFinalSections ? null : (
+                            <div className="flex flex-wrap items-center gap-2">
+                              {reg ? <StatusBadge status={reg.status} /> : null}
+                              {row.disqualified ? (
+                                <StatusBadge status="disqualified" />
+                              ) : null}
+                              {row.incomplete ? (
+                                <span className="rounded-md border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                  Incompleta
+                                </span>
+                              ) : null}
+                              {isOutOfDraw(row) ? (
+                                <TooltipProvider delay={200}>
+                                  <Tooltip>
+                                    <TooltipTrigger render={<span className="inline-flex" />}>
+                                      <span
+                                        className="rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-900"
+                                        data-testid={`out-of-draw-${pair.id}`}
+                                      >
+                                        Fuera del cuadro
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-xs">
+                                      {row.outOfDrawReason}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              ) : null}
+                            </div>
+                          )}
+                          <PairResultChips
+                            result={resultByPair.get(pair.id)}
+                            scoring={categoryResults?.scoring ?? false}
+                          />
+                          {showFinalSections ? (
+                            finalNote ? (
+                              <p className="text-xs text-muted-foreground">{finalNote}</p>
+                            ) : null
+                          ) : (
+                            <p className="text-xs text-muted-foreground">
+                              {reg?.registeredAt
+                                ? formatRegisteredAtEs(reg.registeredAt)
+                                : "Sin fecha de inscripción"}
+                              {pair.user1Id || pair.user2Id
+                                ? " · equipo vinculado a usuario(s) del torneo"
+                                : " · sin usuarios vinculados"}
+                            </p>
+                          )}
                           {reg?.statusNote ? (
                             <p className="text-xs text-destructive/90">
                               Nota: {reg.statusNote}
@@ -1916,7 +2077,10 @@ export default function TournamentDetailView({
                   type="button"
                   size="sm"
                   data-testid="add-repechage-pairs-button"
-                  onClick={() => setRepechagePairsOpen(true)}
+                  onClick={() => {
+                    setRepechageModalMode("edit");
+                    setRepechagePairsOpen(true);
+                  }}
                 >
                   Editar parejas
                 </Button>
@@ -1986,13 +2150,15 @@ export default function TournamentDetailView({
                   await qualifyPairMutation.mutateAsync(input);
                 }}
               />
-              <CuadroBoard
-                board={repechageBoard}
-                isLoading={repechageFetching}
-                onOpenResult={openResult}
-                onOpenPair={openPairDetail}
-                tournamentLocked={tournamentLocked}
-              />
+              {repechageBoard.elimMatches.length > 0 ? (
+                <CuadroBoard
+                  board={repechageBoard}
+                  isLoading={repechageFetching}
+                  onOpenResult={openResult}
+                  onOpenPair={openPairDetail}
+                  tournamentLocked={tournamentLocked}
+                />
+              ) : null}
             </>
           ) : repechageFetching ? (
             <p className="text-sm text-muted-foreground">Cargando repechaje…</p>
@@ -2022,8 +2188,15 @@ export default function TournamentDetailView({
           ) : configBoard?.notice ? (
             <p className="text-sm text-muted-foreground">{configBoard.notice}</p>
           ) : null}
+          {flow.copy.configNotice && !tournamentLocked ? (
+            <Alert variant="info" data-testid="ranking-event-config-notice">
+              <Info />
+              <AlertDescription>{flow.copy.configNotice}</AlertDescription>
+            </Alert>
+          ) : null}
           {configBoard ? (
             <TournamentForm
+              policy={flow.form}
               key={`${configBoard.generatedAt}-${configBoard.ruleset?.id ?? "rules"}`}
               courts={clubCourts
                 .filter((court) => court.status === "active")
@@ -2060,11 +2233,14 @@ export default function TournamentDetailView({
                 const acceptedSpots =
                   capacity.acceptedPairs +
                   Math.ceil(capacity.acceptedSoloPlayers / 2);
-                if (acceptedSpots > 0) {
+                const notices = flow.saveWarnings(values, formInitial);
+                if (acceptedSpots > 0 || notices.length > 0) {
                   setPendingConfigSave({
                     values,
                     banner,
                     overflow: values.maxPairs < acceptedSpots,
+                    notices,
+                    rebuild: acceptedSpots > 0,
                   });
                   return;
                 }
@@ -2098,12 +2274,17 @@ export default function TournamentDetailView({
       >
         {pendingConfigSave ? (
           <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
-            {configSaveWarningItems(
-              pendingConfigSave.values.maxPairs,
-              capacity.acceptedPairs +
-                Math.ceil(capacity.acceptedSoloPlayers / 2),
-              pendingConfigSave.overflow,
-            ).map((item, index, list) => (
+            {[
+              ...pendingConfigSave.notices,
+              ...(pendingConfigSave.rebuild
+                ? configSaveWarningItems(
+                  pendingConfigSave.values.maxPairs,
+                  capacity.acceptedPairs +
+                    Math.ceil(capacity.acceptedSoloPlayers / 2),
+                  pendingConfigSave.overflow,
+                )
+                : []),
+            ].map((item, index, list) => (
               <li key={item}>
                 {item}
                 {pendingConfigSave.overflow &&
@@ -2321,10 +2502,10 @@ export default function TournamentDetailView({
           if (cancelMutation.isPending) return;
           setConfirmCancelOpen(open);
         }}
-        title="Cancelar torneo"
-        description="El torneo queda cancelado. No se asignan puntos ni cuenta en el historial de los jugadores. Esta acción no se deshace."
+        title={flow.copy.cancelTitle}
+        description={flow.copy.cancelDescription}
         cancelLabel="Volver"
-        confirmLabel="Cancelar torneo"
+        confirmLabel={flow.copy.cancelButton}
         confirmVariant="destructive"
         isConfirming={cancelMutation.isPending}
         onConfirm={() => {
@@ -2380,10 +2561,22 @@ export default function TournamentDetailView({
             {finishPhase === "confirm" ? (
               <DialogDescription>
                 Al finalizar, el torneo queda cerrado. Resultados, cuadro, inscripciones
-                y horarios dejan de poder editarse.
+                y horarios dejan de poder editarse
+                {repechageCreated ? ", también los del repechaje" : ""}.
               </DialogDescription>
             ) : null}
           </DialogHeader>
+          {finishPhase === "confirm" && finishBlockedByRepechage ? (
+            <Alert variant="warning" data-testid="finish-repechage-pending">
+              <TriangleAlert />
+              <AlertDescription>
+                {repechagePendingCount === 1
+                  ? "Falta cargar 1 resultado del repechaje."
+                  : `Faltan cargar ${repechagePendingCount} resultados del repechaje.`}{" "}
+                No se puede finalizar hasta completarlos.
+              </AlertDescription>
+            </Alert>
+          ) : null}
           {finishPhase === "pending" ? (
             <div className="flex items-center gap-3 py-2 text-sm">
               <LoaderCircle className="size-5 animate-spin" />
@@ -2412,9 +2605,23 @@ export default function TournamentDetailView({
                   Cancelar
                 </Button>
               ) : null}
+              {finishPhase === "confirm" && finishBlockedByRepechage ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  data-testid="finish-go-to-repechage"
+                  onClick={() => {
+                    setFinishOpen(false);
+                    setActiveTab("repechaje");
+                  }}
+                >
+                  Ir al repechaje
+                </Button>
+              ) : null}
               <Button
                 type="button"
                 variant={finishPhase === "confirm" ? "destructive" : "default"}
+                disabled={finishPhase === "confirm" && finishBlockedByRepechage}
                 onClick={() => {
                   if (finishPhase === "confirm") {
                     setFinishPhase("pending");
@@ -2561,12 +2768,20 @@ export default function TournamentDetailView({
 
       <RepechagePairsModal
         open={repechagePairsOpen}
+        mode={repechageModalMode}
         candidates={repechageCandidates}
         isLoading={repechageCandidatesFetching && repechageCandidates.length === 0}
-        isSubmitting={saveRepechageEntriesMutation.isPending}
+        isSubmitting={
+          repechageModalMode === "create"
+            ? createRepechageMutation.isPending
+            : saveRepechageEntriesMutation.isPending
+        }
         onOpenChange={setRepechagePairsOpen}
-        onSubmit={(input) => {
+        onSave={(input) => {
           saveRepechageEntriesMutation.mutate(input);
+        }}
+        onCreate={(input) => {
+          createRepechageMutation.mutate(input);
         }}
       />
 

@@ -10,7 +10,7 @@ import { useDebounce } from "@/hooks/useDebounce";
 import type { TournamentCard } from "@/domain";
 import { ROUTES } from "@/router/routes";
 import { useAuthStore } from "@/stores/authStore";
-import HomeTournamentCard from "../components/HomeTournamentCard";
+import HomeTournamentCard from "@/components/tournaments/HomeTournamentCard";
 import TournamentsPagination from "./components/TournamentsPagination";
 
 const PAGE_SIZE = 12;

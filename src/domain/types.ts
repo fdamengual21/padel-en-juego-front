@@ -313,6 +313,16 @@ export interface Tournament {
   clubCoverUrl?: string | null;
   /** Flyer publico del torneo. Null si el club no cargo uno. */
   bannerUrl?: string | null;
+  /** Circuito Quality. Null si es un torneo suelto. */
+  rankingCircuitId?: string | null;
+  /** Número de fecha dentro del circuito. */
+  weekIndex?: number | null;
+  /** Cantidad de fechas del circuito. */
+  rankingWeekCount?: number | null;
+  /** Día en que abre la inscripción pública (T−2). */
+  registrationOpensAt?: string | null;
+  /** Fecha de circuito: día en que aparece en el catálogo (T−7). Solo en la vista del club. */
+  visibleFrom?: string | null;
   /** Inscripcion del jugador logueado en alguna categoria del torneo. */
   myRegistrationStatus?: "PENDING" | "ACCEPTED" | "WAITLIST" | null;
   /** Categorias, cuando el listado publico las trae. */
@@ -811,6 +821,10 @@ export interface TournamentCard {
   /** Pareja del jugador. Null en el catálogo público. */
   pairId: string | null;
   categories: Array<{ id: string; name: string }>;
+  rankingCircuitId?: string | null;
+  weekIndex?: number | null;
+  rankingWeekCount?: number | null;
+  registrationOpensAt?: string | null;
 }
 
 export interface PlayerDashboard {
@@ -931,6 +945,12 @@ export interface RepechageCandidate {
 export interface RepechageEntriesInput {
   addPairIds: string[];
   removePairIds: string[];
+}
+
+/** Alta del repechaje: punto de oro o ventaja y parejas iniciales (pueden ir vacías). */
+export interface CreateRepechageInput {
+  goldenPoint: boolean;
+  pairIds: string[];
 }
 
 /** Tab Zonas: tablas + agenda + standings listos para UI. */

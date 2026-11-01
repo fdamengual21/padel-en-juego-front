@@ -18,7 +18,7 @@ import type { PlayerMatchView } from "@/domain";
 import type { PlayerReservation } from "@/modules/reservations";
 import { ROUTES } from "@/router/routes";
 import { cn } from "@/lib/utils";
-import HomeTournamentCard from "../components/HomeTournamentCard";
+import HomeTournamentCard from "@/components/tournaments/HomeTournamentCard";
 import PlayerReservationCard from "../UserHomeScreen/components/PlayerReservationCard";
 import PlayerReservationDetailModal from "../UserHomeScreen/components/PlayerReservationDetailModal";
 import HistoryPagination from "./components/HistoryPagination";

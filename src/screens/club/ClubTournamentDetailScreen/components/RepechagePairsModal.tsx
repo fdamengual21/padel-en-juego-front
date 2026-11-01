@@ -16,30 +16,43 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { FIVE_PAIR_ZONE_NOTICE, type RepechageCandidate, type RepechageEntriesInput } from "@/domain";
+import type { CreateRepechageInput, RepechageCandidate, RepechageEntriesInput } from "@/domain";
 
 interface RepechagePairsModalProps {
   open: boolean;
+  /** `create`: elige punto de oro o ventaja y parejas opcionales. `edit`: solo parejas. */
+  mode: "create" | "edit";
   candidates: RepechageCandidate[];
   isLoading?: boolean;
   isSubmitting?: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (input: RepechageEntriesInput) => void;
+  onSave: (input: RepechageEntriesInput) => void;
+  onCreate: (input: CreateRepechageInput) => void;
 }
+
+const EQUALS_OPTIONS = [
+  { goldenPoint: true, label: "Punto de oro" },
+  { goldenPoint: false, label: "Con ventaja (diferencia de 2)" },
+] as const;
 
 export default function RepechagePairsModal({
   open,
+  mode,
   candidates,
   isLoading = false,
   isSubmitting = false,
   onOpenChange,
-  onSubmit,
+  onSave,
+  onCreate,
 }: RepechagePairsModalProps) {
+  const creating = mode === "create";
   const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [goldenPoint, setGoldenPoint] = useState(true);
 
   useEffect(() => {
     if (!open) {
       setChecked(new Set());
+      setGoldenPoint(true);
       return;
     }
     setChecked(new Set(candidates.filter((item) => item.alreadyInRepechage).map((item) => item.pairId)));
@@ -55,7 +68,12 @@ export default function RepechagePairsModal({
     return { addPairIds, removePairIds };
   }, [candidates, checked]);
 
-  const canSave = payload.addPairIds.length > 0 || payload.removePairIds.length > 0;
+  const canSave = creating || payload.addPairIds.length > 0 || payload.removePairIds.length > 0;
+
+  const submit = () => {
+    if (creating) onCreate({ goldenPoint, pairIds: payload.addPairIds });
+    else onSave(payload);
+  };
 
   const toggle = (item: RepechageCandidate) => {
     if (!(item.selectable || item.removable) || isSubmitting) return;
@@ -71,20 +89,31 @@ export default function RepechagePairsModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg" data-testid="repechage-pairs-modal">
         <DialogHeader>
-          <DialogTitle>Parejas del repechaje</DialogTitle>
+          <DialogTitle>{creating ? "Crear repechaje" : "Parejas del repechaje"}</DialogTitle>
           <DialogDescription>
-            Elegí parejas eliminadas del cuadro. Podés sacar a las que todavía no jugaron en el
-            repechaje.
+            {creating
+              ? "Se juega en una sola zona, todos contra todos. Las parejas son opcionales: podés sumarlas después."
+              : "Elegí parejas eliminadas del cuadro. Podés sacar a las que todavía no jugaron en el repechaje."}
           </DialogDescription>
         </DialogHeader>
-        {checked.size === 5 ? (
-          <p
-            className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-950"
-            data-testid="five-pair-zone-notice"
-          >
-            {FIVE_PAIR_ZONE_NOTICE}
-          </p>
+        {creating ? (
+          <fieldset className="m-0 space-y-2 border-0 p-0" data-testid="repechage-equals-options">
+            <legend className="text-sm font-medium">En iguales (40-40)</legend>
+            {EQUALS_OPTIONS.map((option) => (
+              <label key={option.label} className="flex items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="repechageEquals"
+                  checked={goldenPoint === option.goldenPoint}
+                  disabled={isSubmitting}
+                  onChange={() => setGoldenPoint(option.goldenPoint)}
+                />
+                {option.label}
+              </label>
+            ))}
+          </fieldset>
         ) : null}
+        {creating ? <p className="text-sm font-medium">Seleccioná las parejas</p> : null}
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Cargando parejas…</p>
         ) : candidates.length === 0 ? (
@@ -150,9 +179,15 @@ export default function RepechagePairsModal({
             type="button"
             data-testid="repechage-pairs-submit"
             disabled={isSubmitting || !canSave}
-            onClick={() => onSubmit(payload)}
+            onClick={submit}
           >
-            {isSubmitting ? "Guardando…" : "Guardar"}
+            {creating
+              ? isSubmitting
+                ? "Creando…"
+                : "Crear repechaje"
+              : isSubmitting
+                ? "Guardando…"
+                : "Guardar"}
           </Button>
         </DialogFooter>
       </DialogContent>

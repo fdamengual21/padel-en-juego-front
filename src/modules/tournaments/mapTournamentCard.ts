@@ -31,6 +31,10 @@ export function asTournamentCard(raw: unknown): TournamentCard | null {
     myRegistrationStatus: asChip(row.myRegistrationStatus),
     pairId: asText(row.pairId) || null,
     categories: asCategories(row.categories),
+    rankingCircuitId: asText(row.rankingCircuitId) || null,
+    weekIndex: asOptionalNumber(row.weekIndex),
+    rankingWeekCount: asOptionalNumber(row.rankingWeekCount),
+    registrationOpensAt: asText(row.registrationOpensAt) || null,
   };
 }
 
@@ -70,6 +74,11 @@ function asChip(value: unknown): TournamentCard["myRegistrationStatus"] {
 
 function asText(value: unknown): string {
   return typeof value === "string" ? value : "";
+}
+
+function asOptionalNumber(value: unknown): number | null {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
 function asPageNumber(value: unknown, fallback: number): number {

@@ -13,6 +13,10 @@ import {
   type TournamentBannerDraft,
   type TournamentFormValues,
 } from "@/modules/tournaments/types";
+import {
+  standaloneTournamentFlow,
+  type TournamentFormPolicy,
+} from "@/modules/tournaments/flows";
 import { formatLongDateEs, parseIsoDateOnly, toIsoDateOnly } from "@/lib/dates";
 import { toastError } from "@/lib/toast";
 import {
@@ -122,6 +126,8 @@ interface TournamentFormProps {
   isSubmitting?: boolean;
   /** Torneo finalizado/cancelado: se ve la config, no se edita. */
   readOnly?: boolean;
+  /** Qué se bloquea y cómo se valida. Torneo suelto por defecto. */
+  policy?: TournamentFormPolicy;
 }
 
 export default function TournamentForm({
@@ -131,7 +137,10 @@ export default function TournamentForm({
   onSubmit,
   isSubmitting = false,
   readOnly = false,
+  policy = standaloneTournamentFlow.form,
 }: TournamentFormProps) {
+  const categoryLocked = readOnly || policy.lockCategory;
+  const matchPlayTypeLocked = readOnly || policy.lockMatchPlayType;
   const [rulesOpen, setRulesOpen] = useState(false);
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [removeBanner, setRemoveBanner] = useState(false);
@@ -181,7 +190,11 @@ export default function TournamentForm({
       if (key === "maxPairs" && next.matchPlayType === "STANDARD" && typeof value === "number") {
         next.maxPairs = clampScoringMaxPairs(value);
       }
-      if (key === "startDate" && typeof value === "string" && next.endDate < value) {
+      if (
+        key === "startDate" &&
+        typeof value === "string" &&
+        (policy.singleDay || next.endDate < value)
+      ) {
         next.endDate = value;
       }
       if (
@@ -225,6 +238,11 @@ export default function TournamentForm({
             "La fecha no puede ser anterior a hoy",
             "Elegí el día de hoy o uno posterior.",
           );
+          return;
+        }
+        const issue = policy.validate(values);
+        if (issue) {
+          toastError(issue.title, issue.detail);
           return;
         }
         void onSubmit(values, { file: bannerFile, remove: removeBanner });
@@ -284,7 +302,11 @@ export default function TournamentForm({
               </p>
             </Field>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Inicio" htmlFor="start">
+              <Field
+                label={policy.singleDay ? "Fecha" : "Inicio"}
+                htmlFor="start"
+                className={policy.singleDay ? "col-span-2" : undefined}
+              >
                 <DatePicker
                   id="start"
                   value={values.startDate}
@@ -296,18 +318,20 @@ export default function TournamentForm({
                   }}
                 />
               </Field>
-              <Field label="Fin" htmlFor="end">
-                <DatePicker
-                  id="end"
-                  value={values.endDate}
-                  minDate={endMinDate}
-                  invalid={endDateInvalid}
-                  disabled={readOnly}
-                  onChange={(next) => {
-                    if (next && next >= today) patch("endDate", next);
-                  }}
-                />
-              </Field>
+              {policy.singleDay ? null : (
+                <Field label="Fin" htmlFor="end">
+                  <DatePicker
+                    id="end"
+                    value={values.endDate}
+                    minDate={endMinDate}
+                    invalid={endDateInvalid}
+                    disabled={readOnly}
+                    onChange={(next) => {
+                      if (next && next >= today) patch("endDate", next);
+                    }}
+                  />
+                </Field>
+              )}
               {datesInvalid ? (
                 <p className="col-span-2 text-xs text-destructive">
                   La fecha no puede ser anterior a hoy.
@@ -333,6 +357,9 @@ export default function TournamentForm({
 
         <Section title="Categoría" description="Nivel 1ª–8ª o suma (12, 15…), con género.">
           <div className="space-y-4">
+            {policy.lockCategory && policy.lockedHint ? (
+              <p className="text-xs text-muted-foreground">{policy.lockedHint}</p>
+            ) : null}
             <div className="space-y-2">
               <p className="text-sm font-medium">Tipo</p>
               {(
@@ -345,14 +372,14 @@ export default function TournamentForm({
                   key={kind}
                   className={cn(
                     "flex items-center gap-2 text-sm",
-                    readOnly && "cursor-not-allowed text-muted-foreground",
+                    categoryLocked && "cursor-not-allowed text-muted-foreground",
                   )}
                 >
                   <input
                     type="radio"
                     name="categoryKind"
                     checked={values.categoryKind === kind}
-                    disabled={readOnly}
+                    disabled={categoryLocked}
                     onChange={() => patch("categoryKind", kind as CategoryKind)}
                   />
                   {label}
@@ -373,14 +400,14 @@ export default function TournamentForm({
                   key={gender}
                   className={cn(
                     "flex items-center gap-2 text-sm",
-                    readOnly && "cursor-not-allowed text-muted-foreground",
+                    categoryLocked && "cursor-not-allowed text-muted-foreground",
                   )}
                 >
                   <input
                     type="radio"
                     name="gender"
                     checked={values.categoryGender === gender}
-                    disabled={readOnly}
+                    disabled={categoryLocked}
                     onChange={() => patch("categoryGender", gender as CategoryGender)}
                   />
                   {label}
@@ -394,7 +421,7 @@ export default function TournamentForm({
                   id="level"
                   className="h-8 w-full rounded-lg border border-border bg-background px-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
                   value={values.categoryLevel ?? 6}
-                  disabled={readOnly}
+                  disabled={categoryLocked}
                   onChange={(e) =>
                     patch(
                       "categoryLevel",
@@ -417,7 +444,7 @@ export default function TournamentForm({
                   min={2}
                   max={16}
                   value={values.sumaTarget ?? 12}
-                  disabled={readOnly}
+                  disabled={categoryLocked}
                   onChange={(e) => {
                     patch("categoryLevel", null);
                     patch("sumaTarget", Number(e.target.value));
@@ -434,7 +461,7 @@ export default function TournamentForm({
               <Input
                 id="catName"
                 value={values.categoryName}
-                disabled={readOnly}
+                disabled={categoryLocked}
                 onChange={(e) => patch("categoryName", e.target.value)}
               />
             </Field>
@@ -447,6 +474,11 @@ export default function TournamentForm({
           className="md:col-span-2"
         >
           <div className="space-y-5">
+            {(policy.lockMatchPlayType || policy.lockFormat) && policy.lockedHint ? (
+              <p className="text-xs text-muted-foreground">
+                Tipo de partido y estructura: {policy.lockedHint.toLowerCase()}
+              </p>
+            ) : null}
             <div className="space-y-2">
               <p className="text-sm font-medium">Tipo de partido</p>
               {(
@@ -457,7 +489,7 @@ export default function TournamentForm({
                 ] as const
               ).map(([value, label]) => {
                 const scoringLocked = value === "STANDARD";
-                const optionDisabled = readOnly || scoringLocked;
+                const optionDisabled = matchPlayTypeLocked || scoringLocked;
                 return (
                   <div key={value} className="space-y-2">
                     <label
@@ -508,7 +540,7 @@ export default function TournamentForm({
                 id="maxPairs"
                 type="number"
                 disabled={readOnly || values.matchPlayType === "STANDARD"}
-                min={values.matchPlayType === "STANDARD" ? SCORING_MIN_PAIRS : 2}
+                min={values.matchPlayType === "STANDARD" ? SCORING_MIN_PAIRS : policy.minPairs}
                 max={values.matchPlayType === "STANDARD" ? SCORING_MAX_PAIRS : undefined}
                 value={values.maxPairs}
                 onChange={(e) => patch("maxPairs", Number(e.target.value))}
@@ -518,6 +550,8 @@ export default function TournamentForm({
                   Mínimo {SCORING_MIN_PAIRS} parejas. El mínimo y este máximo se
                   controlan al inscribir.
                 </p>
+              ) : policy.maxPairsHint ? (
+                <p className="text-xs text-muted-foreground mt-1">{policy.maxPairsHint}</p>
               ) : null}
             </Field>
 
@@ -533,7 +567,7 @@ export default function TournamentForm({
                   key={value}
                   className={cn(
                     "flex items-center gap-2 text-sm",
-                    (readOnly || values.matchPlayType === "STANDARD") &&
+                    (matchPlayTypeLocked || values.matchPlayType === "STANDARD") &&
                       "cursor-not-allowed text-muted-foreground",
                   )}
                 >
@@ -541,7 +575,7 @@ export default function TournamentForm({
                     type="radio"
                     name="equalsResolution"
                     checked={values.equalsResolution === value}
-                    disabled={readOnly || values.matchPlayType === "STANDARD"}
+                    disabled={matchPlayTypeLocked || values.matchPlayType === "STANDARD"}
                     onChange={() =>
                       patch("equalsResolution", value as EqualsResolution)
                     }
@@ -601,6 +635,7 @@ export default function TournamentForm({
                 ).map(([value, label]) => {
                   const locked =
                     readOnly ||
+                    policy.lockFormat ||
                     (values.matchPlayType === "STANDARD" && !isScoringFormat(value));
                   return (
                     <label
@@ -666,7 +701,9 @@ export default function TournamentForm({
                 : ""}
             </p>
             <p className="text-muted-foreground">
-              {formatLongDateEs(values.startDate)} → {formatLongDateEs(values.endDate)}
+              {values.endDate === values.startDate
+                ? formatLongDateEs(values.startDate)
+                : `${formatLongDateEs(values.startDate)} → ${formatLongDateEs(values.endDate)}`}
               {values.dailyStartTime ? ` · desde ${values.dailyStartTime}` : ""}
             </p>
           </div>
@@ -789,13 +826,15 @@ function Field({
   label,
   htmlFor,
   children,
+  className,
 }: {
   label: string;
   htmlFor: string;
   children: ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="space-y-1.5">
+    <div className={cn("space-y-1.5", className)}>
       <Label htmlFor={htmlFor}>{label}</Label>
       {children}
     </div>

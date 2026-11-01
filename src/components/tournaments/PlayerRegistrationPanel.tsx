@@ -40,6 +40,8 @@ interface PlayerRegistrationPanelProps {
     endDate: string | null;
     dailyStartTime: string;
     dailyEndTime: string;
+    rankingCircuitId?: string | null;
+    registrationOpensAt?: string | null;
   };
   categories: Array<{ id: string; name: string }>;
   categoryId: string;
@@ -286,7 +288,13 @@ export default function PlayerRegistrationPanel({
   } else if (tournament.status === "cancelled") {
     blockedNotice = { type: "info", message: "El torneo está cancelado." };
   } else if (closed) {
-    blockedNotice = { type: "info", message: "Inscripciones cerradas" };
+    blockedNotice = {
+      type: "info",
+      message:
+        tournament.rankingCircuitId && tournament.registrationOpensAt
+          ? `Las inscripciones de esta fecha abren el ${formatTournamentDayEs(tournament.registrationOpensAt)}.`
+          : "Inscripciones cerradas",
+    };
   }
 
   const waitingForMine = isAuthenticated && mine.isLoading && blockedNotice == null;

@@ -55,6 +55,11 @@ function asTournament(raw: Tournament): Tournament {
     clubCoverUrl: raw.clubCoverUrl ?? null,
     bannerUrl: raw.bannerUrl ?? null,
     myRegistrationStatus: raw.myRegistrationStatus ?? null,
+    rankingCircuitId: raw.rankingCircuitId ?? null,
+    weekIndex: raw.weekIndex ?? null,
+    rankingWeekCount: raw.rankingWeekCount ?? null,
+    registrationOpensAt: raw.registrationOpensAt ?? null,
+    visibleFrom: raw.visibleFrom ?? null,
     phaseDays: raw.phaseDays ?? [],
   };
 }

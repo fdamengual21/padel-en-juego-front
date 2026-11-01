@@ -86,8 +86,10 @@ import {
   type RepechageBoardView,
   type RepechageCandidate,
   type RepechageEntriesInput,
+  type CreateRepechageInput,
 } from "@/domain";
 import type {
+  CategoryResults,
   PublicCuadroBoardDto,
   PublicParticipantsBoardDto,
   PublicRepechageBoardDto,
@@ -114,10 +116,14 @@ export interface ITournamentOpsRepository {
   getZonesBoard(categoryId: string): Promise<ZonesBoardView>;
   getParticipantsBoard(categoryId: string): Promise<ParticipantsBoardView>;
   getParticipantPlayers(categoryId: string, ids: string[]): Promise<RegistrationPlayerDetail[]>;
+  getCategoryResults(categoryId: string): Promise<CategoryResults>;
   getConfigBoard(categoryId: string): Promise<ConfigBoardView>;
   getRepechageBoard(categoryId: string): Promise<RepechageBoardView>;
   listRepechageCandidates(categoryId: string): Promise<RepechageCandidate[]>;
-  createRepechage(categoryId: string): Promise<{ repechageCreated: boolean; message: string }>;
+  createRepechage(
+    categoryId: string,
+    input: CreateRepechageInput,
+  ): Promise<{ repechageCreated: boolean; message: string }>;
   saveRepechageEntries(
     categoryId: string,
     input: RepechageEntriesInput,
@@ -299,6 +305,7 @@ export interface ITournamentOpsRepository {
   getPublicZonesBoard(categoryId: string): Promise<PublicZonesBoardDto>;
   getPublicParticipantsBoard(categoryId: string): Promise<PublicParticipantsBoardDto>;
   getPublicParticipantPlayers(categoryId: string, ids: string[]): Promise<RegistrationPlayerDetail[]>;
+  getPublicCategoryResults(categoryId: string): Promise<CategoryResults>;
   getMyRegistration(categoryId: string): Promise<MyTournamentRegistration>;
 }
 
@@ -379,6 +386,10 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
     );
   }
 
+  async getCategoryResults(categoryId: string) {
+    return this.read<CategoryResults>(`/club/tournaments/categories/${categoryId}/results`);
+  }
+
   async getConfigBoard(categoryId: string): Promise<ConfigBoardView> {
     return this.read<ConfigBoardView>(`/club/tournaments/categories/${categoryId}/boards/config`);
   }
@@ -395,10 +406,11 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
     );
   }
 
-  async createRepechage(categoryId: string) {
+  async createRepechage(categoryId: string, input: CreateRepechageInput) {
     return this.read<{ repechageCreated: boolean; message: string }>(
       `/club/tournaments/categories/${categoryId}/repechage`,
       "post",
+      input,
     );
   }
 
@@ -827,6 +839,10 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
     return this.read<RegistrationPlayerDetail[]>(
       `/public/tournaments/categories/${categoryId}/participant-players?${playerIdsQuery(ids)}`,
     );
+  }
+
+  async getPublicCategoryResults(categoryId: string) {
+    return this.read<CategoryResults>(`/public/tournaments/categories/${categoryId}/results`);
   }
 
   async getMyRegistration(categoryId: string) {

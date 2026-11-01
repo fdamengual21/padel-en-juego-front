@@ -13,10 +13,10 @@ pnpm lint
 
 ## Feature flags
 
-En `.env` / `.env.example` (`VITE_FEATURE_*`). Default en código: todas `true` salvo Ranking.
+En `.env` / `.env.example` (`VITE_FEATURE_*`). Default en código: todas `true`.
 
 ```bash
-VITE_FEATURE_RANKING=false
+VITE_FEATURE_RANKING=true
 VITE_FEATURE_TOURNAMENTS=true
 ```
 

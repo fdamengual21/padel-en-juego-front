@@ -3,7 +3,7 @@ import { toPublicParticipantsBoard } from "../helpers/toPublicParticipantsBoard"
 import { toPublicRepechageBoard } from "../helpers/toPublicRepechageBoard";
 import { toPublicZonesBoard } from "../helpers/toPublicZonesBoard";
 import type { ITournamentOpsRepository } from "../repositories/TournamentOpsRepository";
-import type { RepechageEntriesInput } from "@/domain";
+import type { CreateRepechageInput, RepechageEntriesInput } from "@/domain";
 import type { GenerateGroupsConfig, MatchResultInput } from "../types";
 
 export class TournamentOpsService {
@@ -65,6 +65,10 @@ export class TournamentOpsService {
     return this.repository.getParticipantPlayers(categoryId, ids);
   }
 
+  getCategoryResults(categoryId: string) {
+    return this.repository.getCategoryResults(categoryId);
+  }
+
   getConfigBoard(categoryId: string) {
     return this.repository.getConfigBoard(categoryId);
   }
@@ -77,8 +81,8 @@ export class TournamentOpsService {
     return this.repository.listRepechageCandidates(categoryId);
   }
 
-  createRepechage(categoryId: string) {
-    return this.repository.createRepechage(categoryId);
+  createRepechage(categoryId: string, input: CreateRepechageInput) {
+    return this.repository.createRepechage(categoryId, input);
   }
 
   saveRepechageEntries(categoryId: string, input: RepechageEntriesInput) {
@@ -369,6 +373,10 @@ export class TournamentOpsService {
 
   getPublicParticipantPlayers(categoryId: string, ids: string[]) {
     return this.repository.getPublicParticipantPlayers(categoryId, ids);
+  }
+
+  getPublicCategoryResults(categoryId: string) {
+    return this.repository.getPublicCategoryResults(categoryId);
   }
 
   getMyRegistration(categoryId: string) {

@@ -1,7 +1,7 @@
 /**
  * Feature flags globales (Vite env).
  * Convención: `VITE_FEATURE_<NAME>=true|false`
- * Default: todas en true salvo Ranking.
+ * Default: todas en true.
  */
 
 function envFlag(value: string | undefined, defaultValue: boolean): boolean {
@@ -17,8 +17,8 @@ export const FEATURES = {
   home: envFlag(import.meta.env.VITE_FEATURE_HOME, true),
   /** Torneos (jugador y club) */
   tournaments: envFlag(import.meta.env.VITE_FEATURE_TOURNAMENTS, true),
-  /** Ranking (off por default) */
-  ranking: envFlag(import.meta.env.VITE_FEATURE_RANKING, false),
+  /** Ranking de circuitos Quality */
+  ranking: envFlag(import.meta.env.VITE_FEATURE_RANKING, true),
   /** Historial del jugador */
   history: envFlag(import.meta.env.VITE_FEATURE_HISTORY, true),
   /** Perfil del jugador (resumen + cuenta) */

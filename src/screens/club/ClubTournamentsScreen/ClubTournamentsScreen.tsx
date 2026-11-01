@@ -13,7 +13,7 @@ import { useDebounce } from "@/hooks/useDebounce";
 import type { Tournament } from "@/domain";
 import { ROUTES } from "@/router/routes";
 import { cn } from "@/lib/utils";
-import HomeTournamentCard from "@/screens/users/components/HomeTournamentCard";
+import HomeTournamentCard from "@/components/tournaments/HomeTournamentCard";
 import TournamentsPagination from "@/screens/users/UserTournamentsScreen/components/TournamentsPagination";
 
 const PAGE_SIZE = 12;
@@ -142,7 +142,11 @@ export default function ClubTournamentsScreen() {
           <HomeTournamentCard
             key={tournament.id}
             tournament={tournament}
-            to={ROUTES.club.tournamentDetail(tournament.id)}
+            to={
+              tournament.rankingCircuitId
+                ? ROUTES.club.rankingEvent(tournament.rankingCircuitId, tournament.id)
+                : ROUTES.club.tournamentDetail(tournament.id)
+            }
           />
         ))}
       </div>

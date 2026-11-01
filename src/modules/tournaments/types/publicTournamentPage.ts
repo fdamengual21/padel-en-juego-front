@@ -23,6 +23,10 @@ export interface PublicTournamentPage {
     format: TournamentFormat;
     registrationFee: number;
     bannerUrl: string | null;
+    rankingCircuitId: string | null;
+    weekIndex: number | null;
+    rankingWeekCount: number | null;
+    registrationOpensAt: string | null;
   };
   categories: PublicTournamentCategoryRef[];
   category: PublicTournamentCategoryRef;

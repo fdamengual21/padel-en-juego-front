@@ -95,6 +95,46 @@ export function toIsoDateOnly(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+/** Hoy en `yyyy-MM-dd` según el calendario de Argentina (mismo criterio que la API). */
+export function todayIsoAr(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Argentina/Buenos_Aires",
+  }).format(new Date());
+}
+
+/** Día corto con semana: "mar 3/11". */
+export function formatWeekdayShortEs(iso: string | null | undefined): string {
+  const date = parseIsoDateOnly(iso);
+  if (!date) return "";
+  return `${dayjs(date).format("ddd").replace(/\./g, "")} ${date.getDate()}/${date.getMonth() + 1}`;
+}
+
+/** Rango corto de cards: "05 nov", "05 nov – 26 nov", "28 dic 2026 – 04 ene 2027". */
+export function formatDateRangeShortEs(
+  startIso: string,
+  endIso: string | null | undefined,
+): string {
+  const start = parseIsoDateOnly(startIso);
+  const end = parseIsoDateOnly(endIso ?? startIso);
+  if (!start) return "";
+  const endDate = end ?? start;
+  const sameDay = dayjs(start).isSame(endDate, "day");
+  const currentYear = dayjs().year();
+  const startYear = dayjs(start).year();
+  const endYear = dayjs(endDate).year();
+  const spansYears = startYear !== endYear;
+  const showYear = spansYears || startYear !== currentYear || endYear !== currentYear;
+
+  if (sameDay) return shortStamp(start, showYear);
+  return `${shortStamp(start, spansYears)} – ${shortStamp(endDate, showYear)}`;
+}
+
+function shortStamp(date: Date, withYear: boolean): string {
+  return dayjs(date)
+    .format(withYear ? "DD MMM YYYY" : "DD MMM")
+    .replace(/\./g, "");
+}
+
 /** Fecha compacta para el trigger del datepicker: "17 de Enero 1999". */
 export function formatIsoDateOnlyEs(iso: string | null | undefined): string {
   const date = parseIsoDateOnly(iso);

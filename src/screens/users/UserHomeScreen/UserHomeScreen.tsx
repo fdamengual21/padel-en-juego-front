@@ -11,7 +11,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { ROUTES } from "@/router/routes";
 import { cn } from "@/lib/utils";
 import type { PlayerReservation } from "@/modules/reservations";
-import HomeTournamentCard from "../components/HomeTournamentCard";
+import HomeTournamentCard from "@/components/tournaments/HomeTournamentCard";
 import PlayerReservationDetailModal from "./components/PlayerReservationDetailModal";
 import PlayerWeekBoard from "./components/PlayerWeekBoard";
 

@@ -1,8 +1,10 @@
 import { useState } from "react";
 import {
+  CalendarClock,
   CalendarDays,
   CircleDollarSign,
   MapPin,
+  Medal,
   Phone,
   Repeat2,
   Tag,
@@ -12,6 +14,8 @@ import {
 } from "lucide-react";
 import ImageViewerDialog from "@/components/ImageViewerDialog";
 import PhoneWhatsApp from "@/components/PhoneWhatsApp";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -26,6 +30,8 @@ export type TournamentSummaryStatKind =
   | "pairs"
   | "fee"
   | "circuit"
+  | "ranking"
+  | "registrationOpens"
   | "zones"
   | "matches";
 
@@ -45,6 +51,7 @@ interface TournamentSummaryCardProps {
 }
 
 const DESCRIPTION_PREVIEW_LENGTH = 100;
+const MOBILE_VISIBLE_STATS = 4;
 
 const STAT_ICONS: Record<TournamentSummaryStatKind, LucideIcon> = {
   category: Tag,
@@ -52,6 +59,8 @@ const STAT_ICONS: Record<TournamentSummaryStatKind, LucideIcon> = {
   pairs: Users,
   fee: CircleDollarSign,
   circuit: Repeat2,
+  ranking: Medal,
+  registrationOpens: CalendarClock,
   zones: MapPin,
   matches: Trophy,
 };
@@ -66,8 +75,13 @@ export default function TournamentSummaryCard({
   const [flyerOpen, setFlyerOpen] = useState(false);
   const [descriptionOpen, setDescriptionOpen] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
+  const [statsExpanded, setStatsExpanded] = useState(false);
   const showFlyer = Boolean(bannerUrl) && !imageFailed;
   const trimmedContactPhone = contactPhone?.trim() ?? "";
+  const statCount = stats.length + (trimmedContactPhone ? 1 : 0);
+  const hasCollapsedStats = statCount > MOBILE_VISIBLE_STATS;
+  const collapsedClass = (index: number) =>
+    !statsExpanded && index >= MOBILE_VISIBLE_STATS ? "hidden sm:block" : undefined;
   const trimmedDescription = description?.trim() ?? "";
   const isDescriptionTruncated = trimmedDescription.length > DESCRIPTION_PREVIEW_LENGTH;
   const descriptionPreview = isDescriptionTruncated
@@ -121,16 +135,18 @@ export default function TournamentSummaryCard({
             </div>
           ) : null}
           <div className="p-4 sm:p-5">
-            <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {stats.map((stat) => {
+            <dl className="grid grid-cols-2 gap-x-3 gap-y-4 sm:gap-4 lg:grid-cols-3">
+              {stats.map((stat, index) => {
                 const Icon = STAT_ICONS[stat.kind];
                 return (
-                  <div key={stat.kind} className="space-y-1">
+                  <div key={stat.kind} className={cn("min-w-0 space-y-1", collapsedClass(index))}>
                     <dt className="flex items-center gap-1.5 text-muted-foreground">
                       <Icon className="size-3.5 shrink-0" />
                       <span className="text-sm">{stat.label}</span>
                     </dt>
-                    <dd className="text-base font-semibold text-foreground">{stat.value}</dd>
+                    <dd className="text-sm font-semibold break-words text-foreground sm:text-base">
+                      {stat.value}
+                    </dd>
                     {stat.detail ? (
                       <dd className="text-xs text-amber-700">{stat.detail}</dd>
                     ) : null}
@@ -138,17 +154,33 @@ export default function TournamentSummaryCard({
                 );
               })}
               {trimmedContactPhone ? (
-                <div className="space-y-1" data-testid="tournament-contact">
+                <div
+                  className={cn("min-w-0 space-y-1", collapsedClass(stats.length))}
+                  data-testid="tournament-contact"
+                >
                   <dt className="flex items-center gap-1.5 text-muted-foreground">
                     <Phone className="size-3.5 shrink-0" />
                     <span className="text-sm">Contacto</span>
                   </dt>
-                  <dd className="text-base font-semibold text-foreground">
+                  <dd className="text-sm font-semibold break-words text-foreground sm:text-base">
                     <PhoneWhatsApp phone={trimmedContactPhone} />
                   </dd>
                 </div>
               ) : null}
             </dl>
+            {hasCollapsedStats ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="mt-3 w-full sm:hidden"
+                aria-expanded={statsExpanded}
+                onClick={() => setStatsExpanded((open) => !open)}
+                data-testid="tournament-summary-toggle"
+              >
+                {statsExpanded ? "Ver menos" : "Ver más"}
+              </Button>
+            ) : null}
           </div>
         </div>
       </section>

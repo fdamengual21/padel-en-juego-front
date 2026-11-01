@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   LogOut,
   MapPin,
+  Medal,
   Menu,
   Repeat,
   Settings,
@@ -70,6 +71,13 @@ const items: NavItem[] = [
     feature: "tournaments",
     permission: PERMISSION_CLUB_TOURNAMENTS_READ,
   },
+  {
+    to: ROUTES.club.ranking,
+    label: "Ranking",
+    icon: Medal,
+    feature: "ranking",
+    permission: PERMISSION_CLUB_TOURNAMENTS_READ,
+  },
   { to: ROUTES.club.clients, label: "Clientes", icon: Users, feature: "clients", permission: PERMISSION_CLUB_CLIENTS_READ },
   {
     to: ROUTES.club.staff,
@@ -109,6 +117,7 @@ const gridColsClass: Record<number, string> = {
   5: "grid-cols-5",
   6: "grid-cols-6",
   7: "grid-cols-7",
+  8: "grid-cols-8",
 };
 
 export default function ClubShell() {

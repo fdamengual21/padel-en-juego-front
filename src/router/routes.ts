@@ -26,6 +26,9 @@ export const ROUTES = {
     clubs: "/clubes",
     clubDetail: (id: string) => `/clubes/${id}`,
     clubAvailability: (id: string) => `/clubes/${id}/disponibilidad`,
+    clubRanking: (id: string) => `/clubes/${id}/ranking`,
+    clubRankingDetail: (clubId: string, circuitId: string) =>
+      `/clubes/${clubId}/ranking/${circuitId}`,
     match: (id: string) => `/partidos/${id}`,
   },
   club: {
@@ -34,6 +37,11 @@ export const ROUTES = {
     tournaments: "/club/torneos",
     tournamentNew: "/club/torneos/nuevo",
     tournamentDetail: (id: string) => `/club/torneos/${id}`,
+    ranking: "/club/ranking",
+    rankingNew: "/club/ranking/nuevo",
+    rankingDetail: (id: string) => `/club/ranking/${id}`,
+    rankingEvent: (circuitId: string, tournamentId: string) =>
+      `/club/ranking/${circuitId}/fechas/${tournamentId}`,
     players: "/club/jugadores",
     clients: "/club/clientes",
     staff: "/club/usuarios",

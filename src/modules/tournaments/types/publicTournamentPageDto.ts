@@ -29,6 +29,10 @@ export interface PublicTournamentDto {
   format: string;
   registrationFee: number;
   bannerUrl: string | null;
+  rankingCircuitId?: string | null;
+  weekIndex?: number | null;
+  rankingWeekCount?: number | null;
+  registrationOpensAt?: string | null;
 }
 
 export interface PublicTournamentCategoryRefDto {

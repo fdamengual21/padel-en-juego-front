@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 
 const labels: Record<string, string> = {
   scheduled: "Programado",
+  live: "En curso",
   inProgress: "En vivo",
   finished: "Finalizado",
   walkover: "Walkover",
@@ -10,6 +11,7 @@ const labels: Record<string, string> = {
   booked: "Reservada",
   completed: "Completada",
   draft: "Borrador",
+  upcoming: "Próximamente",
   registrationOpen: "Inscripciones abiertas",
   draftTournament: "Borrador",
   DISQUALIFIED: "Desclasificado",
@@ -29,9 +31,13 @@ const warningTone = "border-transparent! bg-warning-muted! text-warning-foregrou
 const dangerTone = "border-transparent! bg-destructive-muted! text-destructive";
 const mutedTone = "border-transparent! bg-muted! text-muted-foreground";
 
+const upcomingTone = "border-transparent! bg-primary/20! text-foreground";
+
 const tones: Record<string, string> = {
+  upcoming: upcomingTone,
   ACCEPTED: successTone,
   CONFIRMED: successTone,
+  live: successTone,
   PENDING: warningTone,
   WAITLIST: mutedTone,
   REJECTED: dangerTone,
@@ -44,10 +50,12 @@ const tones: Record<string, string> = {
 
 interface StatusBadgeProps {
   status: string;
+  /** Pisa el texto por defecto del estado. */
+  label?: string;
   className?: string;
 }
 
-export default function StatusBadge({ status, className }: StatusBadgeProps) {
+export default function StatusBadge({ status, label, className }: StatusBadgeProps) {
   const isLive = status === "inProgress";
   const isOpen = status === "registrationOpen";
 
@@ -64,7 +72,7 @@ export default function StatusBadge({ status, className }: StatusBadgeProps) {
       {isLive ? (
         <span className="size-1.5 shrink-0 animate-pulse rounded-full bg-current" aria-hidden />
       ) : null}
-      {labels[status] ?? status}
+      {label ?? labels[status] ?? status}
     </Badge>
   );
 }

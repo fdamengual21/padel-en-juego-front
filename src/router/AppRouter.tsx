@@ -22,6 +22,10 @@ import ClubHomeGate from "@/router/guards/ClubHomeGate";
 import ClubTournamentsScreen from "@/screens/club/ClubTournamentsScreen";
 import ClubTournamentCreateScreen from "@/screens/club/ClubTournamentCreateScreen";
 import ClubTournamentDetailScreen from "@/screens/club/ClubTournamentDetailScreen";
+import ClubRankingScreen from "@/screens/club/ClubRankingScreen";
+import ClubRankingCreateScreen from "@/screens/club/ClubRankingCreateScreen";
+import ClubRankingDetailScreen from "@/screens/club/ClubRankingDetailScreen";
+import ClubRankingEventScreen from "@/screens/club/ClubRankingEventScreen";
 import ClubClientsScreen from "@/screens/club/ClubClientsScreen";
 import ClubStaffScreen from "@/screens/club/ClubStaffScreen";
 import ClubClientDetailScreen from "@/screens/club/ClubClientDetailScreen";
@@ -33,6 +37,8 @@ import UserHomeScreen from "@/screens/users/UserHomeScreen";
 import UserClubsScreen from "@/screens/users/UserClubsScreen";
 import UserClubDetailScreen from "@/screens/users/UserClubDetailScreen";
 import UserClubAvailabilityScreen from "@/screens/users/UserClubAvailabilityScreen";
+import UserClubRankingScreen from "@/screens/users/UserClubRankingScreen";
+import UserClubRankingDetailScreen from "@/screens/users/UserClubRankingDetailScreen";
 import UserTournamentsScreen from "@/screens/users/UserTournamentsScreen";
 import UserTournamentDetailScreen from "@/screens/users/UserTournamentDetailScreen";
 import UserRankingScreen from "@/screens/users/UserRankingScreen";
@@ -102,6 +108,15 @@ const router = createBrowserRouter(
           />
         </Route>
         <Route
+          element={<RequireFeature feature="ranking" redirectTo={ROUTES.home} />}
+        >
+          <Route path="clubes/:clubId/ranking" element={<UserClubRankingScreen />} />
+          <Route
+            path="clubes/:clubId/ranking/:circuitId"
+            element={<UserClubRankingDetailScreen />}
+          />
+        </Route>
+        <Route
           element={
             <RequireFeature feature="tournaments" redirectTo={ROUTES.home} />
           }
@@ -167,6 +182,31 @@ const router = createBrowserRouter(
             }
           >
             <Route path="torneos/nuevo" element={<ClubTournamentCreateScreen />} />
+          </Route>
+        </Route>
+        <Route
+          element={
+            <RequireFeature feature="ranking" redirectTo={ROUTES.club.dashboard} />
+          }
+        >
+          <Route
+            element={
+              <RequirePermission permission={PERMISSION_CLUB_TOURNAMENTS_WRITE} />
+            }
+          >
+            <Route path="ranking/nuevo" element={<ClubRankingCreateScreen />} />
+          </Route>
+          <Route
+            element={
+              <RequirePermission permission={PERMISSION_CLUB_TOURNAMENTS_READ} />
+            }
+          >
+            <Route path="ranking" element={<ClubRankingScreen />} />
+            <Route path="ranking/:circuitId" element={<ClubRankingDetailScreen />} />
+            <Route
+              path="ranking/:circuitId/fechas/:tournamentId"
+              element={<ClubRankingEventScreen />}
+            />
           </Route>
         </Route>
         <Route

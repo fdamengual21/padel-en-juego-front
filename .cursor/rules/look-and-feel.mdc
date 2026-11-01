@@ -30,6 +30,7 @@ Sin hex hardcodeados en screens/components. Usar clases semánticas (`bg-primary
 
 ## UI
 
+- Botones de acción de una pantalla o sección: a la derecha en desktop (`ml-auto` + `justify-end`), también si bajan de fila. En mobile, en una fila a todo el ancho con columnas iguales.
 - Superficies antes que Card; no Cards anidadas. Card solo si agrupa (partido, torneo, cliente) o hay interacción.
 - Estados de partido/torneo: chips chicos, no bloques de color. Lima para inscripciones abiertas (invitación). En vivo: `destructive` + punto; resto muted/warning.
 - Preferir domain (`MatchCard`, `Score`, `TournamentCard`, `BracketView`, …) antes que Card/Badge genéricos.

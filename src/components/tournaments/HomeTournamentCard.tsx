@@ -1,10 +1,10 @@
 import { Link } from "react-router-dom";
-import dayjs from "dayjs";
 import { useState } from "react";
 import StatusBadge from "@/components/tournaments/StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import type { Tournament } from "@/domain";
-import { parseIsoDateOnly } from "@/lib/dates";
+import { formatDateRangeShortEs } from "@/lib/dates";
+import { tournamentStatusView } from "@/modules/tournaments/flows";
 
 /** Campos que pinta la card. Un `Tournament` completo también entra. */
 export type HomeTournamentCardData = Pick<
@@ -20,6 +20,11 @@ export type HomeTournamentCardData = Pick<
       | "bannerUrl"
       | "categories"
       | "myRegistrationStatus"
+      | "weekIndex"
+      | "rankingWeekCount"
+      | "rankingCircuitId"
+      | "registrationOpensAt"
+      | "visibleFrom"
     >
   >;
 
@@ -57,6 +62,7 @@ export default function HomeTournamentCard({
   const chip = tournament.myRegistrationStatus
     ? inscriptionChip[tournament.myRegistrationStatus]
     : undefined;
+  const statusView = tournamentStatusView(tournament);
 
   return (
     <Link
@@ -84,6 +90,11 @@ export default function HomeTournamentCard({
         </p>
         <div className="flex min-w-0 items-center gap-2">
           <p className="min-w-0 truncate text-sm text-muted-foreground">{meta}</p>
+          {tournament.weekIndex && tournament.rankingWeekCount ? (
+            <Badge variant="secondary" className="h-auto shrink-0 px-1.5 py-0.5 text-xs font-medium">
+              Fecha {tournament.weekIndex} de {tournament.rankingWeekCount}
+            </Badge>
+          ) : null}
           {chip ? (
             <Badge
               variant="secondary"
@@ -94,9 +105,13 @@ export default function HomeTournamentCard({
           ) : null}
         </div>
         <div className="mt-auto flex min-w-0 items-center gap-2">
-          <StatusBadge status={tournament.status} className="min-w-0 w-fit max-w-full shrink" />
+          <StatusBadge
+            status={statusView.status}
+            label={statusView.label}
+            className="min-w-0 w-fit max-w-full shrink"
+          />
           <span className="ml-auto shrink-0 text-xs font-bold text-foreground">
-            {formatRange(tournament.startDate, tournament.endDate)}
+            {formatDateRangeShortEs(tournament.startDate, tournament.endDate)}
           </span>
         </div>
       </div>
@@ -112,26 +127,4 @@ function initials(name: string): string {
     .map((part) => part.charAt(0).toUpperCase())
     .join("");
   return letters || "T";
-}
-
-function formatRange(startIso: string, endIso: string | null | undefined): string {
-  const start = parseIsoDateOnly(startIso);
-  const end = parseIsoDateOnly(endIso ?? startIso);
-  if (!start) return "";
-  const endDate = end ?? start;
-  const sameDay = dayjs(start).isSame(endDate, "day");
-  const currentYear = dayjs().year();
-  const startYear = dayjs(start).year();
-  const endYear = dayjs(endDate).year();
-  const spansYears = startYear !== endYear;
-  const showYear = spansYears || startYear !== currentYear || endYear !== currentYear;
-
-  if (sameDay) return stamp(start, showYear);
-  return `${stamp(start, spansYears)} – ${stamp(endDate, showYear)}`;
-}
-
-function stamp(date: Date, withYear: boolean): string {
-  return dayjs(date)
-    .format(withYear ? "DD MMM YYYY" : "DD MMM")
-    .replace(/\./g, "");
 }

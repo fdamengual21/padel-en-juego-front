@@ -4,9 +4,10 @@ import { ChevronLeft, CircleAlert, Trophy } from "lucide-react";
 import Api from "@/api/Api";
 import { EmptyState } from "@/components/EmptyState";
 import { buttonVariants } from "@/components/ui/button";
+import { isFeatureEnabled } from "@/config/features";
 import { ROUTES } from "@/router/routes";
 import { cn } from "@/lib/utils";
-import HomeTournamentCard from "../components/HomeTournamentCard";
+import HomeTournamentCard from "@/components/tournaments/HomeTournamentCard";
 import PublicClubFacts from "./components/PublicClubFacts";
 import PublicClubHero from "./components/PublicClubHero";
 import TodayFreeSlots from "./components/TodayFreeSlots";
@@ -56,13 +57,24 @@ export default function UserClubDetailScreen() {
           <PublicClubHero club={data} />
           <PublicClubFacts club={data} />
           <TodayFreeSlots club={data} />
-          <Link
-            to={ROUTES.player.clubAvailability(data.id)}
-            className={cn(buttonVariants(), "h-9")}
-            data-testid="public-club-availability-link"
-          >
-            Ver disponibilidad
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              to={ROUTES.player.clubAvailability(data.id)}
+              className={cn(buttonVariants(), "h-9")}
+              data-testid="public-club-availability-link"
+            >
+              Ver disponibilidad
+            </Link>
+            {isFeatureEnabled("ranking") ? (
+              <Link
+                to={ROUTES.player.clubRanking(data.id)}
+                className={cn(buttonVariants({ variant: "outline" }), "h-9")}
+                data-testid="public-club-ranking-link"
+              >
+                Ver ranking
+              </Link>
+            ) : null}
+          </div>
           <section className="space-y-3" data-testid="public-club-tournaments">
             <h3 className="text-lg font-semibold tracking-tight">Próximos torneos</h3>
             {tournamentsQuery.isError && !tournamentsQuery.data ? (
