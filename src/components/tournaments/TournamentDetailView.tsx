@@ -11,10 +11,14 @@ import {
   isQualityPreset,
   resolveMatchDurationMinutes,
   FIVE_PAIR_ZONE_NOTICE,
+  DRAW_REBUILD_ON_ADD_NOTICE,
+  SCORING_PAIR_COUNT_REASON,
   acceptedOverflowSubstitutes,
   championPairNames,
+  drawRebuildWarningItems,
   removeAcceptedPairBlockedReason,
   resolveTournamentChampionPairId,
+  startTournamentDescription,
   type Match,
   type MatchPhase,
   type MatchResultInput,
@@ -175,6 +179,7 @@ export default function TournamentDetailView({
     null,
   );
   const [removeNote, setRemoveNote] = useState("");
+  const [pendingAcceptId, setPendingAcceptId] = useState<string | null>(null);
   const [pairModalOpen, setPairModalOpen] = useState(false);
   const [editingPair, setEditingPair] = useState<
     ParticipantsBoardView["rows"][number]["pair"] | null
@@ -1097,15 +1102,36 @@ export default function TournamentDetailView({
       ? "El torneo está cancelado. Las inscripciones no se pueden modificar."
       : "El torneo ya finalizó. Las inscripciones no se pueden modificar."
     : null;
+  const scoringAtCap =
+    ruleset?.preset === "STANDARD" && capacity.maxPairs >= 32;
+  const canGrowAcceptedCup =
+    !tournamentLocked &&
+    tournamentStarted &&
+    !configBoard?.structureLocked &&
+    !scoringAtCap;
   const addPairBlockedReason = participantsLockedReason
     ? participantsLockedReason
     : !admission.allowed
       ? (admission.reason ?? "No se pueden sumar parejas en este momento.")
-      : tournament.status === "inProgress" && acceptedFull
-        ? "El cupo de parejas aceptadas está completo."
-        : categoryFull
+      : tournament.status === "inProgress" && acceptedFull && scoringAtCap
+        ? SCORING_PAIR_COUNT_REASON
+        : !tournamentStarted && categoryFull
           ? "El cupo está completo: ya están las parejas aceptadas y los 2 suplentes."
           : null;
+  const canAcceptIntoDraw =
+    admission.allowed && (!acceptedFull || canGrowAcceptedCup);
+  const acceptBlockedReason = !admission.allowed
+    ? (admission.reason ?? "No se pueden sumar parejas en este momento.")
+    : acceptedFull && scoringAtCap
+      ? SCORING_PAIR_COUNT_REASON
+      : acceptedFull
+        ? "El cupo de parejas aceptadas está completo."
+        : null;
+  const drawRebuildItems = drawRebuildWarningItems(
+    acceptedFull ? capacity.maxPairs : null,
+  );
+  const showDrawRebuildNotice =
+    tournamentStarted && !tournamentLocked && !configBoard?.structureLocked;
   const canMutateParticipants = !tournamentLocked;
   const matchRules =
     zonesBoard?.matchRules ??
@@ -1515,6 +1541,11 @@ export default function TournamentDetailView({
             >
               {admission.reason}
             </p>
+          ) : showDrawRebuildNotice ? (
+            <Alert variant="warning" data-testid="draw-rebuild-notice">
+              <TriangleAlert />
+              <AlertDescription>{DRAW_REBUILD_ON_ADD_NOTICE}</AlertDescription>
+            </Alert>
           ) : null}
           {participantsBoard?.notice ? (
             <p className="text-sm text-muted-foreground">{participantsBoard.notice}</p>
@@ -1667,12 +1698,18 @@ export default function TournamentDetailView({
                                     </TooltipContent>
                                   </Tooltip>
                                 </TooltipProvider>
-                              ) : admission.allowed && !acceptedFull ? (
+                              ) : canAcceptIntoDraw ? (
                                 <Button
                                   type="button"
                                   size="sm"
                                   disabled={acceptMutation.isPending}
-                                  onClick={() => acceptMutation.mutate(reg.id)}
+                                  onClick={() => {
+                                    if (showDrawRebuildNotice) {
+                                      setPendingAcceptId(reg.id);
+                                      return;
+                                    }
+                                    acceptMutation.mutate(reg.id);
+                                  }}
                                 >
                                   Aceptar
                                 </Button>
@@ -1685,9 +1722,8 @@ export default function TournamentDetailView({
                                       </Button>
                                     </TooltipTrigger>
                                     <TooltipContent className="max-w-xs">
-                                      {acceptedFull
-                                        ? "El cupo de parejas aceptadas está completo."
-                                        : (admission.reason ?? "No se pueden sumar parejas en este momento.")}
+                                      {acceptBlockedReason ??
+                                        "No se pueden sumar parejas en este momento."}
                                     </TooltipContent>
                                   </Tooltip>
                                 </TooltipProvider>
@@ -2304,11 +2340,10 @@ export default function TournamentDetailView({
           setConfirmStartOpen(open);
         }}
         title="Comenzar torneo"
-        description={
-          capacity.acceptedSoloPlayers > 0
-            ? `Se cierra la inscripción y se arma el cuadro con las ${capacity.acceptedPairs} parejas aceptadas. Hay ${capacity.acceptedSoloPlayers} jugadores sin pareja: se emparejan entre sí por orden de inscripción aunque jueguen del mismo lado; si queda uno impar, queda afuera. Si hay partidos jugados, ya no se puede cambiar la configuración (tipo, formato, fechas, categoría). Esta acción no se deshace.`
-            : `Se cierra la inscripción y se arma el cuadro con las ${capacity.acceptedPairs} parejas aceptadas. Si hay partidos jugados, ya no se puede cambiar la configuración (tipo, formato, fechas, categoría). Esta acción no se deshace.`
-        }
+        description={startTournamentDescription(
+          capacity.acceptedPairs,
+          capacity.acceptedSoloPlayers,
+        )}
         cancelLabel="Cancelar"
         confirmLabel="Comenzar"
         isConfirming={startMutation.isPending}
@@ -2438,6 +2473,30 @@ export default function TournamentDetailView({
         </DialogContent>
       </Dialog>
 
+      <WarningDialog
+        open={Boolean(pendingAcceptId)}
+        onOpenChange={(open) => {
+          if (acceptMutation.isPending) return;
+          if (!open) setPendingAcceptId(null);
+        }}
+        title="Aceptar inscripción"
+        cancelLabel="Cancelar"
+        confirmLabel="Aceptar"
+        isConfirming={acceptMutation.isPending}
+        onConfirm={() => {
+          if (!pendingAcceptId || acceptMutation.isPending) return;
+          const id = pendingAcceptId;
+          setPendingAcceptId(null);
+          acceptMutation.mutate(id);
+        }}
+      >
+        <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
+          {drawRebuildItems.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      </WarningDialog>
+
       <PairFormModal
         open={canMutateParticipants && pairModalOpen}
         mode={editingPair ? "edit" : "create"}
@@ -2462,6 +2521,15 @@ export default function TournamentDetailView({
             : []
         }
         isSaving={savePairMutation.isPending}
+        structureWarning={
+          showDrawRebuildNotice
+            ? {
+                title: "Sumar pareja al cuadro",
+                items: drawRebuildItems,
+                confirmLabel: "Sumar",
+              }
+            : null
+        }
         onOpenChange={(open) => {
           setPairModalOpen(open);
           if (!open) setEditingPair(null);

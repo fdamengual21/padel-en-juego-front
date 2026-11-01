@@ -19,6 +19,46 @@ export const FIVE_PAIR_ZONE_BLOCKED_NOTICE =
 export const REMOVE_ACCEPTED_AFTER_START_REASON =
   "El torneo ya comenzó. Para sacar a una pareja aceptada, desclasificala.";
 
+/** Hay un partido con resultado o en cancha: el club no suma parejas al cuadro. */
+export const ADMISSION_CLOSED_AFTER_PLAYED_REASON =
+  "Hay partidos con resultado. No se pueden sumar parejas.";
+
+/** Aviso en Participantes si el torneo empezó y todavía no hay partidos jugados. */
+export const DRAW_REBUILD_ON_ADD_NOTICE =
+  "Todavía no hay partidos jugados. Si sumás una pareja al cuadro, se vuelven a armar las zonas y los versus. Si el cupo está lleno, también sube el número de participantes.";
+
+/** Confirmación al sentar una pareja con el cuadro ya armado y sin partidos jugados. */
+export const DRAW_REBUILD_WARNING =
+  "Al confirmar, se vuelven a armar las zonas y los versus con las parejas aceptadas.";
+
+/** Tope del torneo puntuable (preset Estándar). */
+export const SCORING_PAIR_COUNT_REASON =
+  "Un torneo puntuable admite entre 16 y 32 parejas.";
+
+/** Línea extra si el alta sube el cupo en el mismo paso. */
+export function drawRebuildCupIncreaseItem(from: number, to: number) {
+  return `El número de participantes pasa de ${from} a ${to}.`;
+}
+
+/** Ítems del aviso al sentar una pareja en el cuadro sin partidos jugados. */
+export function drawRebuildWarningItems(cupFrom: number | null): string[] {
+  const items = [DRAW_REBUILD_WARNING];
+  if (cupFrom != null) items.push(drawRebuildCupIncreaseItem(cupFrom, cupFrom + 1));
+  return items;
+}
+
+/** Texto de «Comenzar torneo»: el club sigue pudiendo sumar parejas hasta que haya partidos jugados. */
+export function startTournamentDescription(
+  acceptedPairs: number,
+  acceptedSoloPlayers: number,
+) {
+  const solos =
+    acceptedSoloPlayers > 0
+      ? ` Hay ${acceptedSoloPlayers} jugadores sin pareja: se emparejan entre sí por orden de inscripción aunque jueguen del mismo lado; si queda uno impar, queda afuera.`
+      : "";
+  return `Se arma el cuadro con las ${acceptedPairs} parejas aceptadas.${solos} Los jugadores ya no se pueden anotar. El club puede sumar parejas o cambiar la configuración hasta que haya partidos jugados. Esta acción no se deshace.`;
+}
+
 /** Mover a una zona que ya tiene 4 dejaría 5. */
 export const ZONE_MOVE_DEST_FULL_REASON = "Esa zona ya tiene 4 parejas.";
 

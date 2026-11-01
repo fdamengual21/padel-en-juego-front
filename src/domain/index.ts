@@ -60,6 +60,13 @@ export {
   FIVE_PAIR_ZONE_NOTICE,
   FIVE_PAIR_ZONE_BLOCKED_NOTICE,
   REMOVE_ACCEPTED_AFTER_START_REASON,
+  ADMISSION_CLOSED_AFTER_PLAYED_REASON,
+  DRAW_REBUILD_ON_ADD_NOTICE,
+  DRAW_REBUILD_WARNING,
+  SCORING_PAIR_COUNT_REASON,
+  drawRebuildCupIncreaseItem,
+  drawRebuildWarningItems,
+  startTournamentDescription,
   type RulesSection,
 } from "./tournamentRules";
 export {

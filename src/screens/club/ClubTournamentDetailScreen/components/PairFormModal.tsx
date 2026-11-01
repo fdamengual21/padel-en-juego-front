@@ -72,6 +72,12 @@ interface PairFormModalProps {
   /** Otras inscripciones incompletas vigentes de la categoría. */
   soloCandidates?: SoloRegistrationCandidate[];
   isSaving?: boolean;
+  /** Si hay cuadro armado sin partidos jugados, confirmar antes de sentar una pareja completa. */
+  structureWarning?: {
+    title: string;
+    items: string[];
+    confirmLabel: string;
+  } | null;
   onOpenChange: (open: boolean) => void;
   onCreatePlayer: (draft: ManualPlayerDraft) => Promise<Player>;
   onSubmit: (values: PairFormSubmitValues) => Promise<void> | void;
@@ -220,6 +226,7 @@ export default function PairFormModal({
   enrolledPlayerIds = [],
   soloCandidates = [],
   isSaving = false,
+  structureWarning = null,
   onOpenChange,
   onCreatePlayer,
   onSubmit,
@@ -230,6 +237,7 @@ export default function PairFormModal({
     null,
   );
   const [confirmSplitOpen, setConfirmSplitOpen] = useState(false);
+  const [confirmDrawOpen, setConfirmDrawOpen] = useState(false);
   const [points1, setPoints1] = useState("");
   const [points2, setPoints2] = useState("");
   const [availability, setAvailability] = useState<AvailabilityDraft[]>([]);
@@ -265,6 +273,7 @@ export default function PairFormModal({
     setSkipDupForSlot({});
     setSelectedSoloPlayerId(null);
     setConfirmSplitOpen(false);
+    setConfirmDrawOpen(false);
     if (mode === "edit" && pair) {
       if (editPlayers.isLoading) return;
       if (editPlayers.isError) {
@@ -386,6 +395,10 @@ export default function PairFormModal({
     mode === "edit" && slot2Empty && visibleSoloCandidates.length > 0;
   const removingPartner =
     mode === "edit" && Boolean(pair?.player2Id) && slot2Empty && !selectedSoloPlayerId;
+  const seatingCompletePair =
+    Boolean(structureWarning) &&
+    (!slot2Empty || Boolean(selectedSoloPlayerId)) &&
+    (mode === "create" || !pair?.player2Id);
 
   const savePair = async () => {
     setError(null);
@@ -627,6 +640,10 @@ export default function PairFormModal({
                 setConfirmSplitOpen(true);
                 return;
               }
+              if (seatingCompletePair) {
+                setConfirmDrawOpen(true);
+                return;
+              }
               void savePair();
             }}
           >
@@ -679,6 +696,30 @@ export default function PairFormModal({
         void savePair();
       }}
     />
+    <WarningDialog
+      open={confirmDrawOpen}
+      onOpenChange={(next) => {
+        if (isSaving) return;
+        setConfirmDrawOpen(next);
+      }}
+      title={structureWarning?.title ?? "Sumar pareja al cuadro"}
+      cancelLabel="Cancelar"
+      confirmLabel={structureWarning?.confirmLabel ?? "Sumar"}
+      isConfirming={isSaving}
+      onConfirm={() => {
+        if (isSaving) return;
+        setConfirmDrawOpen(false);
+        void savePair();
+      }}
+    >
+      {structureWarning ? (
+        <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
+          {structureWarning.items.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      ) : null}
+    </WarningDialog>
     </>
   );
 }
