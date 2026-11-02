@@ -121,7 +121,11 @@ interface RankingFormProps {
   bannerUrl?: string | null;
   /** `edit`: calendario, categoría y cupo quedan fijos; el cupo se cambia en cada fecha. */
   mode?: "create" | "edit";
+  /** En `edit`, ranking sin fechas jugadas: calendario, categoría y cupo siguen editables. */
+  canEditStructure?: boolean;
   initialValues?: RankingFormValues;
+  /** Acción extra a la izquierda de Guardar (p. ej. Cancelar ranking). */
+  secondaryAction?: ReactNode;
   onSubmit: (values: RankingFormValues, banner: RankingBannerDraft) => Promise<void> | void;
 }
 
@@ -130,10 +134,13 @@ export default function RankingForm({
   isSubmitting = false,
   bannerUrl = null,
   mode = "create",
+  canEditStructure = false,
   initialValues,
+  secondaryAction,
   onSubmit,
 }: RankingFormProps) {
-  const locked = mode === "edit";
+  const editing = mode === "edit";
+  const locked = editing && !canEditStructure;
   const [values, setValues] = useState<RankingFormValues>(
     () => initialValues ?? defaultRankingFormValues(),
   );
@@ -172,7 +179,7 @@ export default function RankingForm({
           toastError("Ingresá el nombre del ranking");
           return;
         }
-        if (!locked && values.firstDate < today) {
+        if (!locked && values.firstDate < today && values.firstDate !== initialValues?.firstDate) {
           toastError("La primera fecha no puede ser anterior a hoy");
           return;
         }
@@ -293,7 +300,9 @@ export default function RankingForm({
           description={
             locked
               ? "Las fechas ya están generadas. Para mover una, cambiale el día desde su configuración."
-              : "Un Quality por semana. Quality y el formato quedan fijos."
+              : editing
+                ? "Mientras no se juegue ninguna fecha, podés cambiar el calendario. Las fechas se reacomodan una por semana desde la primera."
+                : "Un Quality por semana. Quality y el formato quedan fijos."
           }
         >
           <Field label="Día" htmlFor="ranking-weekday">
@@ -357,7 +366,9 @@ export default function RankingForm({
             <p className="mt-1 text-xs text-muted-foreground">
               {locked
                 ? "El cupo se cambia en cada fecha, desde su configuración."
-                : "Mínimo 6 parejas para comenzar cada fecha."}
+                : editing
+                  ? "Se aplica a todas las fechas. Mínimo 6 parejas para comenzar cada una."
+                  : "Mínimo 6 parejas para comenzar cada fecha."}
             </p>
           </Field>
         </Section>
@@ -366,8 +377,10 @@ export default function RankingForm({
           title="Categoría"
           description={
             locked
-              ? "Fija desde que se creó el ranking."
-              : "Queda congelada al crear el ranking. Quality, zonas y eliminación."
+              ? "Fija desde que se jugó la primera fecha."
+              : editing
+                ? "Mientras no se juegue ninguna fecha, podés cambiarla. Se aplica a todas las fechas."
+                : "Queda congelada cuando se juega la primera fecha. Quality, zonas y eliminación."
           }
         >
           <fieldset disabled={locked} className="m-0 min-w-0 space-y-4 border-0 p-0 disabled:opacity-60">
@@ -449,9 +462,12 @@ export default function RankingForm({
         </Section>
       </fieldset>
 
-      <Button type="submit" disabled={isSubmitting || !values.name.trim()}>
-        {submitLabel}
-      </Button>
+      <div className="grid auto-cols-fr grid-flow-col gap-2 md:flex md:justify-end">
+        {secondaryAction}
+        <Button type="submit" disabled={isSubmitting || !values.name.trim()}>
+          {submitLabel}
+        </Button>
+      </div>
     </form>
   );
 }

@@ -41,6 +41,10 @@ export class RankingService {
     return this.repository.update(id, input);
   }
 
+  cancel(id: string) {
+    return this.repository.cancel(id);
+  }
+
   listPublic(query?: PublicRankingListQuery) {
     return this.repository.listPublic(query);
   }

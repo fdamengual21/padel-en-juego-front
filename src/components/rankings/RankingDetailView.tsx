@@ -83,6 +83,7 @@ export default function RankingDetailView({
                 <HomeTournamentCard
                   key={event.id}
                   to={tournamentTo(event.id)}
+                  variant="rankingEvent"
                   tournament={{
                     id: event.id,
                     name: event.name,

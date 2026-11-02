@@ -115,6 +115,19 @@ export interface UpdateClubRankingRequest {
   description: string | null;
   dailyStartTime: string | null;
   registrationFee: number;
+  /**
+   * Calendario, categoría y cupo: solo mientras no se jugó ninguna fecha; se aplican a cada fecha.
+   * Achicar `weekCount` borra las últimas fechas con sus inscripciones. Sin valor, no cambia.
+   */
+  weekCount?: number;
+  weekday?: number;
+  firstDate?: string;
+  gender?: string;
+  kind?: string;
+  level?: number | null;
+  sumaTarget?: number | null;
+  categoryName?: string;
+  defaultMaxPairs?: number;
   prizes: Array<{ place: number; label: string }>;
 }
 

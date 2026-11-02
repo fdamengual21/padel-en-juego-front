@@ -175,6 +175,12 @@ export default function UserTournamentDetailScreen() {
       ? `${formatTournamentDayEs(tournament.startDate)} → ${formatTournamentDayEs(tournament.endDate)}`
       : formatTournamentDayEs(tournament.startDate);
   const statusView = tournamentStatusView(tournament);
+  const back = tournament.rankingCircuitId
+    ? {
+        to: `${ROUTES.player.clubRankingDetail(tournament.clubId, tournament.rankingCircuitId)}?tab=fechas`,
+        label: "← Volver al ranking",
+      }
+    : { to: ROUTES.player.tournaments, label: "← Volver a torneos" };
   const results = resultsQuery.data?.finished ? resultsQuery.data : null;
   const resultByPair = new Map((results?.items ?? []).map((item) => [item.pairId, item]));
   const resultRank = new Map((results?.items ?? []).map((item, index) => [item.pairId, index]));
@@ -187,8 +193,8 @@ export default function UserTournamentDetailScreen() {
   return (
     <div className="space-y-5 p-4 md:p-0" data-testid="player-tournament-detail">
       <div>
-        <Link to={ROUTES.player.tournaments} className="text-sm text-sidebar hover:underline">
-          ← Volver a torneos
+        <Link to={back.to} className="text-sm text-sidebar hover:underline">
+          {back.label}
         </Link>
         <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-wrap items-center gap-2">

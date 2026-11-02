@@ -12,7 +12,13 @@ import type {
 } from "../types";
 
 export interface PublicRankingListQuery {
+  /** `all` trae en curso, programados y finalizados (primero los no terminados). Default `live`. */
+  scope?: "live" | "finished" | "all";
   clubId?: string | null;
+  /** Nombre del club, búsqueda parcial. */
+  q?: string | null;
+  provinceId?: number | null;
+  municipalityId?: number | null;
   gender?: string | null;
   kind?: string | null;
   level?: number | null;
@@ -37,6 +43,7 @@ export interface IRankingRepository {
   getPublicStandings(circuitId: string, query?: RankingStandingsQuery): Promise<ClubRankingStandingsPage>;
   create(input: CreateClubRankingRequest): Promise<ClubRankingCircuit>;
   update(id: string, input: UpdateClubRankingRequest): Promise<ClubRankingCircuit>;
+  cancel(id: string): Promise<ClubRankingCircuit>;
   uploadFlyer(id: string, file: File): Promise<ClubRankingCircuit>;
   deleteFlyer(id: string): Promise<ClubRankingCircuit>;
   listPublic(query?: PublicRankingListQuery): Promise<ClubRankingCircuit[]>;
@@ -112,6 +119,14 @@ export class RankingRepository implements IRankingRepository {
     return readData(response);
   }
 
+  async cancel(id: string): Promise<ClubRankingCircuit> {
+    this.assertClubHeader();
+    const response = await this.http.post<ApiEnvelope<ClubRankingCircuit>>(
+      `/club/rankings/${id}/cancel`,
+    );
+    return readData(response);
+  }
+
   async uploadFlyer(id: string, file: File): Promise<ClubRankingCircuit> {
     this.assertClubHeader();
     const body = new FormData();
@@ -135,7 +150,11 @@ export class RankingRepository implements IRankingRepository {
   async listPublic(query: PublicRankingListQuery = {}): Promise<ClubRankingCircuit[]> {
     const response = await this.http.get<ApiEnvelope<ClubRankingCircuit[]>>("/public/rankings", {
       params: {
+        scope: query.scope ?? undefined,
         clubId: query.clubId || undefined,
+        q: query.q?.trim() || undefined,
+        provinceId: query.provinceId ?? undefined,
+        municipalityId: query.municipalityId ?? undefined,
         gender: query.gender || undefined,
         kind: query.kind || undefined,
         level: query.level ?? undefined,

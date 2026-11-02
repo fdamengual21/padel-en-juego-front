@@ -224,6 +224,8 @@ export default function PlayerRegistrationPanel({
     current.status !== "CANCELLED";
   const started = tournamentHasStarted(tournament.status);
   const closed = tournament.status !== "registrationOpen";
+  const notYetOpen =
+    !holdsSpot && tournament.status === "draft" && Boolean(tournament.rankingCircuitId);
   const canRegister = Boolean(categoryId) && !holdsSpot && !started && !closed && !quotaFull;
   const canCancel =
     holdsSpot &&
@@ -333,6 +335,26 @@ export default function PlayerRegistrationPanel({
             Inscribirme
           </Button>
         )
+      ) : notYetOpen ? (
+        <TooltipProvider delay={200}>
+          <Tooltip>
+            <TooltipTrigger render={<span className="inline-flex" />}>
+              <Button
+                type="button"
+                className="shrink-0"
+                data-testid="tournament-subscribe-cta"
+                disabled
+              >
+                Aún no habilitado
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {tournament.registrationOpensAt
+                ? `La inscripción abre el ${formatTournamentDayEs(tournament.registrationOpensAt)}.`
+                : "La inscripción todavía no abrió."}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       ) : blockedNotice ? (
         <div className="flex flex-wrap items-center gap-2">
           <MessageAlert

@@ -78,7 +78,7 @@ export function rankingEventFlow({ circuitId, weekIndex, weekCount }: RankingEve
   const which = weekIndex && weekCount ? `Fecha ${weekIndex} de ${weekCount}` : "Fecha";
   return {
     kind: "rankingEvent",
-    backTo: ROUTES.club.rankingDetail(circuitId),
+    backTo: `${ROUTES.club.rankingDetail(circuitId)}?tab=fechas`,
     copy: {
       backLabel: "← Volver al ranking",
       cancelButton: "Cancelar fecha",

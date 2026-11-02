@@ -31,6 +31,8 @@ export type HomeTournamentCardData = Pick<
 interface HomeTournamentCardProps {
   tournament: HomeTournamentCardData;
   to: string;
+  /** `rankingEvent`: dentro del detalle del ranking. Sin imagen y con "Fecha N" como título. */
+  variant?: "default" | "rankingEvent";
 }
 
 const inscriptionChip: Record<string, { label: string; tone: StatusTone }> = {
@@ -42,22 +44,29 @@ const inscriptionChip: Record<string, { label: string; tone: StatusTone }> = {
 export default function HomeTournamentCard({
   tournament,
   to,
+  variant = "default",
 }: HomeTournamentCardProps) {
   const [failed, setFailed] = useState(false);
+  const isRankingEvent = variant === "rankingEvent";
   const photo = failed
     ? null
     : (tournament.bannerUrl ?? tournament.clubCoverUrl ?? tournament.clubAvatarUrl);
   const category =
     tournament.categories?.map((item) => item.name).filter(Boolean).join(" · ") || "Sin categoría";
   const week =
-    tournament.weekIndex && tournament.rankingWeekCount
+    !isRankingEvent && tournament.weekIndex && tournament.rankingWeekCount
       ? `Fecha ${tournament.weekIndex} de ${tournament.rankingWeekCount}`
       : null;
+  const title =
+    isRankingEvent && tournament.weekIndex ? `Fecha ${tournament.weekIndex}` : tournament.name;
   const meta = [tournament.clubName, category, week].filter(Boolean).join(" · ");
   const chip = tournament.myRegistrationStatus
     ? inscriptionChip[tournament.myRegistrationStatus]
     : undefined;
   const statusView = tournamentStatusView(tournament);
+  const statusChip = (
+    <TournamentStatusChip view={statusView} className="min-w-0 w-fit max-w-full shrink" />
+  );
 
   return (
     <Link
@@ -65,33 +74,35 @@ export default function HomeTournamentCard({
       className="flex min-w-0 cursor-pointer gap-3 overflow-hidden rounded-xl border border-border bg-card p-3.5 text-left"
       data-testid={`home-tournament-${tournament.id}`}
     >
-      <div className="relative w-[72px] shrink-0 self-stretch overflow-hidden rounded-md bg-muted">
-        {photo ? (
-          <img
-            src={photo}
-            alt=""
-            className="absolute inset-0 size-full object-cover"
-            onError={() => setFailed(true)}
-          />
-        ) : (
-          <span className="absolute inset-0 flex items-center justify-center text-sm font-medium text-muted-foreground">
-            {initials(tournament.clubName || tournament.name)}
-          </span>
-        )}
-      </div>
+      {isRankingEvent ? null : (
+        <div className="relative w-[72px] shrink-0 self-stretch overflow-hidden rounded-md bg-muted">
+          {photo ? (
+            <img
+              src={photo}
+              alt=""
+              className="absolute inset-0 size-full object-cover"
+              onError={() => setFailed(true)}
+            />
+          ) : (
+            <span className="absolute inset-0 flex items-center justify-center text-sm font-medium text-muted-foreground">
+              {initials(tournament.clubName || tournament.name)}
+            </span>
+          )}
+        </div>
+      )}
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <p className="min-w-0 truncate text-sm font-semibold tracking-tight">
-          {tournament.name}
-        </p>
+        <div className="flex min-w-0 items-center gap-2">
+          <p className="min-w-0 truncate text-sm font-semibold tracking-tight">
+            {title}
+          </p>
+          {isRankingEvent ? statusChip : null}
+        </div>
         <div className="flex min-w-0 items-center gap-2">
           <p className="min-w-0 truncate text-sm text-muted-foreground">{meta}</p>
           {chip ? <StatusChip tone={chip.tone} label={chip.label} /> : null}
         </div>
         <div className="mt-auto flex min-w-0 items-center gap-2">
-          <TournamentStatusChip
-            view={statusView}
-            className="min-w-0 w-fit max-w-full shrink"
-          />
+          {isRankingEvent ? null : statusChip}
           <span className="ml-auto shrink-0 text-xs font-bold text-foreground">
             {formatDateRangeShortEs(tournament.startDate, tournament.endDate)}
           </span>
