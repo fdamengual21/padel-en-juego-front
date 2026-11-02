@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, CircleAlert, Trophy } from "lucide-react";
+import { ChevronRight, CircleAlert, LoaderCircle, Trophy } from "lucide-react";
 import Api from "@/api/Api";
 import { useMockSession } from "@/app/MockSessionProvider";
 import { useUser } from "@/app/UserProvider";
@@ -73,7 +73,10 @@ export default function UserHomeScreen() {
           ) : null}
         </div>
         {isLoading || !data ? (
-          <p className="text-sm text-muted-foreground">Cargando torneos…</p>
+          <div className="flex flex-col items-center justify-center gap-2">
+            <LoaderCircle className="size-6 animate-spin text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Cargando torneos</p>
+          </div>
         ) : data.upcomingTournaments.length === 0 ? (
           <EmptyState
             icon={Trophy}

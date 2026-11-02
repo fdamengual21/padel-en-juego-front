@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import dayjs from "dayjs";
-import { Calendar, ChevronRight } from "lucide-react";
+import { Calendar, ChevronRight, LoaderCircle } from "lucide-react";
 import { useState } from "react";
 import { PlayerReservationStatusChip } from "@/components/reservations";
 import { Badge } from "@/components/ui/badge";
@@ -45,7 +45,10 @@ export default function PlayerWeekBoard({
         ) : null}
       </div>
       {loading ? (
-        <p className="text-sm text-muted-foreground">Cargando la semana…</p>
+        <div className="flex flex-col items-center justify-center gap-2">
+          <LoaderCircle className="size-6 animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Cargando partidos/reservas</p>
+        </div>
       ) : (
         <div className="flex items-start overflow-x-auto pb-1 pl-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {days.map((day, index) => (

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { CircleAlert, Search, Trophy } from "lucide-react";
+import { CircleAlert, LoaderCircle, Search, Trophy } from "lucide-react";
 import Api from "@/api/Api";
 import { useUser } from "@/app/UserProvider";
 import { EmptyState } from "@/components/EmptyState";
@@ -128,11 +128,16 @@ export default function UserTournamentsScreen() {
       </div>
 
       {isFetching && items.length > 0 ? (
-        <p className="text-center text-xs text-muted-foreground">Actualizando…</p>
+        <div className="flex flex-col items-center justify-center gap-2">
+          <LoaderCircle className="size-6 animate-spin text-muted-foreground" />
+        </div>
       ) : null}
 
       {showLoading ? (
-        <p className="text-sm text-muted-foreground">Cargando torneos…</p>
+        <div className="flex flex-col items-center justify-center gap-2">
+          <LoaderCircle className="size-6 animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Cargando torneos</p>
+        </div>
       ) : null}
 
       {isError && items.length > 0 ? (

@@ -152,8 +152,8 @@ export default function UserClubsScreen() {
         <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3">
           {showSkeletons
             ? Array.from({ length: PAGE_SIZE }, (_, i) => (
-                <ClubCardSkeleton key={`sk-${i}`} />
-              ))
+              <ClubCardSkeleton key={`sk-${i}`} />
+            ))
             : items.map((club) => <ClubListCard key={club.id} club={club} />)}
         </div>
       ) : null}
