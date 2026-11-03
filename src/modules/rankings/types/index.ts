@@ -74,11 +74,19 @@ export interface ClubRankingCircuit {
   sumaTarget: number | null;
   categoryName: string;
   format: string;
+  /** Tipo de partido de las fechas: QUALITY o CUSTOM. */
+  preset: string;
+  /** En iguales: punto de oro (true) o con ventaja. */
+  goldenPoint: boolean;
+  setsToWin: number;
+  tiebreakPoints: number;
   defaultMaxPairs: number;
   minPairs: number;
   dailyStartTime: string | null;
   registrationFee: number;
   status: ClubRankingStatus;
+  /** Ningún partido jugado: calendario, categoría, cupo y formato se pueden cambiar. Solo en el detalle. */
+  structureEditable?: boolean;
   createdAt: string;
   updatedAt: string;
   eventCount?: number;
@@ -104,6 +112,10 @@ export interface CreateClubRankingRequest {
   sumaTarget: number | null;
   categoryName: string;
   format: string;
+  preset: string;
+  goldenPoint: boolean;
+  setsToWin: number;
+  tiebreakPoints: number;
   defaultMaxPairs: number;
   dailyStartTime: string | null;
   registrationFee: number;
@@ -116,7 +128,7 @@ export interface UpdateClubRankingRequest {
   dailyStartTime: string | null;
   registrationFee: number;
   /**
-   * Calendario, categoría y cupo: solo mientras no se jugó ninguna fecha; se aplican a cada fecha.
+   * Calendario, categoría, cupo, formato y reglas de partido: solo mientras no se jugó ningún partido; se aplican a cada fecha.
    * Achicar `weekCount` borra las últimas fechas con sus inscripciones. Sin valor, no cambia.
    */
   weekCount?: number;
@@ -128,6 +140,11 @@ export interface UpdateClubRankingRequest {
   sumaTarget?: number | null;
   categoryName?: string;
   defaultMaxPairs?: number;
+  format?: string;
+  preset?: string;
+  goldenPoint?: boolean;
+  setsToWin?: number;
+  tiebreakPoints?: number;
   prizes: Array<{ place: number; label: string }>;
 }
 

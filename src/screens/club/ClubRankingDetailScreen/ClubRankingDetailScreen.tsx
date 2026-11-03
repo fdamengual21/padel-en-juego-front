@@ -14,6 +14,8 @@ import { toastError, toastSuccess } from "@/lib/toast";
 import type { RankingBannerDraft } from "@/modules/rankings";
 import RankingForm, {
   circuitToRankingFormValues,
+  rankingRulesChanged,
+  rankingRulesSummary,
   type RankingFormValues,
 } from "@/screens/club/components/RankingForm";
 import { ROUTES } from "@/router/routes";
@@ -37,16 +39,32 @@ export default function ClubRankingDetailScreen() {
     enabled: Boolean(clubId && circuitId),
   });
   const circuit = query.data;
-  const [pendingShrink, setPendingShrink] = useState<SaveInput | null>(null);
+  const [pendingSave, setPendingSave] = useState<SaveInput | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
-  const canEditStructure = circuit?.status === "scheduled";
+  const canEditStructure = circuit?.structureEditable === true;
+  const initialValues = useMemo(
+    () => (circuit ? circuitToRankingFormValues(circuit) : null),
+    [circuit],
+  );
   const droppedWeeks = useMemo(() => {
-    if (!circuit || !pendingShrink) return [];
+    if (!circuit || !pendingSave) return [];
     return (circuit.events ?? [])
       .map((event) => event.weekIndex)
-      .filter((week): week is number => week != null && week > pendingShrink.values.weekCount)
+      .filter((week): week is number => week != null && week > pendingSave.values.weekCount)
       .sort((a, b) => a - b);
-  }, [circuit, pendingShrink]);
+  }, [circuit, pendingSave]);
+  const reconfiguredWeeks = useMemo(() => {
+    if (!circuit || !pendingSave || !initialValues) return [];
+    if (!rankingRulesChanged(initialValues, pendingSave.values)) return [];
+    return (circuit.events ?? [])
+      .filter((event) =>
+        ["draft", "registrationOpen", "inProgress"].includes(event.status),
+      )
+      .map((event) => event.weekIndex)
+      .filter((week): week is number => week != null && week <= pendingSave.values.weekCount)
+      .sort((a, b) => a - b);
+  }, [circuit, pendingSave, initialValues]);
+  const shrinking = droppedWeeks.length > 0;
 
   const save = useMutation({
     mutationFn: async ({ values, banner }: SaveInput) => {
@@ -67,6 +85,11 @@ export default function ClubRankingDetailScreen() {
               sumaTarget: values.categoryKind === "suma" ? values.sumaTarget : null,
               categoryName: values.categoryName.trim(),
               defaultMaxPairs: values.maxPairs,
+              format: values.format,
+              preset: values.matchPlayType,
+              goldenPoint: values.equalsResolution === "goldenPoint",
+              setsToWin: values.setsToWin,
+              tiebreakPoints: values.tiebreakPoints,
             }
           : {}),
       });
@@ -137,7 +160,7 @@ export default function ClubRankingDetailScreen() {
               submitLabel="Guardar"
               isSubmitting={save.isPending}
               bannerUrl={circuit.flyerUrl}
-              initialValues={circuitToRankingFormValues(circuit)}
+              initialValues={initialValues ?? undefined}
               secondaryAction={
                 <Button
                   type="button"
@@ -149,8 +172,13 @@ export default function ClubRankingDetailScreen() {
                 </Button>
               }
               onSubmit={(values, banner) => {
-                if (canEditStructure && values.weekCount < circuit.weekCount) {
-                  setPendingShrink({ values, banner });
+                const shrinks = canEditStructure && values.weekCount < circuit.weekCount;
+                const reconfigures =
+                  canEditStructure &&
+                  initialValues != null &&
+                  rankingRulesChanged(initialValues, values);
+                if (shrinks || reconfigures) {
+                  setPendingSave({ values, banner });
                   return;
                 }
                 save.mutate({ values, banner });
@@ -161,21 +189,33 @@ export default function ClubRankingDetailScreen() {
       />
 
       <WarningDialog
-        open={pendingShrink != null}
+        open={pendingSave != null}
         onOpenChange={(open) => {
-          if (!open && !save.isPending) setPendingShrink(null);
+          if (!open && !save.isPending) setPendingSave(null);
         }}
-        title={droppedWeeks.length === 1 ? "Quitar 1 fecha" : `Quitar ${droppedWeeks.length} fechas`}
-        description={`Se van a borrar ${droppedWeeksLabel(droppedWeeks)}. Las parejas anotadas en esas fechas quedan dadas de baja.`}
-        confirmLabel="Quitar y guardar"
+        title={confirmTitle(droppedWeeks.length, reconfiguredWeeks.length > 0)}
+        confirmLabel={shrinking ? "Quitar y guardar" : "Reconfigurar y guardar"}
         cancelLabel="Volver"
-        confirmVariant="destructive"
+        confirmVariant={shrinking ? "destructive" : "default"}
         isConfirming={save.isPending}
         onConfirm={() => {
-          if (!pendingShrink) return;
-          save.mutate(pendingShrink, { onSettled: () => setPendingShrink(null) });
+          if (!pendingSave) return;
+          save.mutate(pendingSave, { onSettled: () => setPendingSave(null) });
         }}
-      />
+      >
+        {reconfiguredWeeks.length > 0 && pendingSave ? (
+          <p className="text-sm text-muted-foreground">
+            Se van a reconfigurar {weeksLabel(reconfiguredWeeks)} con{" "}
+            {rankingRulesSummary(pendingSave.values)}. Las parejas anotadas siguen anotadas.
+          </p>
+        ) : null}
+        {shrinking ? (
+          <p className="text-sm text-muted-foreground">
+            Se van a borrar {weeksLabel(droppedWeeks)}. Las parejas anotadas en esas fechas
+            quedan dadas de baja.
+          </p>
+        ) : null}
+      </WarningDialog>
 
       <WarningDialog
         open={cancelOpen}
@@ -203,9 +243,19 @@ interface SaveInput {
   banner: RankingBannerDraft;
 }
 
-function droppedWeeksLabel(weeks: number[]): string {
+function confirmTitle(droppedCount: number, reconfigures: boolean): string {
+  if (droppedCount > 0 && reconfigures) return "Confirmar cambios";
+  if (droppedCount === 1) return "Quitar 1 fecha";
+  if (droppedCount > 1) return `Quitar ${droppedCount} fechas`;
+  return "Reconfigurar fechas";
+}
+
+function weeksLabel(weeks: number[]): string {
   if (weeks.length === 0) return "las últimas fechas";
   if (weeks.length === 1) return `la fecha ${weeks[0]}`;
+  const first = weeks[0];
+  const last = weeks[weeks.length - 1];
+  if (last - first === weeks.length - 1) return `las fechas ${first} a ${last}`;
   const head = weeks.slice(0, -1).join(", ");
-  return `las fechas ${head} y ${weeks[weeks.length - 1]}`;
+  return `las fechas ${head} y ${last}`;
 }

@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Trash2 } from "lucide-react";
+import { Loader2, Trash2 } from "lucide-react";
+import MatchFormatFields from "@/screens/club/components/MatchFormatFields";
 import TournamentBannerField from "@/screens/club/components/TournamentBannerField";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -11,10 +12,19 @@ import {
   type CategoryGender,
   type CategoryKind,
   type CategoryLevel,
+  type EqualsResolution,
+  type RulesetPreset,
+  type TournamentFormat,
 } from "@/domain";
 import { toIsoDateOnly } from "@/lib/dates";
 import { toastError } from "@/lib/toast";
+import { cn } from "@/lib/utils";
 import type { ClubRankingCircuit, RankingBannerDraft } from "@/modules/rankings";
+
+const MIN_SETS_TO_WIN = 1;
+const MAX_SETS_TO_WIN = 3;
+const MIN_TIEBREAK_POINTS = 5;
+const MAX_TIEBREAK_POINTS = 15;
 
 const WEEKDAYS = [
   { value: 0, label: "Domingo" },
@@ -40,6 +50,13 @@ export interface RankingFormValues {
   sumaTarget: number | null;
   categoryName: string;
   maxPairs: number;
+  /** Quality. Personalizado solo se muestra si el ranking ya lo usa. El torneo puntuable no se ofrece. */
+  matchPlayType: RulesetPreset;
+  equalsResolution: EqualsResolution;
+  setsToWin: number;
+  tiebreakPoints: number;
+  /** Zonas + eliminación o eliminación directa. */
+  format: TournamentFormat;
   prizes: Array<{ place: number; label: string }>;
 }
 
@@ -67,6 +84,11 @@ export function defaultRankingFormValues(
     sumaTarget,
     categoryName: "",
     maxPairs: 12,
+    matchPlayType: "QUALITY",
+    equalsResolution: "goldenPoint",
+    setsToWin: 1,
+    tiebreakPoints: 7,
+    format: "GROUPS_ELIMINATION",
     prizes: [
       { place: 1, label: "" },
       { place: 2, label: "" },
@@ -104,8 +126,33 @@ export function circuitToRankingFormValues(circuit: ClubRankingCircuit): Ranking
     sumaTarget: circuit.sumaTarget,
     categoryName: circuit.categoryName,
     maxPairs: circuit.defaultMaxPairs,
+    matchPlayType: circuit.preset === "CUSTOM" ? "CUSTOM" : "QUALITY",
+    equalsResolution: circuit.goldenPoint === false ? "advantage" : "goldenPoint",
+    setsToWin: circuit.setsToWin ?? 1,
+    tiebreakPoints: circuit.tiebreakPoints ?? 7,
+    format: circuit.format === "DIRECT_ELIMINATION" ? "DIRECT_ELIMINATION" : "GROUPS_ELIMINATION",
     prizes: circuit.prizes.map((item) => ({ place: item.place, label: item.label })),
   });
+}
+
+/** True si cambia el tipo de partido, los iguales, los sets, el tie-break o la estructura. */
+export function rankingRulesChanged(current: RankingFormValues, next: RankingFormValues): boolean {
+  return (
+    current.matchPlayType !== next.matchPlayType ||
+    current.equalsResolution !== next.equalsResolution ||
+    current.format !== next.format ||
+    (next.matchPlayType === "CUSTOM" &&
+      (current.setsToWin !== next.setsToWin || current.tiebreakPoints !== next.tiebreakPoints))
+  );
+}
+
+/** "Personalizado · con ventaja · eliminación directa". */
+export function rankingRulesSummary(values: RankingFormValues): string {
+  const preset = values.matchPlayType === "CUSTOM" ? "Personalizado" : "Quality";
+  const equals = values.equalsResolution === "goldenPoint" ? "punto de oro" : "con ventaja";
+  const format =
+    values.format === "DIRECT_ELIMINATION" ? "eliminación directa" : "zonas + eliminación";
+  return `${preset} · ${equals} · ${format}`;
 }
 
 function nextWeekday(iso: string, weekday: number): string {
@@ -165,6 +212,10 @@ export default function RankingForm({
       ) {
         next.categoryName = rankingCategoryName(next);
       }
+      if (key === "matchPlayType" && value === "QUALITY") {
+        next.setsToWin = 1;
+        next.tiebreakPoints = 7;
+      }
       return next;
     });
   };
@@ -185,6 +236,25 @@ export default function RankingForm({
         }
         if (!locked && (values.weekCount < 4 || values.weekCount > 52)) {
           toastError("El ranking dura entre 4 y 52 semanas");
+          return;
+        }
+        if (
+          !locked &&
+          values.matchPlayType === "CUSTOM" &&
+          (values.setsToWin < MIN_SETS_TO_WIN || values.setsToWin > MAX_SETS_TO_WIN)
+        ) {
+          toastError(`Los sets para ganar van de ${MIN_SETS_TO_WIN} a ${MAX_SETS_TO_WIN}`);
+          return;
+        }
+        if (
+          !locked &&
+          values.matchPlayType === "CUSTOM" &&
+          (values.tiebreakPoints < MIN_TIEBREAK_POINTS ||
+            values.tiebreakPoints > MAX_TIEBREAK_POINTS)
+        ) {
+          toastError(
+            `El tie-break va de ${MIN_TIEBREAK_POINTS} a ${MAX_TIEBREAK_POINTS} puntos`,
+          );
           return;
         }
         void onSubmit(values, { file: bannerFile, remove: removeBanner });
@@ -299,10 +369,10 @@ export default function RankingForm({
           title="Calendario"
           description={
             locked
-              ? "Las fechas ya están generadas. Para mover una, cambiale el día desde su configuración."
+              ? "Ya se jugó un partido. Para mover una fecha, cambiale el día desde su configuración."
               : editing
-                ? "Mientras no se juegue ninguna fecha, podés cambiar el calendario. Las fechas se reacomodan una por semana desde la primera."
-                : "Un Quality por semana. Quality y el formato quedan fijos."
+                ? "Mientras no se juegue ningún partido, podés cambiar el calendario. Las fechas se reacomodan una por semana desde la primera."
+                : "Una fecha por semana, con el formato del ranking."
           }
         >
           <Field label="Día" htmlFor="ranking-weekday">
@@ -377,10 +447,10 @@ export default function RankingForm({
           title="Categoría"
           description={
             locked
-              ? "Fija desde que se jugó la primera fecha."
+              ? "Fija desde que se jugó el primer partido."
               : editing
-                ? "Mientras no se juegue ninguna fecha, podés cambiarla. Se aplica a todas las fechas."
-                : "Queda congelada cuando se juega la primera fecha. Quality, zonas y eliminación."
+                ? "Mientras no se juegue ningún partido, podés cambiarla. Se aplica a todas las fechas."
+                : "Queda congelada cuando se juega el primer partido."
           }
         >
           <fieldset disabled={locked} className="m-0 min-w-0 space-y-4 border-0 p-0 disabled:opacity-60">
@@ -460,12 +530,50 @@ export default function RankingForm({
             </Field>
           </fieldset>
         </Section>
+
+        <Section
+          title="Formato"
+          className="md:col-span-2"
+          description={
+            locked
+              ? "Fijo desde que se jugó el primer partido."
+              : editing
+                ? "Mientras no se juegue ningún partido, podés cambiarlo. Se aplica a todas las fechas."
+                : "Tipo de partido y estructura de cada fecha. Queda fijo cuando se juega el primer partido."
+          }
+        >
+          <MatchFormatFields
+            idPrefix="ranking"
+            values={values}
+            onChange={patch}
+            matchPlayTypeLocked={locked}
+            presetOptions={
+              initialValues?.matchPlayType === "CUSTOM"
+                ? [
+                    { value: "QUALITY", label: "Quality — 1 set" },
+                    { value: "CUSTOM", label: "Personalizado" },
+                  ]
+                : [{ value: "QUALITY", label: "Quality — 1 set" }]
+            }
+            formatOptions={[
+              { value: "GROUPS_ELIMINATION", label: "Zonas + eliminación", disabled: locked },
+              { value: "DIRECT_ELIMINATION", label: "Eliminación directa", disabled: locked },
+            ]}
+          />
+        </Section>
       </fieldset>
 
       <div className="grid auto-cols-fr grid-flow-col gap-2 md:flex md:justify-end">
         {secondaryAction}
         <Button type="submit" disabled={isSubmitting || !values.name.trim()}>
-          {submitLabel}
+          {isSubmitting ? (
+            <>
+              <Loader2 className="animate-spin" aria-hidden />
+              Guardando…
+            </>
+          ) : (
+            submitLabel
+          )}
         </Button>
       </div>
     </form>
@@ -476,13 +584,17 @@ function Section({
   title,
   description,
   children,
+  className,
 }: {
   title: string;
   description: string;
   children: ReactNode;
+  className?: string;
 }) {
   return (
-    <section className="h-full space-y-4 rounded-xl border border-border bg-card p-4">
+    <section
+      className={cn("h-full space-y-4 rounded-xl border border-border bg-card p-4", className)}
+    >
       <header className="space-y-1">
         <h3 className="text-base font-semibold tracking-tight">{title}</h3>
         <p className="text-sm text-muted-foreground">{description}</p>

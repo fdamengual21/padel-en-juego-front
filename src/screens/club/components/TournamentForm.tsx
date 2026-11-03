@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Info } from "lucide-react";
+import { Info, Loader2 } from "lucide-react";
 import {
   buildMatchRulesFromForm,
   defaultPhaseDays,
@@ -25,8 +25,6 @@ import {
   type CategoryGender,
   type CategoryKind,
   type CategoryLevel,
-  type EqualsResolution,
-  type RulesetPreset,
   type TournamentFormat,
   asTournamentFormat,
   SCORING_MAX_PAIRS,
@@ -40,6 +38,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import MatchFormatFields from "./MatchFormatFields";
 import TournamentBannerField from "./TournamentBannerField";
 
 function isoPlusDays(iso: string, days: number): string {
@@ -479,192 +478,74 @@ export default function TournamentForm({
                 Tipo de partido y estructura: {policy.lockedHint.toLowerCase()}
               </p>
             ) : null}
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Tipo de partido</p>
-              {(
+            <MatchFormatFields
+              values={values}
+              onChange={patch}
+              readOnly={readOnly}
+              matchPlayTypeLocked={matchPlayTypeLocked}
+              equalsLocked={values.matchPlayType === "STANDARD"}
+              presetOptions={[
+                { value: "QUALITY", label: "Quality — 1 set" },
+                { value: "STANDARD", label: "Torneo puntuable", disabled: true, hint: "Próximamente" },
+                { value: "CUSTOM", label: "Personalizado" },
+              ]}
+              formatOptions={(
                 [
-                  ["QUALITY", "Quality — 1 set"],
-                  ["STANDARD", "Torneo puntuable"],
-                  ["CUSTOM", "Personalizado"],
+                  ["GROUPS_ELIMINATION", "Zonas + eliminación"],
+                  ["DIRECT_ELIMINATION", "Eliminación directa"],
+                  ["ROUND_ROBIN", "Todos contra todos"],
                 ] as const
-              ).map(([value, label]) => {
-                const scoringLocked = value === "STANDARD";
-                const optionDisabled = matchPlayTypeLocked || scoringLocked;
-                return (
-                  <div key={value} className="space-y-2">
-                    <label
-                      className={cn(
-                        "flex items-center gap-2 text-sm",
-                        optionDisabled && "cursor-not-allowed text-muted-foreground",
-                      )}
-                    >
-                      <input
-                        type="radio"
-                        name="matchPlayType"
-                        checked={values.matchPlayType === value}
-                        disabled={optionDisabled}
-                        onChange={() => patch("matchPlayType", value as RulesetPreset)}
-                      />
-                      {label}
-                      {scoringLocked ? (
-                        <span className="text-xs text-muted-foreground">Próximamente</span>
-                      ) : null}
-                    </label>
-                    {value === "STANDARD" && values.matchPlayType === "STANDARD" ? (
-                      <Alert variant="info">
-                        <Info />
-                        <AlertDescription>
-                          Este torneo suma al ranking. El mínimo y el máximo de
-                          parejas se controlan al inscribir.
-                        </AlertDescription>
-                        <div className="col-start-2">
-                          <Button
-                            type="button"
-                            variant="link"
-                            className="h-auto px-0 text-primary-strong"
-                            disabled={readOnly}
-                            onClick={() => setRulesOpen(true)}
-                          >
-                            Ver reglas
-                          </Button>
-                        </div>
-                      </Alert>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
-
-            <Field label="Máximo de parejas" htmlFor="maxPairs">
-              <Input
-                id="maxPairs"
-                type="number"
-                disabled={readOnly || values.matchPlayType === "STANDARD"}
-                min={values.matchPlayType === "STANDARD" ? SCORING_MIN_PAIRS : policy.minPairs}
-                max={values.matchPlayType === "STANDARD" ? SCORING_MAX_PAIRS : undefined}
-                value={values.maxPairs}
-                onChange={(e) => patch("maxPairs", Number(e.target.value))}
-              />
-              {values.matchPlayType === "STANDARD" ? (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Mínimo {SCORING_MIN_PAIRS} parejas. El mínimo y este máximo se
-                  controlan al inscribir.
-                </p>
-              ) : policy.maxPairsHint ? (
-                <p className="text-xs text-muted-foreground mt-1">{policy.maxPairsHint}</p>
-              ) : null}
-            </Field>
-
-            <div className="space-y-2">
-              <p className="text-sm font-medium">En iguales (40-40)</p>
-              {(
-                [
-                  ["goldenPoint", "Punto de oro"],
-                  ["advantage", "Con ventaja (diferencia de 2)"],
-                ] as const
-              ).map(([value, label]) => (
-                <label
-                  key={value}
-                  className={cn(
-                    "flex items-center gap-2 text-sm",
-                    (matchPlayTypeLocked || values.matchPlayType === "STANDARD") &&
-                      "cursor-not-allowed text-muted-foreground",
-                  )}
-                >
-                  <input
-                    type="radio"
-                    name="equalsResolution"
-                    checked={values.equalsResolution === value}
-                    disabled={matchPlayTypeLocked || values.matchPlayType === "STANDARD"}
-                    onChange={() =>
-                      patch("equalsResolution", value as EqualsResolution)
-                    }
-                  />
-                  {label}
-                </label>
-              ))}
-              <p className="text-xs text-muted-foreground">
-                En punto de oro, la pareja que resta elige el lado. Con ventaja hay que ganar dos
-                puntos seguidos tras iguales.
-              </p>
-            </div>
-
-            {values.matchPlayType === "CUSTOM" ? (
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Sets para ganar el partido" htmlFor="setsToWin">
+              ).map(([value, label]) => ({
+                value,
+                label,
+                disabled:
+                  policy.lockFormat ||
+                  (values.matchPlayType === "STANDARD" && !isScoringFormat(value)),
+              }))}
+              renderPresetExtra={(preset) =>
+                preset === "STANDARD" ? (
+                  <Alert variant="info">
+                    <Info />
+                    <AlertDescription>
+                      Este torneo suma al ranking. El mínimo y el máximo de
+                      parejas se controlan al inscribir.
+                    </AlertDescription>
+                    <div className="col-start-2">
+                      <Button
+                        type="button"
+                        variant="link"
+                        className="h-auto px-0 text-primary-strong"
+                        disabled={readOnly}
+                        onClick={() => setRulesOpen(true)}
+                      >
+                        Ver reglas
+                      </Button>
+                    </div>
+                  </Alert>
+                ) : null
+              }
+              afterPreset={
+                <Field label="Máximo de parejas" htmlFor="maxPairs">
                   <Input
-                    id="setsToWin"
+                    id="maxPairs"
                     type="number"
-                    min={1}
-                    max={3}
-                    value={values.setsToWin}
-                    disabled={readOnly}
-                    onChange={(e) => patch("setsToWin", Number(e.target.value))}
+                    disabled={readOnly || values.matchPlayType === "STANDARD"}
+                    min={values.matchPlayType === "STANDARD" ? SCORING_MIN_PAIRS : policy.minPairs}
+                    max={values.matchPlayType === "STANDARD" ? SCORING_MAX_PAIRS : undefined}
+                    value={values.maxPairs}
+                    onChange={(e) => patch("maxPairs", Number(e.target.value))}
                   />
+                  {values.matchPlayType === "STANDARD" ? (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Mínimo {SCORING_MIN_PAIRS} parejas. El mínimo y este máximo se
+                      controlan al inscribir.
+                    </p>
+                  ) : policy.maxPairsHint ? (
+                    <p className="text-xs text-muted-foreground mt-1">{policy.maxPairsHint}</p>
+                  ) : null}
                 </Field>
-                <Field label="Tie-break a (puntos)" htmlFor="tbPoints">
-                  <Input
-                    id="tbPoints"
-                    type="number"
-                    min={5}
-                    max={15}
-                    value={values.tiebreakPoints}
-                    disabled={readOnly}
-                    onChange={(e) => patch("tiebreakPoints", Number(e.target.value))}
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Con diferencia de 2 (ej. 7 puntos).
-                  </p>
-                </Field>
-              </div>
-            ) : values.matchPlayType === "QUALITY" ? (
-              <p className="text-xs text-muted-foreground">
-                Quality: 1 set a 6 juegos; a 6-6 se juega tie-break a 7.
-              </p>
-            ) : null}
-
-            <div className="border-t border-border pt-4 space-y-3">
-              <p className="text-sm font-medium">Estructura del torneo</p>
-              <div className="space-y-2">
-                {(
-                  [
-                    ["GROUPS_ELIMINATION", "Zonas + eliminación"],
-                    ["DIRECT_ELIMINATION", "Eliminación directa"],
-                    ["ROUND_ROBIN", "Todos contra todos"],
-                  ] as const
-                ).map(([value, label]) => {
-                  const locked =
-                    readOnly ||
-                    policy.lockFormat ||
-                    (values.matchPlayType === "STANDARD" && !isScoringFormat(value));
-                  return (
-                    <label
-                      key={value}
-                      className={cn(
-                        "flex items-center gap-2 text-sm",
-                        locked && "cursor-not-allowed text-muted-foreground",
-                      )}
-                    >
-                      <input
-                        type="radio"
-                        name="format"
-                        checked={values.format === value}
-                        disabled={locked}
-                        onChange={() => patch("format", value as TournamentFormat)}
-                      />
-                      {label}
-                    </label>
-                  );
-                })}
-              </div>
-              {values.format === "GROUPS_ELIMINATION" ? (
-                <p className="text-sm text-muted-foreground">
-                  Zonas de 3. Si sobra una pareja, la zona A queda de 4. Si sobran
-                  dos, A y B quedan de 4. De cada zona pasan 2. En la llave, 1° vs
-                  2° de otra zona.
-                </p>
-              ) : null}
-            </div>
+              }
+            />
             {values.matchPlayType !== "QUALITY" ? (
               <PhaseDayPicker
                 values={values}
@@ -717,7 +598,14 @@ export default function TournamentForm({
             data-testid="tournament-form-submit"
             disabled={isSubmitting || datesInvalid || nameInvalid}
           >
-            {submitLabel}
+            {isSubmitting ? (
+              <>
+                <Loader2 className="animate-spin" aria-hidden />
+                Guardando…
+              </>
+            ) : (
+              submitLabel
+            )}
           </Button>
         </div>
       )}
