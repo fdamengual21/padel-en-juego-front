@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { CalendarDays, Image as ImageIcon, MapPin, Phone, Tag } from "lucide-react";
 import ImageViewerDialog from "@/components/ImageViewerDialog";
 import ShareButton from "@/components/ShareButton";
@@ -17,10 +18,12 @@ const heroButton =
 
 interface RankingHeroProps {
   circuit: ClubRankingCircuit;
+  /** Perfil del club. Sin esto el nombre del club no es link. */
+  clubTo?: string;
 }
 
 /** Cabecera del ranking: portada del club con velo navy, datos clave y accesos a premios, reglamento y flyer. */
-export default function RankingHero({ circuit }: RankingHeroProps) {
+export default function RankingHero({ circuit, clubTo }: RankingHeroProps) {
   const [coverFailed, setCoverFailed] = useState(false);
   const [flyerOpen, setFlyerOpen] = useState(false);
   const showCover = Boolean(circuit.clubCoverUrl) && !coverFailed;
@@ -63,9 +66,22 @@ export default function RankingHero({ circuit }: RankingHeroProps) {
               {formatTournamentDayEs(circuit.firstDate)}
             </li>
             {circuit.clubName ? (
-              <li className="inline-flex items-center gap-1.5">
-                <MapPin className="size-3.5 shrink-0" />
-                {circuit.clubName}
+              <li className="inline-flex">
+                {clubTo ? (
+                  <Link
+                    to={clubTo}
+                    className="inline-flex items-center gap-1.5 underline-offset-4 transition-colors hover:text-sidebar-foreground hover:underline focus-visible:outline-2 focus-visible:outline-sidebar-ring"
+                    data-testid="ranking-club-link"
+                  >
+                    <MapPin className="size-3.5 shrink-0" />
+                    {circuit.clubName}
+                  </Link>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5">
+                    <MapPin className="size-3.5 shrink-0" />
+                    {circuit.clubName}
+                  </span>
+                )}
               </li>
             ) : null}
             {phone ? (

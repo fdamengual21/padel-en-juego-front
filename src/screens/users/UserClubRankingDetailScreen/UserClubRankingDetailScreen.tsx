@@ -34,6 +34,7 @@ export default function UserClubRankingDetailScreen() {
           circuit={query.data}
           standingsSource="public"
           tournamentTo={(id) => ROUTES.player.tournamentDetail(id)}
+          clubTo={ROUTES.player.clubDetail(query.data.clubId)}
           activeTab={activeTab}
           onTabChange={(tab) => {
             const next = new URLSearchParams(searchParams);

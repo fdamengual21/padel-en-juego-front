@@ -10,7 +10,6 @@ import {
   Menu,
   Trophy,
   User,
-  UserPlus,
   type LucideIcon,
 } from "lucide-react";
 import { useMockSession } from "@/app/MockSessionProvider";

@@ -21,6 +21,8 @@ interface RankingDetailViewProps {
   onTabChange: (tab: RankingDetailTab) => void;
   /** Solo club con permiso de edición y ranking abierto. Sin esto no hay tab Configuración. */
   configTab?: ReactNode;
+  /** Perfil del club desde el nombre en el hero. */
+  clubTo?: string;
 }
 
 /** Detalle del ranking para club y jugador: hero, resumen y tabs. */
@@ -31,6 +33,7 @@ export default function RankingDetailView({
   activeTab,
   onTabChange,
   configTab,
+  clubTo,
 }: RankingDetailViewProps) {
   const hasConfig = Boolean(configTab);
   const tab = activeTab === "config" && !hasConfig ? "ranking" : activeTab;
@@ -38,7 +41,7 @@ export default function RankingDetailView({
 
   return (
     <div className="space-y-4 sm:space-y-5" data-testid="ranking-detail">
-      <RankingHero circuit={circuit} />
+      <RankingHero circuit={circuit} clubTo={clubTo} />
       <RankingSummaryStrip circuit={circuit} />
 
       <Tabs value={tab} onValueChange={(value) => onTabChange(value as RankingDetailTab)}>
