@@ -121,17 +121,7 @@ export default function UserShell() {
           onSelect: () => navigate(ROUTES.auth.login),
           testId:
             placement === "sidebar" ? "player-sidebar-login" : "player-more-login",
-        },
-        {
-          label: "Registrarme",
-          icon: UserPlus,
-          group: "session",
-          onSelect: () => navigate(ROUTES.auth.register),
-          testId:
-            placement === "sidebar"
-              ? "player-sidebar-register"
-              : "player-more-register",
-        },
+        }
       ];
     }
 
