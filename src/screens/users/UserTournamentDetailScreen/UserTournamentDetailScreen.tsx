@@ -208,6 +208,7 @@ export default function UserTournamentDetailScreen() {
             <TournamentRulesDialog
               format={tournament.format}
               matchRules={page.matchRules}
+              drawRules={page.drawRules}
               categoryName={category.name}
             />
             <ShareButton

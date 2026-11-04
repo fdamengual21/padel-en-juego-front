@@ -376,12 +376,8 @@ export default function PairFormModal({
 
   const slot1PlayerId = slot1.mode === "search" ? slot1.player?.id : undefined;
   const slot2PlayerId = slot2.mode === "search" ? slot2.player?.id : undefined;
-  const exclude1 = slot2PlayerId
-    ? [...blockedPlayerIds, slot2PlayerId]
-    : blockedPlayerIds;
-  const exclude2 = slot1PlayerId
-    ? [...blockedPlayerIds, slot1PlayerId]
-    : blockedPlayerIds;
+  const exclude1 = slot2PlayerId ? [slot2PlayerId] : [];
+  const exclude2 = slot1PlayerId ? [slot1PlayerId] : [];
   const visibleSoloCandidates = useMemo(
     () =>
       soloCandidates.filter(
@@ -499,12 +495,14 @@ export default function PairFormModal({
             required
             value={slot1}
             excludeIds={exclude1}
+            disabledIds={blockedPlayerIds}
             onChange={setSlot1}
           />
           <PlayerPickerField
             label="Jugador 2 (opcional)"
             value={slot2}
             excludeIds={exclude2}
+            disabledIds={blockedPlayerIds}
             onChange={(value) => {
               setSelectedSoloPlayerId(null);
               setSlot2(value);

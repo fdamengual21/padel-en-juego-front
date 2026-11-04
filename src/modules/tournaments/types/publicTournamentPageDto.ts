@@ -7,6 +7,7 @@ export interface PublicTournamentPageDto {
   category: PublicTournamentCategoryRefDto;
   matchRules: MatchRules;
   preset: string | null;
+  drawRules?: string;
   tournamentStarted: boolean;
   summary: PublicTournamentSummaryDto;
   quotaFull: boolean;

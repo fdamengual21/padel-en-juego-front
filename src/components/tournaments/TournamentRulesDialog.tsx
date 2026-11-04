@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { BookOpen } from "lucide-react";
-import type { MatchRules, TournamentFormat } from "@/domain";
-import { tournamentFormatLabel, tournamentRulesSections } from "@/domain";
+import type { DrawRules, MatchRules, TournamentFormat } from "@/domain";
+import { asDrawRules, tournamentFormatLabel, tournamentRulesSections } from "@/domain";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,6 +20,7 @@ import {
 interface TournamentRulesDialogProps {
   format: TournamentFormat;
   matchRules: MatchRules;
+  drawRules?: DrawRules | string | null;
   categoryName?: string | null;
 }
 
@@ -27,10 +28,16 @@ interface TournamentRulesDialogProps {
 export default function TournamentRulesDialog({
   format,
   matchRules,
+  drawRules,
   categoryName,
 }: TournamentRulesDialogProps) {
   const [open, setOpen] = useState(false);
-  const sections = tournamentRulesSections(format, matchRules);
+  const rulesCode = asDrawRules(drawRules);
+  const sections = tournamentRulesSections(format, matchRules, rulesCode);
+  const aligned =
+    rulesCode === "FAP"
+      ? "Criterios alineados al reglamento FAP para zonas y clasificación."
+      : "Criterios alineados al reglamento FIP para torneos por puntos.";
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <TooltipProvider delay={200}>
@@ -58,7 +65,7 @@ export default function TournamentRulesDialog({
           <DialogTitle>Reglamento · {tournamentFormatLabel(format)}</DialogTitle>
           <DialogDescription>
             {categoryName ? `${categoryName}. ` : ""}
-            Criterios alineados al reglamento FIP para torneos por puntos.
+            {aligned}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">

@@ -11,6 +11,7 @@ import type {
   UnresolvedTie,
 } from "@/domain";
 import {
+  asDrawRules,
   canOpenMatchResult,
   knockoutRebuildBlockedReason,
   matchLiveAction,
@@ -19,6 +20,7 @@ import {
   matchWinnerSide,
   qualifyChangeBlockedReason,
   scoreboardSlotCount,
+  standingsHint,
   tieBreakHint,
   tieBreakLabel,
 } from "@/domain";
@@ -98,6 +100,8 @@ interface GroupZonesPanelProps {
   /** @deprecated Nombres van en PairVsBlock vía pairLabels; se mantiene por compat. */
   pairPlayerNames?: Record<string, [string, string]>;
   matchRules: MatchRules;
+  /** Motor FIP/FAP para el hint de la tabla. */
+  drawRules?: import("@/domain").DrawRules | string | null;
   courts?: Court[];
   allMatches?: Match[];
   slots?: MatchSlot[];
@@ -153,9 +157,6 @@ interface GroupZonesPanelProps {
   onQualifyPair?: (input: { matchId: string; pairId: string | null }) => Promise<void> | void;
   qualifySaving?: boolean;
 }
-
-const STANDINGS_HINT =
-  "Se ordena por puntos de zona: 2 si ganó el partido, 1 si lo perdió jugando, 0 si no se presentó (W.O.). Entre dos empatadas, el partido directo; entre tres o más, sets y games solo entre ellas, luego games de toda la zona. Si todo sigue igual, el club sortea desde acá.";
 
 function signed(value: number): string {
   return `${value > 0 ? "+" : ""}${value}`;
@@ -456,6 +457,7 @@ export default function GroupZonesPanel({
   pairLabels,
   pairPlayerNames = {},
   matchRules,
+  drawRules = "FIP",
   courts = [],
   allMatches,
   slots = [],
@@ -483,6 +485,7 @@ export default function GroupZonesPanel({
   onQualifyPair,
   qualifySaving = false,
 }: GroupZonesPanelProps) {
+  const tableHint = standingsHint(asDrawRules(drawRules));
   const [scheduleMatchId, setScheduleMatchId] = useState<string | null>(null);
   const [tieGroupId, setTieGroupId] = useState<string | null>(null);
   const [pairingMatchId, setPairingMatchId] = useState<string | null>(null);
@@ -499,6 +502,7 @@ export default function GroupZonesPanel({
     scheduleMatches.some((match) => match.phase === phase),
   );
   const canEditPairing = Boolean(onSetPairing) && !tournamentLocked;
+  /** Solo llave: no se mueven parejas entre zonas (sorteo FIP). */
   const canMovePairs = Boolean(onMovePair) && !tournamentLocked && tournamentStarted;
   const canSetLive = Boolean(onSetStatus) && !tournamentLocked;
   const showMatchActions = canEditPairing || canMovePairs || canSetLive;
@@ -512,7 +516,7 @@ export default function GroupZonesPanel({
     return (
       <EmptyState
         icon={Users}
-        title="Todavía no hay zonas"
+        title="Todavía no hay zonas armadas"
         description="Hacen falta al menos dos parejas aceptadas y completas para armar las zonas y el cuadro."
         className={compact ? "min-h-0 py-8" : undefined}
       />
@@ -570,11 +574,6 @@ export default function GroupZonesPanel({
       ),
     ]),
   ];
-  const moveGroups = groups.map((group) => ({
-    id: group.id,
-    name: groupNames[group.id] ?? group.name,
-    pairCount: group.pairIds.length,
-  }));
   const pairGroupIds = Object.fromEntries(
     groups.flatMap((group) => group.pairIds.map((pairId) => [pairId, group.id])),
   );
@@ -620,7 +619,7 @@ export default function GroupZonesPanel({
                           >
                             <Info className="h-3 w-3" />
                           </TooltipTrigger>
-                          <TooltipContent className="max-w-xs">{STANDINGS_HINT}</TooltipContent>
+                          <TooltipContent className="max-w-xs">{tableHint}</TooltipContent>
                         </Tooltip>
                       </p>
                     </TooltipProvider>
@@ -941,7 +940,7 @@ export default function GroupZonesPanel({
                             }
                             : undefined
                         }
-                        onMovePair={canMovePairs ? setMovingMatchId : undefined}
+                        onMovePair={undefined}
                       />
                     </TableCell>
                   ) : null}
@@ -1238,8 +1237,8 @@ export default function GroupZonesPanel({
           pairs={movingPairs}
           currentPhase={movingMatch?.phase ?? null}
           phases={movePhases}
-          groups={moveGroups}
-          currentGroupId={movingMatch?.groupId ?? null}
+          groups={[]}
+          currentGroupId={null}
           pairGroupIds={pairGroupIds}
           isSubmitting={moveSaving}
           onOpenChange={(open) => {

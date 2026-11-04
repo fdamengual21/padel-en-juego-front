@@ -77,9 +77,8 @@ export default function MovePairPhaseModal({
         <DialogHeader>
           <DialogTitle>Mover pareja</DialogTitle>
           <DialogDescription>
-            Elegí la pareja y el destino: otra ronda de la llave o otra zona. Se recuentan los
-            versus. No se puede mover si esa zona o esa pareja ya jugó, si el destino tiene 4 o si
-            el origen quedaría con 2.
+            Elegí la pareja y el destino: otra ronda de la llave. Se recuentan los
+            versus. No se puede mover si esa pareja ya jugó.
           </DialogDescription>
         </DialogHeader>
         {pairs.length === 0 ? (
@@ -133,7 +132,7 @@ export default function MovePairPhaseModal({
                 <p className="text-sm text-muted-foreground">Elegí una pareja.</p>
               ) : !hasDestinations ? (
                 <p className="text-sm text-muted-foreground">
-                  No hay otra ronda o zona para mover.
+                  No hay otra ronda para mover.
                 </p>
               ) : (
                 <ul className="space-y-2">

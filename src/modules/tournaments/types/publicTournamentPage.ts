@@ -32,6 +32,8 @@ export interface PublicTournamentPage {
   category: PublicTournamentCategoryRef;
   matchRules: MatchRules;
   preset: RulesetPreset | null;
+  /** Motor de zonas y tabla. */
+  drawRules: "FIP" | "FAP";
   tournamentStarted: boolean;
   summary: {
     pairCount: number;

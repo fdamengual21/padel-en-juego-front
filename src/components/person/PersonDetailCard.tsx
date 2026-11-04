@@ -1,5 +1,8 @@
+import { Link } from "react-router-dom";
+import { ChevronRight } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import PhoneWhatsApp from "@/components/PhoneWhatsApp";
+import { ROUTES } from "@/router/routes";
 
 export interface PersonDetailBadge {
   label: string;
@@ -17,6 +20,8 @@ export interface PersonDetailField {
 interface PersonDetailCardProps {
   name: string;
   avatarUrl?: string | null;
+  /** Cuenta app; si hay, muestra “Ver perfil” al lado del nombre. */
+  userId?: string | null;
   badges?: PersonDetailBadge[];
   fields: PersonDetailField[];
 }
@@ -25,6 +30,7 @@ interface PersonDetailCardProps {
 export default function PersonDetailCard({
   name,
   avatarUrl,
+  userId = null,
   badges = [],
   fields,
 }: PersonDetailCardProps) {
@@ -40,7 +46,19 @@ export default function PersonDetailCard({
         />
         <div className="min-w-0 flex-1 space-y-4">
           <div className="space-y-2">
-            <h2 className="text-2xl font-semibold tracking-tight text-foreground">{name}</h2>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <h2 className="text-2xl font-semibold tracking-tight text-foreground">{name}</h2>
+              {userId ? (
+                <Link
+                  to={ROUTES.player.playerProfile(userId)}
+                  className="inline-flex shrink-0 items-center gap-0.5 text-sm font-medium text-primary-strong hover:underline"
+                  data-testid="person-detail-profile-link"
+                >
+                  Ver perfil
+                  <ChevronRight className="size-4" />
+                </Link>
+              ) : null}
+            </div>
             {badges.length > 0 ? (
               <div className="flex flex-wrap gap-2">
                 {badges.map((badge) =>

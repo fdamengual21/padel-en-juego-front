@@ -164,6 +164,7 @@ export function emptyParticipantsBoard(): ParticipantsBoardView {
     generatedAt: new Date().toISOString(),
     rows: [],
     tournamentStarted: false,
+    structureLocked: false,
     admission: { allowed: true, reason: null },
     capacity: {
       maxPairs: 0,

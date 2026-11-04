@@ -1,19 +1,14 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import PersonDetailCard from "@/components/person/PersonDetailCard";
-import { buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { formatCategoryLevel, isCategoryLevel, playerSidePreferenceLabel } from "@/domain";
-import { cn } from "@/lib/utils";
 import type { ClubRankingStanding } from "@/modules/rankings";
-import { ROUTES } from "@/router/routes";
 import type { RankingStandingsSource } from "./RankingStandingsTable";
 
 interface RankingPlayerDialogProps {
@@ -40,7 +35,6 @@ export default function RankingPlayerDialog({
     : null;
   const side = playerSidePreferenceLabel(player?.sidePreference);
   const phone = player?.phone?.trim() || null;
-  const profileUserId = source === "public" ? (player?.userId ?? null) : null;
 
   return (
     <Dialog open={row !== null} onOpenChange={onOpenChange}>
@@ -58,6 +52,7 @@ export default function RankingPlayerDialog({
             <PersonDetailCard
               name={name}
               avatarUrl={player.avatarUrl}
+              userId={player.userId}
               badges={[
                 category ? { label: `Categoría ${category}` } : { label: "Sin categoría", plain: true },
                 ...(side ? [{ label: `Lado ${side}` }] : []),
@@ -77,18 +72,6 @@ export default function RankingPlayerDialog({
               <Stat label="Fechas" value={`${current.datesPlayed}/${totalDates}`} />
             </div>
           </div>
-        ) : null}
-
-        {profileUserId ? (
-          <DialogFooter className="shrink-0 border-t border-border px-4 py-4">
-            <Link
-              to={ROUTES.player.playerProfile(profileUserId)}
-              className={cn(buttonVariants({ variant: "outline" }))}
-              data-testid="ranking-player-profile-link"
-            >
-              Ver perfil
-            </Link>
-          </DialogFooter>
         ) : null}
       </DialogContent>
     </Dialog>

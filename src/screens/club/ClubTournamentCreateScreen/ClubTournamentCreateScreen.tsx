@@ -62,7 +62,6 @@ export default function ClubTournamentCreateScreen() {
         tieBreakers: ["SET_DIFFERENCE", "POINTS", "HEAD_TO_HEAD", "GAME_DIFFERENCE"],
         groupCount: null,
       });
-      await Api.TournamentOpsService().syncCategoryStructure(category.id);
       await Api.TournamentService().applyBanner(tournament.id, banner);
       return tournament;
     },

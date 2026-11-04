@@ -91,6 +91,7 @@ export default function ClientDetailModal({
               <PersonDetailCard
                 name={data.fullName}
                 avatarUrl={data.avatarUrl}
+                userId={data.userId}
                 badges={[
                   category
                     ? { label: `Categoría ${category}` }

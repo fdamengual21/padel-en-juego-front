@@ -65,7 +65,7 @@ export default function ClubTournamentsScreen() {
           <h2 className="text-2xl font-semibold tracking-tight">Torneos</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             {scope === "open"
-              ? "Borradores, inscripciones abiertas y en curso. Los más recientes primero."
+              ? "Inscripciones abiertas y torneos que se están jugando."
               : "Todos los torneos, los más recientes primero."}
           </p>
         </div>
@@ -98,7 +98,7 @@ export default function ClubTournamentsScreen() {
             variant={scope === "open" ? "default" : "outline"}
             onClick={() => setScope("open")}
           >
-            Pendientes y activos
+            Abiertos y en juego
           </Button>
           <Button
             type="button"
@@ -131,7 +131,7 @@ export default function ClubTournamentsScreen() {
             search.trim()
               ? "No hay torneos que coincidan con la búsqueda."
               : scope === "open"
-                ? "No hay torneos pendientes ni en juego."
+                ? "No hay torneos con inscripción abierta."
                 : "Todavía no hay torneos."
           }
         />

@@ -150,6 +150,14 @@ export interface ITournamentOpsRepository {
   scheduleCategory(categoryId: string): Promise<ScheduleResult>;
   finishTournament(tournamentId: string): Promise<FinishTournamentResult>;
   startTournament(tournamentId: string): Promise<StartTournamentResult>;
+  undoStartTournament(tournamentId: string): Promise<
+    import("@/domain").UndoStartTournamentResult
+  >;
+  previewZones(tournamentId: string): Promise<import("@/domain").ZonesPreviewResult>;
+  buildZones(
+    tournamentId: string,
+    expectedVersion: number,
+  ): Promise<import("@/domain").ZonesBuildResult>;
   cancelTournament(tournamentId: string): Promise<CancelTournamentResult>;
   listCourts(clubId: string): Promise<Court[]>;
   createCourt(input: CreateCourtInput): Promise<Court>;
@@ -466,6 +474,28 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
 
   async startTournament(tournamentId: string) {
     return this.read<StartTournamentResult>(`/club/tournaments/${tournamentId}/start`, "post");
+  }
+
+  async undoStartTournament(tournamentId: string) {
+    return this.read<import("@/domain").UndoStartTournamentResult>(
+      `/club/tournaments/${tournamentId}/undo-start`,
+      "post",
+    );
+  }
+
+  async previewZones(tournamentId: string) {
+    return this.read<import("@/domain").ZonesPreviewResult>(
+      `/club/tournaments/${tournamentId}/zones/preview`,
+      "post",
+    );
+  }
+
+  async buildZones(tournamentId: string, expectedVersion: number) {
+    return this.read<import("@/domain").ZonesBuildResult>(
+      `/club/tournaments/${tournamentId}/zones/build`,
+      "post",
+      { expectedVersion },
+    );
   }
 
   async cancelTournament(tournamentId: string) {

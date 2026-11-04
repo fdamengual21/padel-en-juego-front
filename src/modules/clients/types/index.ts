@@ -18,6 +18,8 @@ export interface ClubClient {
   categoryLevel: number | null;
   sidePreference: string | null;
   avatarUrl: string | null;
+  /** Cuenta app vinculada; sin cuenta no hay perfil público. */
+  userId: string | null;
   hasAccount: boolean;
   note: string | null;
   reservationsCount: number;

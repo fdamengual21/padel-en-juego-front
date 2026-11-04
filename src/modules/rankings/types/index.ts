@@ -74,6 +74,8 @@ export interface ClubRankingCircuit {
   sumaTarget: number | null;
   categoryName: string;
   format: string;
+  /** Motor de zonas y tabla: FIP o FAP. No se edita desde la UI. */
+  drawRules?: "FIP" | "FAP";
   /** Tipo de partido de las fechas: QUALITY o CUSTOM. */
   preset: string;
   /** En iguales: punto de oro (true) o con ventaja. */

@@ -117,6 +117,18 @@ export class TournamentOpsService {
     return this.repository.startTournament(tournamentId);
   }
 
+  undoStartTournament(tournamentId: string) {
+    return this.repository.undoStartTournament(tournamentId);
+  }
+
+  previewZones(tournamentId: string) {
+    return this.repository.previewZones(tournamentId);
+  }
+
+  buildZones(tournamentId: string, expectedVersion: number) {
+    return this.repository.buildZones(tournamentId, expectedVersion);
+  }
+
   cancelTournament(tournamentId: string) {
     return this.repository.cancelTournament(tournamentId);
   }

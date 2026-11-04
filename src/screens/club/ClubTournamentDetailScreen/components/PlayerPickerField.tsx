@@ -10,6 +10,7 @@ import PlayerIdentityFields, {
 import SidePreferenceFields, {
   emptySidePreference,
 } from "@/components/players/SidePreferenceFields";
+import { StatusChip } from "@/components/StatusChip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -94,7 +95,10 @@ function emptyManualDraft(
 interface PlayerPickerFieldProps {
   label: string;
   value: PlayerSlotValue;
+  /** Ocultos del listado (p. ej. el del otro slot). */
   excludeIds?: string[];
+  /** Visibles pero no seleccionables (p. ej. ya inscriptos). */
+  disabledIds?: string[];
   required?: boolean;
   onChange: (value: PlayerSlotValue) => void;
 }
@@ -103,6 +107,7 @@ export default function PlayerPickerField({
   label,
   value,
   excludeIds = [],
+  disabledIds = [],
   required = false,
   onChange,
 }: PlayerPickerFieldProps) {
@@ -287,24 +292,47 @@ export default function PlayerPickerField({
         <div className="rounded-lg border border-border bg-card">
           {filtered.length > 0 ? (
             <ul className="max-h-40 overflow-y-auto divide-y divide-border">
-              {filtered.map((player) => (
-                <li key={player.id}>
-                  <button
-                    type="button"
-                    className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm hover:bg-muted/50"
-                    onClick={() => {
-                      onChange({ mode: "search", player });
-                      setQuery("");
-                    }}
-                  >
-                    <span className="font-medium">{player.displayName}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {[player.phone, player.email].filter(Boolean).join(" · ") ||
-                        "Sin contacto"}
-                    </span>
-                  </button>
-                </li>
-              ))}
+              {filtered.map((player) => {
+                const enrolled = disabledIds.includes(player.id);
+                return (
+                  <li key={player.id}>
+                    <button
+                      type="button"
+                      disabled={enrolled}
+                      aria-disabled={enrolled || undefined}
+                      className={cn(
+                        "flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm",
+                        enrolled
+                          ? "cursor-not-allowed opacity-60"
+                          : "hover:bg-muted/50",
+                      )}
+                      onClick={() => {
+                        if (enrolled) return;
+                        onChange({ mode: "search", player });
+                        setQuery("");
+                      }}
+                    >
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="truncate font-medium">
+                          {player.displayName}
+                        </span>
+                        {enrolled ? (
+                          <StatusChip
+                            tone="warning"
+                            label="Ya inscripto"
+                            icon={null}
+                          />
+                        ) : null}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {[player.phone, player.email]
+                          .filter(Boolean)
+                          .join(" · ") || "Sin contacto"}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           ) : (
             <p className="px-3 py-2 text-xs text-muted-foreground">

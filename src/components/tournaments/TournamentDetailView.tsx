@@ -13,14 +13,16 @@ import {
   isQualityPreset,
   resolveMatchDurationMinutes,
   FIVE_PAIR_ZONE_NOTICE,
-  DRAW_REBUILD_ON_ADD_NOTICE,
+  STARTED_OUT_OF_DRAW_NOTICE,
   SCORING_PAIR_COUNT_REASON,
   acceptedOverflowSubstitutes,
   championPairNames,
-  drawRebuildWarningItems,
+  startedOutOfDrawWarningItems,
   removeAcceptedPairBlockedReason,
   resolveTournamentChampionPairId,
   startTournamentDescription,
+  formatUsesZoneStructure,
+  asZoneStructureStatus,
   type CreateRepechageInput,
   type Match,
   type MatchPhase,
@@ -28,6 +30,8 @@ import {
   type MatchRules,
   type ParticipantsBoardView,
   type RankingClosure,
+  type ZonesPreviewResult,
+  type ZoneStructureStatus,
 } from "@/domain";
 import { isLastPendingRankingEvent, rankingChampionsLabel } from "@/modules/rankings";
 import Api from "@/api/Api";
@@ -86,6 +90,7 @@ import {
   type TournamentFormValues,
 } from "@/modules/tournaments/types";
 import {
+  RANKING_EVENT_MIN_PAIRS,
   rankingEventCalendar,
   resolveTournamentFlow,
   tournamentStatusView,
@@ -120,7 +125,7 @@ function configSaveWarningItems(
   overflow: boolean,
 ) {
   const items = [
-    "Al guardar, se vuelven a armar las zonas y los versus con las parejas aceptadas.",
+    "Si ya había zonas armadas, al guardar pueden quedar desactualizadas y hay que rearmarlas antes de comenzar.",
   ];
   if (overflow) {
     const extra = acceptedSpots - maxPairs;
@@ -129,6 +134,32 @@ function configSaveWarningItems(
     );
   }
   return items;
+}
+
+function zoneStructureButtonLabel(status: ZoneStructureStatus) {
+  return status === "none" ? "Armar zonas" : "Rearmar zonas";
+}
+
+function zoneStructureDisabledReason(input: {
+  status: string;
+  format: string;
+  acceptedPairs: number;
+  isRankingEvent: boolean;
+  zoneStructureStatus: ZoneStructureStatus;
+}): string | null {
+  if (input.status === "inProgress" || input.status === "finished" || input.status === "cancelled")
+    return "El torneo ya comenzó. No se pueden armar las zonas.";
+  if (!formatUsesZoneStructure(input.format))
+    return "Este formato no usa armado de zonas.";
+  if (input.zoneStructureStatus === "ready")
+    return "Las zonas ya están armadas.";
+  const minPairs = input.isRankingEvent ? RANKING_EVENT_MIN_PAIRS : 3;
+  if (input.acceptedPairs < minPairs) {
+    return input.isRankingEvent
+      ? "Hacen falta al menos 6 parejas aceptadas para armar las zonas."
+      : "Hacen falta al menos 3 parejas aceptadas para armar las zonas.";
+  }
+  return null;
 }
 
 function overflowPairLabel(
@@ -206,6 +237,8 @@ export default function TournamentDetailView({
     ParticipantsBoardView["rows"][number]["pair"] | null
   >(null);
   const [confirmStartOpen, setConfirmStartOpen] = useState(false);
+  const [zonesModalOpen, setZonesModalOpen] = useState(false);
+  const [zonesPreview, setZonesPreview] = useState<ZonesPreviewResult | null>(null);
   const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
   const [finishOpen, setFinishOpen] = useState(false);
@@ -502,33 +535,11 @@ export default function TournamentDetailView({
         );
       }
       await invalidateOps();
-      const accepted =
-        status === "ACCEPTED" ||
-        Boolean(data.autoMatch) ||
-        (data.kind === "edit" && Boolean(vars.player2Id));
-      if (accepted || vars.splitSolo) {
-        const result =
-          await Api.TournamentOpsService().syncCategoryStructure(categoryId);
-        if (result.message) toastInfo("Estructura actualizada", result.message);
-        await invalidateOps();
-      }
     },
     onError: (err: Error) => {
       toastError("No se pudo agregar la pareja", err.message);
     },
   });
-
-  useEffect(() => {
-    if (!categoryId || !tournament) return;
-    if (tournament.status === "finished" || tournament.status === "cancelled") return;
-    void Api.TournamentOpsService()
-      .syncCategoryStructure(categoryId)
-      .then(async () => {
-        await invalidateOps();
-      });
-    // Sync once when category is ready / registrations already seeded.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categoryId, registrations.length, tournament?.status]);
 
   const localPairLabels = useMemo(() => {
     const map: Record<string, string> = {};
@@ -734,6 +745,53 @@ export default function TournamentDetailView({
     },
   });
 
+  const undoStartMutation = useMutation({
+    mutationFn: () => Api.TournamentOpsService().undoStartTournament(tournamentId),
+    onSuccess: async (result) => {
+      toastSuccess(result.message || "Se deshizo el comienzo.");
+      await Promise.all([
+        invalidateOps(),
+        qc.invalidateQueries({ queryKey: ["tournaments"] }),
+      ]);
+    },
+    onError: (err: Error) => {
+      const logic = err instanceof ApiHttpError && err.status === 422;
+      toastError(
+        logic ? "No se puede deshacer" : "No se pudo deshacer el comienzo",
+        logic ? err.message : undefined,
+      );
+    },
+  });
+
+  const previewZonesMutation = useMutation({
+    mutationFn: () => Api.TournamentOpsService().previewZones(tournamentId),
+    onSuccess: (result) => {
+      setZonesPreview(result);
+      setZonesModalOpen(true);
+    },
+    onError: (err: Error) => {
+      toastError("No se pudo preparar el armado", err.message);
+    },
+  });
+
+  const buildZonesMutation = useMutation({
+    mutationFn: (expectedVersion: number) =>
+      Api.TournamentOpsService().buildZones(tournamentId, expectedVersion),
+    onSuccess: async (result) => {
+      setZonesModalOpen(false);
+      setZonesPreview(null);
+      toastSuccess(result.message);
+      await invalidateOps();
+    },
+    onError: (err: Error) => {
+      const logic = err instanceof ApiHttpError && err.status === 422;
+      toastError(
+        logic ? "No se pudieron armar las zonas" : "Error al armar zonas",
+        logic ? err.message : undefined,
+      );
+    },
+  });
+
   const cancelMutation = useMutation({
     mutationFn: () => Api.TournamentOpsService().cancelTournament(tournamentId),
     onSuccess: async (result) => {
@@ -924,7 +982,7 @@ export default function TournamentDetailView({
         updatedAt: new Date().toISOString(),
       });
       await Api.TournamentService().applyBanner(cfgTournament.id, banner);
-      return Api.TournamentOpsService().syncCategoryStructure(cfgCategory.id);
+      return { message: undefined as string | undefined };
     },
     onSuccess: async (result, input) => {
       toastSuccess(
@@ -987,12 +1045,6 @@ export default function TournamentDetailView({
         toastSuccess("Inscripción aceptada");
       }
       await invalidateOps();
-      if (categoryId) {
-        const sync =
-          await Api.TournamentOpsService().syncCategoryStructure(categoryId);
-        if (sync.message) toastInfo("Estructura actualizada", sync.message);
-        await invalidateOps();
-      }
     },
     onError: (err: Error) => {
       toastError("No se pudo aceptar la inscripción", err.message);
@@ -1025,10 +1077,6 @@ export default function TournamentDetailView({
       setRemoveRegistrationId(null);
       setRemoveNote("");
       await invalidateOps();
-      if (categoryId) {
-        await Api.TournamentOpsService().syncCategoryStructure(categoryId);
-        await invalidateOps();
-      }
     },
     onError: (err: Error) => {
       toastError("No se pudo eliminar la pareja", err.message);
@@ -1165,8 +1213,10 @@ export default function TournamentDetailView({
     tournament.status === "inProgress" ||
     tournament.status === "finished" ||
     Boolean(participantsBoard?.tournamentStarted);
-  const configLocked =
-    tournamentLocked || Boolean(configBoard?.structureLocked);
+  const structureLocked =
+    Boolean(participantsBoard?.structureLocked) ||
+    Boolean(configBoard?.structureLocked);
+  const configLocked = tournamentLocked || structureLocked;
   const participantsLockedReason = tournamentLocked
     ? tournament.status === "cancelled"
       ? "El torneo está cancelado. Las inscripciones no se pueden modificar."
@@ -1177,7 +1227,7 @@ export default function TournamentDetailView({
   const canGrowAcceptedCup =
     !tournamentLocked &&
     tournamentStarted &&
-    !configBoard?.structureLocked &&
+    !structureLocked &&
     !scoringAtCap;
   const addPairBlockedReason = participantsLockedReason
     ? participantsLockedReason
@@ -1197,12 +1247,15 @@ export default function TournamentDetailView({
       : acceptedFull
         ? "El cupo de parejas aceptadas está completo."
         : null;
-  const drawRebuildItems = drawRebuildWarningItems(
+  const startedOutOfDrawItems = startedOutOfDrawWarningItems(
     acceptedFull ? capacity.maxPairs : null,
   );
-  const showDrawRebuildNotice =
-    tournamentStarted && !tournamentLocked && !configBoard?.structureLocked;
+  /** Torneo comenzado, sin partidos jugados: se puede sumar, pero queda fuera del cuadro. */
+  const showStartedOutOfDrawNotice =
+    tournamentStarted && !tournamentLocked && !structureLocked;
   const canMutateParticipants = !tournamentLocked;
+  /** Con partidos jugados no se cambia la composición de la pareja. */
+  const canEditPair = canMutateParticipants && !structureLocked;
   const matchRules =
     zonesBoard?.matchRules ??
     cuadroBoard?.matchRules ??
@@ -1238,8 +1291,35 @@ export default function TournamentDetailView({
     isQualityPreset(ruleset?.preset) &&
     !repechageCreated;
   const finishBlockedByRepechage = repechageCreated && repechagePendingCount > 0;
+  const zoneStructureStatus = asZoneStructureStatus(
+    tournament.zoneStructureStatus ?? zonesBoard?.zoneStructureStatus,
+  );
+  const isRankingEvent = Boolean(tournament.rankingCircuitId);
+  const zoneBuildMinPairs = isRankingEvent ? RANKING_EVENT_MIN_PAIRS : 3;
+  const zoneBuildBlocked = zoneStructureDisabledReason({
+    status: tournament.status,
+    format: tournament.format,
+    acceptedPairs: capacity.acceptedPairs,
+    isRankingEvent,
+    zoneStructureStatus,
+  });
+  const showZoneStructureButton =
+    tournament.status === "draft" ||
+    tournament.status === "registrationOpen" ||
+    tournament.status === "inProgress";
+  const startBlockedByZones =
+    formatUsesZoneStructure(tournament.format) && zoneStructureStatus !== "ready"
+      ? zoneStructureStatus === "stale"
+        ? "Las zonas están desactualizadas. Rearmalas antes de comenzar."
+        : "Hay que armar las zonas antes de comenzar."
+      : null;
   const canStartTournament =
-    tournament.status === "draft" || tournament.status === "registrationOpen";
+    (tournament.status === "draft" || tournament.status === "registrationOpen") &&
+    !startBlockedByZones;
+  const canUndoStart =
+    tournament.status === "inProgress" &&
+    !tournamentLocked &&
+    !structureLocked;
   const canCancelTournament = !tournamentLocked;
   const canFinishTournament = tournament.status === "inProgress";
   const resultMatch = resultMatchId
@@ -1452,6 +1532,12 @@ export default function TournamentDetailView({
             <TournamentRulesDialog
               format={tournament.format}
               matchRules={matchRules}
+              drawRules={
+                zonesBoard?.drawRules ??
+                cuadroBoard?.drawRules ??
+                ruleset?.drawRules ??
+                "FIP"
+              }
               categoryName={category?.name}
             />
             <ShareButton
@@ -1500,15 +1586,85 @@ export default function TournamentDetailView({
                     {flow.copy.cancelButton}
                   </Button>
                 ) : null}
-                {canStartTournament ? (
+                {showZoneStructureButton ? (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger
+                        delay={200}
+                        render={
+                          <span className="inline-flex w-full sm:w-auto" />
+                        }
+                      >
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="w-full"
+                          disabled={
+                            Boolean(zoneBuildBlocked) ||
+                            previewZonesMutation.isPending ||
+                            buildZonesMutation.isPending ||
+                            cancelMutation.isPending
+                          }
+                          onClick={() => previewZonesMutation.mutate()}
+                          data-testid="build-zones-button"
+                        >
+                          {zoneStructureButtonLabel(zoneStructureStatus)}
+                        </Button>
+                      </TooltipTrigger>
+                      {zoneBuildBlocked ? (
+                        <TooltipContent className="max-w-xs">
+                          {zoneBuildBlocked}
+                        </TooltipContent>
+                      ) : null}
+                    </Tooltip>
+                  </TooltipProvider>
+                ) : null}
+                {canStartTournament ||
+                ((tournament.status === "draft" ||
+                  tournament.status === "registrationOpen") &&
+                  startBlockedByZones) ? (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger
+                        delay={200}
+                        render={
+                          <span className="inline-flex w-full sm:w-auto" />
+                        }
+                      >
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="w-full"
+                          disabled={
+                            !canStartTournament ||
+                            startMutation.isPending ||
+                            cancelMutation.isPending
+                          }
+                          onClick={() => setConfirmStartOpen(true)}
+                          data-testid="start-tournament-button"
+                        >
+                          Comenzar torneo
+                        </Button>
+                      </TooltipTrigger>
+                      {startBlockedByZones ? (
+                        <TooltipContent className="max-w-xs">
+                          {startBlockedByZones}
+                        </TooltipContent>
+                      ) : null}
+                    </Tooltip>
+                  </TooltipProvider>
+                ) : null}
+                {canUndoStart ? (
                   <Button
                     type="button"
                     size="sm"
-                    disabled={startMutation.isPending || cancelMutation.isPending}
-                    onClick={() => setConfirmStartOpen(true)}
-                    data-testid="start-tournament-button"
+                    variant="outline"
+                    disabled={undoStartMutation.isPending || cancelMutation.isPending}
+                    onClick={() => undoStartMutation.mutate()}
+                    data-testid="undo-start-tournament-button"
                   >
-                    Comenzar torneo
+                    Deshacer comienzo
                   </Button>
                 ) : null}
                 {canFinishTournament ? (
@@ -1707,10 +1863,10 @@ export default function TournamentDetailView({
             >
               {admission.reason}
             </p>
-          ) : showDrawRebuildNotice ? (
-            <Alert variant="warning" data-testid="draw-rebuild-notice">
+          ) : showStartedOutOfDrawNotice ? (
+            <Alert variant="warning" data-testid="started-out-of-draw-notice">
               <TriangleAlert />
-              <AlertDescription>{DRAW_REBUILD_ON_ADD_NOTICE}</AlertDescription>
+              <AlertDescription>{STARTED_OUT_OF_DRAW_NOTICE}</AlertDescription>
             </Alert>
           ) : null}
           {participantsBoard?.notice ? (
@@ -1887,7 +2043,7 @@ export default function TournamentDetailView({
                                   size="sm"
                                   disabled={acceptMutation.isPending}
                                   onClick={() => {
-                                    if (showDrawRebuildNotice) {
+                                    if (showStartedOutOfDrawNotice) {
                                       setPendingAcceptId(reg.id);
                                       return;
                                     }
@@ -1924,7 +2080,7 @@ export default function TournamentDetailView({
                               </Button>
                             </>
                           ) : null}
-                          {canMutateParticipants &&
+                          {canEditPair &&
                             !row.disqualified &&
                             reg?.status !== "CANCELLED" &&
                             reg?.status !== "REJECTED" ? (
@@ -1997,10 +2153,31 @@ export default function TournamentDetailView({
         </TabsContent>
 
         <TabsContent value="grupos" className="space-y-4 pt-4">
+          {showStartedOutOfDrawNotice && outOfDrawSummary ? (
+            <Alert variant="warning" data-testid="started-out-of-draw-zones-notice">
+              <TriangleAlert className="size-4" />
+              <AlertDescription>{STARTED_OUT_OF_DRAW_NOTICE}</AlertDescription>
+            </Alert>
+          ) : null}
+          {zoneStructureStatus === "stale" ? (
+            <Alert>
+              <TriangleAlert className="size-4" />
+              <AlertDescription>
+                Las zonas están desactualizadas. Rearmalas antes de comenzar.
+              </AlertDescription>
+            </Alert>
+          ) : null}
           {zonesBoard?.notice ? (
             <p className="text-sm text-muted-foreground">{zonesBoard.notice}</p>
           ) : null}
           {zonesBoard ? (
+            zoneStructureStatus === "none" && zonesBoard.groups.length === 0 ? (
+              <EmptyState
+                icon={Users}
+                title="Todavía no hay zonas armadas"
+                description={`Cuando haya al menos ${zoneBuildMinPairs} parejas aceptadas, usá «Armar zonas».`}
+              />
+            ) : (
             <GroupZonesPanel
               groups={zonesBoard.groups}
               matches={zonesBoard.groupMatches}
@@ -2008,6 +2185,7 @@ export default function TournamentDetailView({
               pairLabels={zonesBoard.pairLabels}
               pairPlayerNames={zonesBoard.pairPlayerNames}
               matchRules={zonesBoard.matchRules}
+              drawRules={zonesBoard.drawRules}
               courts={zonesBoard.courts}
               allMatches={zonesBoard.allMatches}
               slots={zonesBoard.slots}
@@ -2058,13 +2236,23 @@ export default function TournamentDetailView({
                 await qualifyPairMutation.mutateAsync(input);
               }}
             />
+            )
           ) : (
             <p className="text-sm text-muted-foreground">Cargando zonas…</p>
           )}
         </TabsContent>
 
         <TabsContent value="cuadro" className="space-y-4 pt-4">
-          {cuadroBoard ? (
+          {zoneStructureStatus === "stale" ? (
+            <Alert>
+              <TriangleAlert className="size-4" />
+              <AlertDescription>
+                Las zonas están desactualizadas. Rearmalas antes de comenzar.
+              </AlertDescription>
+            </Alert>
+          ) : null}
+          {cuadroBoard &&
+          (zoneStructureStatus !== "none" || (cuadroBoard.rounds?.length ?? 0) > 0) ? (
             <CuadroBoard
               board={cuadroBoard}
               isLoading={cuadroFetching}
@@ -2078,7 +2266,7 @@ export default function TournamentDetailView({
             <EmptyState
               icon={GitBranch}
               title="Todavía no hay cuadro"
-              description="Se completa cuando haya parejas inscriptas y zonas armadas."
+              description="Se completa cuando armes las zonas con las parejas aceptadas."
             />
           )}
         </TabsContent>
@@ -2122,6 +2310,7 @@ export default function TournamentDetailView({
                 pairLabels={repechageBoard.pairLabels}
                 pairPlayerNames={repechageBoard.pairPlayerNames}
                 matchRules={repechageBoard.matchRules}
+                drawRules={repechageBoard.drawRules}
                 courts={repechageBoard.courts}
                 allMatches={repechageBoard.allMatches}
                 slots={repechageBoard.slots}
@@ -2560,6 +2749,35 @@ export default function TournamentDetailView({
         }}
       />
 
+      <WarningDialog
+        open={zonesModalOpen}
+        onOpenChange={(open) => {
+          if (buildZonesMutation.isPending || previewZonesMutation.isPending) return;
+          setZonesModalOpen(open);
+          if (!open) setZonesPreview(null);
+        }}
+        title={zoneStructureButtonLabel(zoneStructureStatus)}
+        description={
+          zonesPreview
+            ? [
+                ...zonesPreview.blockingErrors,
+                ...zonesPreview.warnings,
+                zonesPreview.summary.label,
+              ]
+                .filter(Boolean)
+                .join(" ")
+            : "Calculando el armado…"
+        }
+        cancelLabel="Cancelar"
+        confirmLabel={zoneStructureStatus === "none" ? "Armar" : "Rearmar"}
+        isConfirming={buildZonesMutation.isPending}
+        confirmDisabled={!zonesPreview?.canBuild}
+        onConfirm={() => {
+          if (!zonesPreview?.canBuild || buildZonesMutation.isPending) return;
+          buildZonesMutation.mutate(zonesPreview.version);
+        }}
+      />
+
       <Dialog
         open={finishOpen}
         disablePointerDismissal={finishPhase === "pending"}
@@ -2760,7 +2978,7 @@ export default function TournamentDetailView({
         }}
       >
         <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
-          {drawRebuildItems.map((item) => (
+          {startedOutOfDrawItems.map((item) => (
             <li key={item}>{item}</li>
           ))}
         </ul>
@@ -2791,10 +3009,10 @@ export default function TournamentDetailView({
         }
         isSaving={savePairMutation.isPending}
         structureWarning={
-          showDrawRebuildNotice
+          showStartedOutOfDrawNotice
             ? {
-                title: "Sumar pareja al cuadro",
-                items: drawRebuildItems,
+                title: "Sumar pareja fuera del cuadro",
+                items: startedOutOfDrawItems,
                 confirmLabel: "Sumar",
               }
             : null

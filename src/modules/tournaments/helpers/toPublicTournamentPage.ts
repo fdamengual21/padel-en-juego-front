@@ -1,4 +1,10 @@
-import { asTournamentFormat, type MatchRules, type RulesetPreset, type TournamentStatus } from "@/domain";
+import {
+  asDrawRules,
+  asTournamentFormat,
+  type MatchRules,
+  type RulesetPreset,
+  type TournamentStatus,
+} from "@/domain";
 import type { PublicTournamentPage, PublicTournamentCategoryRef } from "../types/publicTournamentPage";
 import type {
   PublicTournamentCategoryRefDto,
@@ -58,6 +64,7 @@ export function toPublicTournamentPage(dto: PublicTournamentPageDto): PublicTour
     category,
     matchRules: dto.matchRules ?? FALLBACK_MATCH_RULES,
     preset: asPreset(dto.preset),
+    drawRules: asDrawRules(dto.drawRules),
     tournamentStarted: Boolean(dto.tournamentStarted),
     summary: {
       pairCount: Number(dto.summary?.pairCount ?? 0),

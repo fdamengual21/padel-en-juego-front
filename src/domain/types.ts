@@ -38,6 +38,43 @@ export interface StartTournamentResult {
   autoMatches: SoloPairAutoMatchResult[];
   /** Nombres de los solos que quedaron sin pareja y se dieron de baja. */
   leftOut: string[];
+  zoneStructureStatus?: ZoneStructureStatus;
+}
+
+/** Preview del armado FIP de zonas. */
+export interface ZonesPreviewResult {
+  canBuild: boolean;
+  canStart: boolean;
+  blockingErrors: string[];
+  warnings: string[];
+  summary: {
+    zoneCount: number;
+    sizes: number[];
+    label: string;
+  };
+  zoneStructureStatus: ZoneStructureStatus;
+  version: number;
+  acceptedPairs: number;
+}
+
+/** Respuesta al confirmar armado/rearmado. */
+export interface ZonesBuildResult {
+  message: string;
+  zoneStructureStatus: ZoneStructureStatus;
+  zoneStructureVersion: number;
+  summary: {
+    zoneCount: number;
+    sizes: number[];
+    label: string;
+  };
+}
+
+/** Respuesta de «Deshacer comienzo». */
+export interface UndoStartTournamentResult {
+  status: string;
+  message: string;
+  zoneStructureStatus: ZoneStructureStatus;
+  canUndoStart: boolean;
 }
 
 /** Respuesta al cancelar un torneo. */
@@ -51,6 +88,25 @@ export type TournamentFormat =
   | "GROUPS_ELIMINATION"
   | "DIRECT_ELIMINATION"
   | "ROUND_ROBIN";
+
+/** Armado explícito de zonas (fase de grupos). */
+export type ZoneStructureStatus = "none" | "ready" | "stale";
+
+/** Normaliza el estado de armado de zonas. */
+export function asZoneStructureStatus(
+  value: string | null | undefined,
+): ZoneStructureStatus {
+  if (value === "ready" || value === "stale") return value;
+  return "none";
+}
+
+/** Motor de armado de zonas y tabla. */
+export type DrawRules = "FIP" | "FAP";
+
+/** Normaliza el motor de cuadro. Cualquier valor distinto de FAP es FIP. */
+export function asDrawRules(value: string | null | undefined): DrawRules {
+  return value === "FAP" ? "FAP" : "FIP";
+}
 
 /** Convierte un formato persistido. Quality viejo pasa a todos contra todos. */
 export function asTournamentFormat(value: string | null | undefined): TournamentFormat {
@@ -305,6 +361,10 @@ export interface Tournament {
   /** Legado. El autoasignado usa el cierre del club. */
   dailyEndTime: string;
   status: TournamentStatus;
+  /** Armado de zonas: none / ready / stale. */
+  zoneStructureStatus?: ZoneStructureStatus;
+  /** Versión del armado para preview/build. */
+  zoneStructureVersion?: number;
   format: TournamentFormat;
   /**
    * Precio de inscripción del torneo (moneda local).
@@ -542,6 +602,8 @@ export interface TournamentRuleset {
   id: string;
   tournamentCategoryId: string;
   preset: RulesetPreset;
+  /** Motor de zonas y tabla. No se edita desde la UI. */
+  drawRules?: DrawRules;
   matchRules: MatchRules;
   tieBreakers: TieBreaker[];
   /** Derivado al sincronizar. No se configura a mano. */
@@ -1020,6 +1082,8 @@ export interface CuadroBoardView {
   pairLabels: Record<string, string>;
   pairPlayerNames: Record<string, [string, string]>;
   matchRules: MatchRules;
+  /** Motor de zonas y tabla. */
+  drawRules?: DrawRules;
   /** Canchas del club (id + nombre) para el diagrama. */
   courts: Array<Pick<Court, "id" | "name">>;
   /** Zonas con empates que esperan al club; sus puestos no pasan al cuadro. */
@@ -1029,6 +1093,8 @@ export interface CuadroBoardView {
   /** Solo backoffice: rondas extra y acciones. El tab público no lo manda. */
   knockoutStructure?: KnockoutStructure | null;
   notice: string | null;
+  zoneStructureStatus?: ZoneStructureStatus;
+  zoneStructureVersion?: number;
 }
 
 /** Tab Repechaje: zonas + cuadro del subdraw, con agenda de club. */
@@ -1074,6 +1140,8 @@ export interface ZonesBoardView {
   pairLabels: Record<string, string>;
   pairPlayerNames: Record<string, [string, string]>;
   matchRules: MatchRules;
+  /** Motor de zonas y tabla. */
+  drawRules?: DrawRules;
   courts: Court[];
   allMatches: Match[];
   slots: MatchSlot[];
@@ -1083,6 +1151,8 @@ export interface ZonesBoardView {
   unresolvedTies: UnresolvedTie[];
   notice: string | null;
   autoAssign: AutoAssignPreview;
+  zoneStructureStatus?: ZoneStructureStatus;
+  zoneStructureVersion?: number;
 }
 
 /** Respuesta del desempate manual de una zona. */
@@ -1191,6 +1261,8 @@ export interface ParticipantsBoardView {
   }>;
   /** El club dio comienzo al torneo (o ya terminó). No depende de horarios ni fechas. */
   tournamentStarted: boolean;
+  /** Hay partidos con resultado / en cancha: no se editan parejas ni config. */
+  structureLocked: boolean;
   admission: PairAdmission;
   capacity: CategoryCapacity;
   notice: string | null;

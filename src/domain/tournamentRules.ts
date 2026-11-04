@@ -1,4 +1,5 @@
 import type {
+  DrawRules,
   Match,
   MatchRules,
   MatchSlot,
@@ -23,13 +24,28 @@ export const REMOVE_ACCEPTED_AFTER_START_REASON =
 export const ADMISSION_CLOSED_AFTER_PLAYED_REASON =
   "Hay partidos con resultado. No se pueden sumar parejas.";
 
-/** Aviso en Participantes si el torneo empezó y todavía no hay partidos jugados. */
-export const DRAW_REBUILD_ON_ADD_NOTICE =
-  "Todavía no hay partidos jugados. Si sumás una pareja al cuadro, se vuelven a armar las zonas y los versus. Si el cupo está lleno, también sube el número de participantes.";
+/** Hay partidos con resultado: no se edita la pareja. */
+export const PAIR_EDIT_PLAYED_REASON =
+  "Hay partidos con resultado. No se puede editar la pareja.";
 
-/** Confirmación al sentar una pareja con el cuadro ya armado y sin partidos jugados. */
+/** Aviso en Participantes si había zonas armadas y el roster cambió (torneo aún no comenzó). */
+export const DRAW_REBUILD_ON_ADD_NOTICE =
+  "Si ya había zonas armadas, al sumar o sacar una pareja aceptada quedan desactualizadas: hay que rearmarlas antes de comenzar.";
+
+/** Confirmación al cambiar el roster con zonas ya armadas (torneo aún no comenzó). */
 export const DRAW_REBUILD_WARNING =
-  "Al confirmar, se vuelven a armar las zonas y los versus con las parejas aceptadas.";
+  "Si ya había zonas armadas, al confirmar quedan desactualizadas y hay que rearmarlas antes de comenzar.";
+
+/**
+ * Torneo comenzado sin partidos jugados: la pareja entra aceptada pero no al cuadro.
+ * Hay que deshacer el comienzo para poder rearmar.
+ */
+export const STARTED_OUT_OF_DRAW_NOTICE =
+  "Con el torneo comenzado, las parejas nuevas quedan aceptadas pero fuera del cuadro. Para incluirlas en las zonas: usá «Deshacer comienzo», rearmá las zonas y volvé a comenzar.";
+
+/** Confirmación al sumar/aceptar con torneo comenzado y sin partidos jugados. */
+export const STARTED_OUT_OF_DRAW_WARNING =
+  "La pareja queda aceptada pero fuera del cuadro. Para sumarla en las zonas tenés que deshacer el comienzo, rearmar las zonas y volver a comenzar.";
 
 /** Tope del torneo puntuable (preset Estándar). */
 export const SCORING_PAIR_COUNT_REASON =
@@ -40,14 +56,23 @@ export function drawRebuildCupIncreaseItem(from: number, to: number) {
   return `El número de participantes pasa de ${from} a ${to}.`;
 }
 
-/** Ítems del aviso al sentar una pareja en el cuadro sin partidos jugados. */
+/** Ítems del aviso al sentar una pareja en el cuadro sin partidos jugados (antes de comenzar). */
 export function drawRebuildWarningItems(cupFrom: number | null): string[] {
   const items = [DRAW_REBUILD_WARNING];
-  if (cupFrom != null) items.push(drawRebuildCupIncreaseItem(cupFrom, cupFrom + 1));
+  if (cupFrom != null)
+    items.push(drawRebuildCupIncreaseItem(cupFrom, cupFrom + 1));
   return items;
 }
 
-/** Texto de «Comenzar torneo»: el club sigue pudiendo sumar parejas hasta que haya partidos jugados. */
+/** Ítems del aviso al sumar/aceptar con torneo comenzado y cuadro aún editable. */
+export function startedOutOfDrawWarningItems(cupFrom: number | null): string[] {
+  const items = [STARTED_OUT_OF_DRAW_WARNING];
+  if (cupFrom != null)
+    items.push(drawRebuildCupIncreaseItem(cupFrom, cupFrom + 1));
+  return items;
+}
+
+/** Texto de «Comenzar torneo»: exige zonas ya armadas (ready). */
 export function startTournamentDescription(
   acceptedPairs: number,
   acceptedSoloPlayers: number,
@@ -56,7 +81,14 @@ export function startTournamentDescription(
     acceptedSoloPlayers > 0
       ? ` Hay ${acceptedSoloPlayers} jugadores sin pareja: se emparejan entre sí por orden de inscripción aunque jueguen del mismo lado; si queda uno impar, queda afuera.`
       : "";
-  return `Se arma el cuadro con las ${acceptedPairs} parejas aceptadas.${solos} Los jugadores ya no se pueden anotar. El club puede sumar parejas o cambiar la configuración hasta que haya partidos jugados. Esta acción no se deshace.`;
+  return `Se cierra la inscripción y el torneo arranca con el armado de zonas ya confirmado (${acceptedPairs} parejas).${solos} Los jugadores ya no se pueden anotar. Podés deshacer el comienzo mientras no haya partidos jugados.`;
+}
+
+/** True si el formato usa armado de zonas / fixture de grupos. */
+export function formatUsesZoneStructure(
+  format: string | null | undefined,
+): boolean {
+  return format === "GROUPS_ELIMINATION" || format === "ROUND_ROBIN";
 }
 
 /** Mover a una zona que ya tiene 4 dejaría 5. */
@@ -101,13 +133,15 @@ export function matchPairingBlockedReason(
   slots: MatchSlot[],
   tournamentStarted: boolean,
 ): string | null {
-  if (!tournamentStarted) return "El torneo todavía no comenzó: el cuadro se arma al comenzar.";
+  if (!tournamentStarted)
+    return "El torneo todavía no comenzó: el cuadro se arma al comenzar.";
   const derivedGroup =
     (match.phase === "GROUP" || !match.roundId) &&
     slots.some(
       (slot) =>
         slot.matchId === match.id &&
-        (slot.sourceType === "MATCH_WINNER" || slot.sourceType === "MATCH_LOSER"),
+        (slot.sourceType === "MATCH_WINNER" ||
+          slot.sourceType === "MATCH_LOSER"),
     );
   if (derivedGroup)
     return "Este partido lo definen el ganador y el perdedor de los anteriores.";
@@ -115,7 +149,9 @@ export function matchPairingBlockedReason(
     return "El partido ya se jugó o está en juego.";
   if (match.status === "cancelled") return "El partido está cancelado.";
   if (match.status === "walkover") {
-    const isBye = slots.some((slot) => slot.matchId === match.id && slot.sourceType === "BYE");
+    const isBye = slots.some(
+      (slot) => slot.matchId === match.id && slot.sourceType === "BYE",
+    );
     if (!isBye) return "El partido tiene un W.O. cargado.";
   }
   return null;
@@ -147,7 +183,9 @@ function matchHasRealPlay(
 ): boolean {
   if (match.status === "finished" || match.status === "inProgress") return true;
   if (match.status !== "walkover") return false;
-  const bye = slots.some((slot) => slot.matchId === match.id && slot.sourceType === "BYE");
+  const bye = slots.some(
+    (slot) => slot.matchId === match.id && slot.sourceType === "BYE",
+  );
   return !bye;
 }
 
@@ -161,15 +199,18 @@ export function matchMoveBlockedReason(
   rebuildBlockedReason: string | null,
   zoneMatches: Pick<Match, "id" | "groupId" | "status">[] = [],
 ): string | null {
-  if (!tournamentStarted) return "Las parejas se mueven con el torneo comenzado.";
+  if (!tournamentStarted)
+    return "Las parejas se mueven con el torneo comenzado.";
   if (match.status === "cancelled") return "Ese partido no está en el cuadro.";
-  if (!match.pairAId && !match.pairBId) return "Todavía no hay una pareja en este cruce.";
+  if (!match.pairAId && !match.pairBId)
+    return "Todavía no hay una pareja en este cruce.";
   if (matchHasRealPlay(match, slots)) return "Esa pareja ya jugó.";
   if (match.phase === "GROUP" && match.groupId) {
     const zonePlayed = zoneMatches.some(
       (item) => item.groupId === match.groupId && matchHasRealPlay(item, slots),
     );
-    if (zonePlayed) return "No se puede cambiar de zona: esta zona ya tiene partidos jugados.";
+    if (zonePlayed)
+      return "No se puede cambiar de zona: esta zona ya tiene partidos jugados.";
   }
   if (rebuildBlockedReason) return rebuildBlockedReason;
   return null;
@@ -185,12 +226,17 @@ export function knockoutRebuildBlockedReason(
 ): string | null {
   const locked = matches.some((match) => {
     if (!match.roundId) return false;
-    if (match.status === "finished" || match.status === "inProgress") return true;
+    if (match.status === "finished" || match.status === "inProgress")
+      return true;
     if (match.status !== "walkover") return false;
-    const bye = slots.some((slot) => slot.matchId === match.id && slot.sourceType === "BYE");
+    const bye = slots.some(
+      (slot) => slot.matchId === match.id && slot.sourceType === "BYE",
+    );
     return !bye;
   });
-  return locked ? "No se puede rearmar la llave porque ya hay partidos jugados." : null;
+  return locked
+    ? "No se puede rearmar la llave porque ya hay partidos jugados."
+    : null;
 }
 
 /** Etiqueta corta del criterio que ubicó a una pareja en la tabla. */
@@ -260,13 +306,17 @@ function matchFormatItems(rules: MatchRules): string[] {
   if (rules.setsToWin === 1) {
     items.push(
       `Cada partido se juega a un set de ${rules.gamesPerSet} games${
-        rules.tiebreakEnabled ? `; a ${rules.gamesPerSet}-${rules.gamesPerSet} se define por tie-break a ${rules.tiebreakPoints}` : ""
+        rules.tiebreakEnabled
+          ? `; a ${rules.gamesPerSet}-${rules.gamesPerSet} se define por tie-break a ${rules.tiebreakPoints}`
+          : ""
       }.`,
     );
   } else {
     items.push(
       `Partidos al mejor de ${rules.setsToWin * 2 - 1} sets, a ${rules.gamesPerSet} games${
-        rules.tiebreakEnabled ? ` con tie-break a ${rules.tiebreakPoints} en ${rules.gamesPerSet}-${rules.gamesPerSet}` : ""
+        rules.tiebreakEnabled
+          ? ` con tie-break a ${rules.tiebreakPoints} en ${rules.gamesPerSet}-${rules.gamesPerSet}`
+          : ""
       }.`,
     );
     if (rules.superTiebreakEnabled) {
@@ -285,22 +335,30 @@ function matchFormatItems(rules: MatchRules): string[] {
   return items;
 }
 
-function zoneItems(format: TournamentFormat): string[] {
+function zoneItems(format: TournamentFormat, drawRules: DrawRules): string[] {
   const base = [
     "Puntos de zona, por partido: 2 si ganó, 1 si lo perdió jugando, 0 si no se presentó (W.O.). No suman sets, games ni el tie-break.",
     "Para la tabla, un no presentado (W.O.) vale 6/0 por set que haga falta ganar.",
     "Si una pareja se retira o es descalificada, se anulan todos sus partidos (jugados y pendientes): el rival gana por W.O. 6/0 por set que haga falta ganar, y la pareja queda última en la zona.",
   ];
   if (format === "GROUPS_ELIMINATION") {
+    const zoneOfFour =
+      drawRules === "FAP"
+        ? "Zona de 4: primero 1 vs 4 y 2 vs 3; después ganador vs ganador y perdedor vs perdedor. Quien gana los dos partidos es 1°; quien pierde los dos queda último (salvo descalificación). Pasan dos."
+        : "Zona de 4: todos contra todos (6 partidos). Primera jornada 1 vs 4 y 2 vs 3; después 1 vs 3 y 2 vs 4; al final 1 vs 2 y 3 vs 4. Pasan dos.";
     return [
       "Con 5 parejas se arma una sola zona todos contra todos, sin llave: el 1° es campeón. Dos o más zonas, a partir de 6 parejas.",
-      "Las zonas se arman por orden de inscripción: con múltiplo de 3, todas de 3; si sobra 1, la zona A tiene 4; si sobran 2, las zonas A y B tienen 4.",
+      "Las zonas se arman con «Armar zonas» (sorteo FIP). En fechas de ranking se usan los puntos; en torneos sueltos, el seed de la pareja. Con múltiplo de 3, todas de 3; si sobra 1, hay una zona de 4; si sobran 2, dos de 4.",
       "Zona de 3: todos contra todos. Pasan dos.",
-      "Zona de 4: todos contra todos (6 partidos). Primera jornada 1 vs 4 y 2 vs 3; después 1 vs 3 y 2 vs 4; al final 1 vs 2 y 3 vs 4. Pasan dos.",
+      zoneOfFour,
       ...base,
     ];
   }
-  return ["Una sola zona, todos contra todos. El orden final de la tabla es el resultado del torneo.", ...base];
+  return [
+    "Las zonas se arman con «Armar zonas» (sorteo FIP). En fechas de ranking se usan los puntos; en torneos sueltos, el seed de la pareja.",
+    "Una sola zona, todos contra todos. El orden final de la tabla es el resultado del torneo.",
+    ...base,
+  ];
 }
 
 const TIE_BREAK_ITEMS = [
@@ -319,6 +377,20 @@ const QUALITY_TIE_BREAK_ITEMS = [
   "4. Si persiste: diferencia de games de toda la zona y luego games a favor.",
   "5. Si todo sigue igual: el club fija el orden (sorteo) desde la tabla.",
 ];
+
+const FAP_ZONE_OF_FOUR_TIE_BREAK_ITEMS = [
+  "En zona de 4: 1° es quien ganó los dos partidos; último quien perdió los dos (salvo descalificación).",
+  "Para 2° y 3°: primero el partido entre ellas (siempre se enfrentaron); después diferencia de sets, diferencia de games, games a favor y, si hace falta, sorteo del club.",
+  "Zona de 3: mismos criterios que el reglamento por puntos (partido directo, sets y games entre empatadas, games de toda la zona, sorteo).",
+];
+
+/** Hint corto de la tabla de zonas según el motor. */
+export function standingsHint(drawRules: DrawRules = "FIP"): string {
+  if (drawRules === "FAP") {
+    return "Zona de 4: 1° gana los dos partidos; último pierde los dos. Entre 2° y 3° decide el partido directo, después sets y games. Zona de 3: por puntos (2/1/0), directo, sets y games.";
+  }
+  return "Se ordena por puntos de zona: 2 si ganó el partido, 1 si lo perdió jugando, 0 si no se presentó (W.O.). Entre dos empatadas, el partido directo; entre tres o más, sets y games solo entre ellas, luego games de toda la zona. Si todo sigue igual, el club sortea desde acá.";
+}
 
 function bracketItems(format: TournamentFormat): string[] {
   if (format === "DIRECT_ELIMINATION") {
@@ -341,40 +413,66 @@ function bracketItems(format: TournamentFormat): string[] {
 }
 
 /**
- * Reglamento general de la categoría, por secciones, según formato y reglas de partido.
+ * Reglamento general de la categoría, por secciones, según formato, reglas de partido y motor FIP/FAP.
  * Es texto para la UI (modal de reglas); las validaciones reales las hace la API.
  */
 export function tournamentRulesSections(
   format: TournamentFormat,
   rules: MatchRules,
+  drawRules: DrawRules = "FIP",
 ): RulesSection[] {
   const sections: RulesSection[] = [
     { title: "Formato de partido", items: matchFormatItems(rules) },
   ];
   if (format !== "DIRECT_ELIMINATION") {
-    sections.push({ title: "Zonas y puntos", items: zoneItems(format) });
+    sections.push({
+      title: "Zonas y puntos",
+      items: zoneItems(format, drawRules),
+    });
     sections.push({
       title: "Desempate en la tabla",
-      items: rules.setsToWin === 1 ? QUALITY_TIE_BREAK_ITEMS : TIE_BREAK_ITEMS,
+      items:
+        drawRules === "FAP"
+          ? FAP_ZONE_OF_FOUR_TIE_BREAK_ITEMS
+          : rules.setsToWin === 1
+            ? QUALITY_TIE_BREAK_ITEMS
+            : TIE_BREAK_ITEMS,
     });
   }
   const bracket = bracketItems(format);
   if (bracket.length) {
     sections.push({
-      title: format === "DIRECT_ELIMINATION" ? "Cuadro" : "Cruces después de las zonas",
+      title:
+        format === "DIRECT_ELIMINATION"
+          ? "Cuadro"
+          : "Cruces después de las zonas",
       items: bracket,
     });
   }
+  const startItems =
+    format === "DIRECT_ELIMINATION"
+      ? [
+          "El cupo cuenta parejas completas más jugadores solos de a dos.",
+          "Las inscripciones se cortan cuando el cupo de aceptadas está lleno y hay 2 suplentes. Si el torneo comenzó, finalizó o está cancelado, tampoco se puede inscribir.",
+          "«Comenzar torneo» cierra la inscripción y arranca el cuadro.",
+          "Los jugadores solos que no consiguieron pareja se emparejan entre sí por orden de inscripción, aunque jueguen del mismo lado; si queda uno impar, queda afuera.",
+          "Con el torneo comenzado no entra una pareja nueva: el cuadro ya está armado.",
+          "Con el torneo comenzado, una pareja aceptada no se elimina: se desclasifica.",
+          "Se puede deshacer el comienzo mientras no haya partidos jugados.",
+        ]
+      : [
+          "El cupo cuenta parejas completas más jugadores solos de a dos.",
+          "Las inscripciones se cortan cuando el cupo de aceptadas está lleno y hay 2 suplentes. Si el torneo comenzó, finalizó o está cancelado, tampoco se puede inscribir.",
+          "Antes de comenzar hay que armar las zonas (mínimo 3 parejas en torneo suelto; 6 en fecha de ranking). «Comenzar torneo» cierra la inscripción y arranca con ese armado.",
+          "Los jugadores solos que no consiguieron pareja se emparejan entre sí por orden de inscripción, aunque jueguen del mismo lado; si queda uno impar, queda afuera.",
+          "Si se suman o sacan parejas después de armar, las zonas quedan desactualizadas y hay que rearmarlas.",
+          "Con el torneo comenzado no entra una pareja nueva: el cuadro ya está armado.",
+          "Con el torneo comenzado, una pareja aceptada no se elimina: se desclasifica.",
+          "Se puede deshacer el comienzo mientras no haya partidos jugados.",
+        ];
   sections.push({
     title: "Inscripción y comienzo",
-    items: [
-      "El cupo cuenta parejas completas más jugadores solos de a dos.",
-      "Las inscripciones se cortan cuando el cupo de aceptadas está lleno y hay 2 suplentes. Si el torneo comenzó, finalizó o está cancelado, tampoco se puede inscribir.",
-      "El torneo comienza solo con «Comenzar torneo»: ahí se cierra la inscripción y se arma el cuadro definitivo con las parejas aceptadas, por orden de inscripción.",
-      "Los jugadores solos que no consiguieron pareja se emparejan entre sí por orden de inscripción, aunque jueguen del mismo lado; si queda uno impar, queda afuera.",
-      "Con el torneo comenzado no entra una pareja nueva: el cuadro ya está armado.",
-      "Con el torneo comenzado, una pareja aceptada no se elimina: se desclasifica.",
-    ],
+    items: startItems,
   });
   return sections;
 }
