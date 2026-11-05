@@ -2,9 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Ban, GitBranch, Info, LoaderCircle, Trash2, TriangleAlert, Trophy, Users } from "lucide-react";
-import { PERMISSION_CLUB_TOURNAMENTS_WRITE } from "@/authorization";
+import { PERMISSION_CLUB_TOURNAMENTS_WRITE, usePermissions } from "@/authorization";
 import { useMockSession } from "@/app/MockSessionProvider";
 import { PermissionsGuard } from "@/components/guards";
+import TournamentGalleryTab from "@/components/tournaments/TournamentGalleryTab";
 import { cn } from "@/lib/utils";
 import {
   OCCUPYING_REGISTRATION_STATUSES,
@@ -19,6 +20,7 @@ import {
   championPairNames,
   startedOutOfDrawWarningItems,
   removeAcceptedPairBlockedReason,
+  canReopenRejectedRegistration,
   resolveTournamentChampionPairId,
   startTournamentDescription,
   formatUsesZoneStructure,
@@ -210,6 +212,7 @@ export default function TournamentDetailView({
   tournamentId,
 }: TournamentDetailViewProps) {
   const qc = useQueryClient();
+  const { can } = usePermissions();
   const [resultMatchId, setResultMatchId] = useState<string | null>(null);
   const [pendingDateValues, setPendingDateValues] =
     useState<TournamentFormValues | null>(null);
@@ -227,6 +230,10 @@ export default function TournamentDetailView({
   } | null>(null);
   const [dqRegistrationId, setDqRegistrationId] = useState<string | null>(null);
   const [dqNote, setDqNote] = useState("");
+  const [rejectRegistrationId, setRejectRegistrationId] = useState<string | null>(
+    null,
+  );
+  const [rejectNote, setRejectNote] = useState("");
   const [removeRegistrationId, setRemoveRegistrationId] = useState<string | null>(
     null,
   );
@@ -1052,17 +1059,31 @@ export default function TournamentDetailView({
   });
 
   const rejectMutation = useMutation({
-    mutationFn: (input: { registrationId: string; note?: string }) =>
+    mutationFn: (input: { registrationId: string; note: string }) =>
       Api.TournamentOpsService().rejectRegistration(
         input.registrationId,
         input.note,
       ),
     onSuccess: async () => {
       toastSuccess("Inscripción rechazada");
+      setRejectRegistrationId(null);
+      setRejectNote("");
       await invalidateOps();
     },
     onError: (err: Error) => {
       toastError("No se pudo rechazar la inscripción", err.message);
+    },
+  });
+
+  const reopenMutation = useMutation({
+    mutationFn: (registrationId: string) =>
+      Api.TournamentOpsService().reopenRegistration(registrationId),
+    onSuccess: async () => {
+      toastSuccess("Inscripción reabierta");
+      await invalidateOps();
+    },
+    onError: (err: Error) => {
+      toastError("No se pudo deshacer el rechazo", err.message);
     },
   });
 
@@ -1799,6 +1820,9 @@ export default function TournamentDetailView({
                   Repechaje
                 </TabsTrigger>
               ) : null}
+              <TabsTrigger value="galeria" className="flex-none">
+                Galería
+              </TabsTrigger>
               <TabsTrigger value="config" className="flex-none">
                 Configuración
               </TabsTrigger>
@@ -2022,6 +2046,23 @@ export default function TournamentDetailView({
                           onClick={(event) => event.stopPropagation()}
                         >
                           {canMutateParticipants &&
+                            reg?.status === "REJECTED" &&
+                            canReopenRejectedRegistration(
+                              reg,
+                              pair,
+                              visibleParticipantRows,
+                            ) ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={reopenMutation.isPending}
+                              onClick={() => reopenMutation.mutate(reg.id)}
+                            >
+                              Deshacer rechazo
+                            </Button>
+                          ) : null}
+                          {canMutateParticipants &&
                             (reg?.status === "PENDING" || reg?.status === "WAITLIST") ? (
                             <>
                               {row.incomplete || !pair.player2Id ? (
@@ -2072,9 +2113,10 @@ export default function TournamentDetailView({
                                 size="sm"
                                 variant="outline"
                                 disabled={rejectMutation.isPending}
-                                onClick={() =>
-                                  rejectMutation.mutate({ registrationId: reg.id })
-                                }
+                                onClick={() => {
+                                  setRejectRegistrationId(reg.id);
+                                  setRejectNote("");
+                                }}
                               >
                                 Rechazar
                               </Button>
@@ -2382,6 +2424,15 @@ export default function TournamentDetailView({
           )}
         </TabsContent>
 
+        <TabsContent value="galeria" className="space-y-4">
+          <TournamentGalleryTab
+            tournamentId={tournamentId}
+            photos={tournament.photos}
+            canManage={can(PERMISSION_CLUB_TOURNAMENTS_WRITE)}
+            enabled={activeTab === "galeria"}
+          />
+        </TabsContent>
+
         <TabsContent value="config" className="pt-4 space-y-3">
           {tournamentLocked ? (
             <p className="text-sm text-muted-foreground">
@@ -2621,6 +2672,68 @@ export default function TournamentDetailView({
               }}
             >
               {disqualifyMutation.isPending ? "Guardando…" : "Desclasificar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={canMutateParticipants && Boolean(rejectRegistrationId)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRejectRegistrationId(null);
+            setRejectNote("");
+          }
+        }}
+      >
+        <DialogContent data-testid="reject-registration-dialog">
+          <DialogHeader>
+            <DialogTitle>Rechazar inscripción</DialogTitle>
+            <DialogDescription>
+              La nota queda asociada a la inscripción. El jugador tiene que hablar con el club:
+              podés deshacer el rechazo o cargarlo de nuevo.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="reject-note">Motivo</Label>
+            <textarea
+              id="reject-note"
+              rows={3}
+              value={rejectNote}
+              onChange={(e) => setRejectNote(e.target.value)}
+              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+              placeholder="Ej. Categoría incorrecta / cupo completo…"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={rejectMutation.isPending}
+              onClick={() => {
+                setRejectRegistrationId(null);
+                setRejectNote("");
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={
+                rejectMutation.isPending ||
+                !rejectNote.trim() ||
+                !rejectRegistrationId
+              }
+              onClick={() => {
+                if (!rejectRegistrationId) return;
+                void rejectMutation.mutateAsync({
+                  registrationId: rejectRegistrationId,
+                  note: rejectNote,
+                });
+              }}
+            >
+              {rejectMutation.isPending ? "Rechazando…" : "Rechazar"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -62,4 +62,24 @@ export class TournamentService {
     if (banner.file) return this.repository.uploadBanner(id, banner.file);
     if (banner.remove) return this.repository.deleteBanner(id);
   }
+
+  listPhotos(tournamentId: string) {
+    return this.repository.listPhotos(tournamentId);
+  }
+
+  uploadPhoto(tournamentId: string, file: File, description?: string | null) {
+    return this.repository.uploadPhoto(tournamentId, file, description);
+  }
+
+  updatePhotoDescription(
+    tournamentId: string,
+    photoId: string,
+    description: string | null,
+  ) {
+    return this.repository.updatePhotoDescription(tournamentId, photoId, description);
+  }
+
+  deletePhoto(tournamentId: string, photoId: string) {
+    return this.repository.deletePhoto(tournamentId, photoId);
+  }
 }

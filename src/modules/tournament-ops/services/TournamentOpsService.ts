@@ -432,8 +432,12 @@ export class TournamentOpsService {
     return this.repository.acceptRegistration(registrationId);
   }
 
-  rejectRegistration(registrationId: string, note?: string | null) {
+  rejectRegistration(registrationId: string, note: string) {
     return this.repository.rejectRegistration(registrationId, note);
+  }
+
+  reopenRegistration(registrationId: string) {
+    return this.repository.reopenRegistration(registrationId);
   }
 
   disqualifyRegistration(registrationId: string, note: string) {

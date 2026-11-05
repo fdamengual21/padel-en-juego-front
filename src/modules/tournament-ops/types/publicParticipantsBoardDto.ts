@@ -16,5 +16,6 @@ export interface PublicParticipantRowDto {
   sidePreference: string | null;
   registeredAt: string | null;
   status?: string | null;
+  statusNote?: string | null;
   disqualified: boolean;
 }

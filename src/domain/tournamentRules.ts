@@ -124,6 +124,60 @@ export function removeAcceptedPairBlockedReason(
   return REMOVE_ACCEPTED_AFTER_START_REASON;
 }
 
+/** El club cerró la inscripción: el jugador debe hablar con el club. */
+export const PLAYER_REGISTRATION_CLOSED_BY_CLUB_REASON =
+  "El club cerró tu inscripción en esta categoría. Hablá con el club para que la reabra o te vuelva a sumar.";
+
+/** True si el jugador no puede auto-inscribirse con este estado. */
+export function playerSelfRegisterBlocked(
+  status: RegistrationStatus | undefined,
+  cancelledBy?: "player" | "club" | null,
+): boolean {
+  if (status === "REJECTED" || status === "DISQUALIFIED") return true;
+  return status === "CANCELLED" && cancelledBy === "club";
+}
+
+/**
+ * True si esta inscripción rechazada es la más reciente de cada jugador de la pareja
+ * entre las filas visibles (misma regla que la API para Deshacer rechazo).
+ */
+export function canReopenRejectedRegistration(
+  registration: {
+    id: string;
+    status: RegistrationStatus;
+    registeredAt: string;
+  },
+  pair: { player1Id: string; player2Id: string | null },
+  rows: Array<{
+    pair: { player1Id: string; player2Id: string | null };
+    registration: { id: string; registeredAt: string } | null;
+  }>,
+): boolean {
+  if (registration.status !== "REJECTED") return false;
+  const playerIds = [pair.player1Id, pair.player2Id].filter(
+    (id): id is string => Boolean(id),
+  );
+  for (const playerId of playerIds) {
+    let latest: { id: string; registeredAt: string } | null = null;
+    for (const row of rows) {
+      const reg = row.registration;
+      if (!reg) continue;
+      const onPair =
+        row.pair.player1Id === playerId || row.pair.player2Id === playerId;
+      if (!onPair) continue;
+      if (
+        !latest ||
+        reg.registeredAt > latest.registeredAt ||
+        (reg.registeredAt === latest.registeredAt && reg.id > latest.id)
+      ) {
+        latest = reg;
+      }
+    }
+    if (!latest || latest.id !== registration.id) return false;
+  }
+  return true;
+}
+
 /**
  * Por qué no se puede fijar a mano el cruce de un partido. Null si se puede.
  * Refleja las guardas de la API para que la UI muestre el motivo antes de pedir.

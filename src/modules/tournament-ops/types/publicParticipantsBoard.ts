@@ -1,12 +1,19 @@
 import type { PairSidePreference } from "@/domain";
 
-/** Tab Participantes público: aceptadas y, antes de empezar, pendientes. */
+/** Tab Participantes público: operativas + rechazo/descalificación; sin canceladas. */
 export interface PublicParticipantsBoard {
   generatedAt: string;
   rows: PublicParticipantRow[];
   tournamentStarted: boolean;
   notice: string | null;
 }
+
+export type PublicParticipantStatus =
+  | "PENDING"
+  | "ACCEPTED"
+  | "WAITLIST"
+  | "REJECTED"
+  | "DISQUALIFIED";
 
 export interface PublicParticipantRow {
   pairId: string;
@@ -17,7 +24,9 @@ export interface PublicParticipantRow {
   incomplete: boolean;
   sidePreference: PairSidePreference | null;
   registeredAt: string | null;
-  /** Pendiente o aceptado. Null si el listado viejo no lo manda. */
-  status: "PENDING" | "ACCEPTED" | null;
+  /** Estado de inscripción. Null si el listado viejo no lo manda. */
+  status: PublicParticipantStatus | null;
+  /** Motivo del club; solo llega si la fila es del jugador logueado. */
+  statusNote: string | null;
   disqualified: boolean;
 }

@@ -277,8 +277,12 @@ export interface ITournamentOpsRepository {
   acceptRegistration(registrationId: string): Promise<AcceptRegistrationResult>;
   rejectRegistration(
     registrationId: string,
-    note?: string | null,
+    note: string,
   ): Promise<RegistrationMutationResult>;
+  /** Deshace un rechazo: vuelve a pendiente. */
+  reopenRegistration(
+    registrationId: string,
+  ): Promise<{ registration: TournamentRegistration }>;
   disqualifyRegistration(
     registrationId: string,
     note: string,
@@ -946,11 +950,18 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
     );
   }
 
-  async rejectRegistration(registrationId: string, note?: string | null) {
+  async rejectRegistration(registrationId: string, note: string) {
     return this.read<RegistrationMutationResult>(
       `/club/tournaments/registrations/${registrationId}/reject`,
       "post",
       { note },
+    );
+  }
+
+  async reopenRegistration(registrationId: string) {
+    return this.read<{ registration: TournamentRegistration }>(
+      `/club/tournaments/registrations/${registrationId}/reopen`,
+      "post",
     );
   }
 

@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/EmptyState";
 import Avatar from "@/components/Avatar";
 import ShareButton from "@/components/ShareButton";
 import TournamentChampionBanner from "@/components/tournaments/TournamentChampionBanner";
+import TournamentGalleryTab from "@/components/tournaments/TournamentGalleryTab";
 import TournamentSummaryCard from "@/components/tournaments/TournamentSummaryCard";
 import PairResultChips from "@/components/tournaments/PairResultChips";
 import PlayerRegistrationPanel from "@/components/tournaments/PlayerRegistrationPanel";
@@ -52,6 +53,11 @@ export default function UserTournamentDetailScreen() {
   const categoryId = page?.category.id ?? "";
   const tournamentLocked =
     page?.tournament.status === "finished" || page?.tournament.status === "cancelled";
+  const galleryFirst = page?.tournament.status === "finished";
+
+  useEffect(() => {
+    setActiveTab(galleryFirst ? "galeria" : "grupos");
+  }, [tournamentId, galleryFirst]);
 
   const zonesQuery = useQuery({
     queryKey: ["public-zones-board", categoryId],
@@ -236,6 +242,7 @@ export default function UserTournamentDetailScreen() {
           <div className="ml-auto flex w-full max-w-xl items-center sm:w-auto">
             <PlayerRegistrationPanel
               tournament={tournament}
+              clubPhone={tournament.clubPhone}
               categories={page.categories}
               categoryId={categoryId}
               quotaFull={page.quotaFull}
@@ -300,6 +307,11 @@ export default function UserTournamentDetailScreen() {
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(String(value))}>
         <div className="min-w-0 overflow-x-auto">
           <TabsList className="h-8 w-max min-w-full">
+            {galleryFirst ? (
+              <TabsTrigger value="galeria" className="flex-none">
+                Galería
+              </TabsTrigger>
+            ) : null}
             <TabsTrigger value="grupos" className="flex-none">
               Zonas
             </TabsTrigger>
@@ -312,6 +324,11 @@ export default function UserTournamentDetailScreen() {
             {page.repechageCreated ? (
               <TabsTrigger value="repechaje" className="flex-none">
                 Repechaje
+              </TabsTrigger>
+            ) : null}
+            {!galleryFirst ? (
+              <TabsTrigger value="galeria" className="flex-none">
+                Galería
               </TabsTrigger>
             ) : null}
           </TabsList>
@@ -346,7 +363,7 @@ export default function UserTournamentDetailScreen() {
           <p className="text-sm text-muted-foreground">
             {page.tournamentStarted
               ? "Parejas inscriptas en la categoría."
-              : "Quién se anotó en la categoría. Pendiente: el club todavía no confirmó."}
+              : "Quién se anotó en la categoría. El estado de cada inscripción se muestra en el chip."}
           </p>
           {participantsQuery.data?.notice ? (
             <p className="text-sm text-muted-foreground">{participantsQuery.data.notice}</p>
@@ -392,10 +409,10 @@ export default function UserTournamentDetailScreen() {
                                 </>
                               )}
                             </div>
-                            {!page.tournamentStarted && row.status ? (
-                              <StatusBadge status={row.status} />
+                            {row.status ? <StatusBadge status={row.status} /> : null}
+                            {row.disqualified && row.status !== "DISQUALIFIED" ? (
+                              <StatusBadge status="disqualified" />
                             ) : null}
-                            {row.disqualified ? <StatusBadge status="disqualified" /> : null}
                           </div>
                           <PairResultChips
                             result={resultByPair.get(row.pairId)}
@@ -406,6 +423,9 @@ export default function UserTournamentDetailScreen() {
                               ? formatRegisteredAtEs(row.registeredAt)
                               : "Sin fecha de inscripción"}
                           </p>
+                          {row.statusNote ? (
+                            <p className="text-xs text-destructive/90">Nota: {row.statusNote}</p>
+                          ) : null}
                         </div>
                       </li>
                     ))}
@@ -490,6 +510,15 @@ export default function UserTournamentDetailScreen() {
             )}
           </TabsContent>
         ) : null}
+
+        <TabsContent value="galeria" className="space-y-4">
+          <TournamentGalleryTab
+            tournamentId={tournamentId}
+            photos={page.tournament.photos}
+            canManage={false}
+            enabled={activeTab === "galeria"}
+          />
+        </TabsContent>
       </Tabs>
 
       <MatchResultModal
@@ -529,15 +558,30 @@ export default function UserTournamentDetailScreen() {
   );
 }
 
+function isActivelySeekingPartner(row: PublicParticipantRow): boolean {
+  if (!row.incomplete) return false;
+  // Solo pendientes (y aceptados incompletos) siguen buscando; rechazados/etc. van aparte.
+  return row.status === "PENDING" || row.status === "ACCEPTED" || row.status === null;
+}
+
 function publicParticipantGroups(rows: PublicParticipantRow[]) {
-  const seeking = rows.filter((row) => row.incomplete);
+  const seeking = rows.filter(isActivelySeekingPartner);
+  const otherIncomplete = rows.filter(
+    (row) => row.incomplete && !isActivelySeekingPartner(row),
+  );
   const complete = rows.filter((row) => !row.incomplete);
+  const hasSoloSections = seeking.length > 0 || otherIncomplete.length > 0;
   return [
     { key: "seeking", title: "Buscando pareja", rows: seeking },
     {
       key: "pairs",
-      title: seeking.length > 0 ? "Parejas" : null,
+      title: hasSoloSections ? "Parejas" : null,
       rows: complete,
+    },
+    {
+      key: "other-incomplete",
+      title: "Otras sin pareja",
+      rows: otherIncomplete,
     },
   ].filter((group) => group.rows.length > 0);
 }

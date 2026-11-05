@@ -3,12 +3,14 @@ import {
   asTournamentFormat,
   type MatchRules,
   type RulesetPreset,
+  type TournamentPhoto,
   type TournamentStatus,
 } from "@/domain";
 import type { PublicTournamentPage, PublicTournamentCategoryRef } from "../types/publicTournamentPage";
 import type {
   PublicTournamentCategoryRefDto,
   PublicTournamentPageDto,
+  PublicTournamentPhotoDto,
 } from "../types/publicTournamentPageDto";
 
 const STATUSES = new Set<string>([
@@ -55,6 +57,7 @@ export function toPublicTournamentPage(dto: PublicTournamentPageDto): PublicTour
       format: asTournamentFormat(dto.tournament.format),
       registrationFee: Number(dto.tournament.registrationFee ?? 0),
       bannerUrl: dto.tournament.bannerUrl ?? null,
+      photos: toPhotos(dto.tournament.photos),
       rankingCircuitId: dto.tournament.rankingCircuitId ?? null,
       weekIndex: dto.tournament.weekIndex ?? null,
       rankingWeekCount: dto.tournament.rankingWeekCount ?? null,
@@ -85,6 +88,19 @@ function toCategory(dto: PublicTournamentCategoryRefDto): PublicTournamentCatego
     name: dto.name,
     circuitType: dto.circuitType === "CICUPA" ? "CICUPA" : "NONE",
   };
+}
+
+function toPhotos(raw: PublicTournamentPhotoDto[] | undefined): TournamentPhoto[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((item) => item && typeof item === "object" && typeof item.url === "string" && item.url)
+    .map((item) => ({
+      id: String(item.id),
+      url: item.url,
+      description: item.description?.trim() ? item.description.trim() : null,
+      sortOrder: Number(item.sortOrder ?? 0),
+    }))
+    .sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
 function asStatus(value: string): TournamentStatus {

@@ -34,9 +34,12 @@ interface ShareOrCopyInput {
 /** Mobile: hoja nativa con imagen + link. Desktop: copia el link. */
 export async function shareOrCopy({ title, url, image, copiedLabel }: ShareOrCopyInput) {
   if (isMobileShare()) {
-    // WhatsApp y otras apps descartan `url` cuando hay archivos: el link va también en `text`.
-    const data: ShareData = { title, text: `${title}\n${url}`, url };
-    if (image && navigator.canShare?.({ files: [image] })) data.files = [image];
+    const file = image && navigator.canShare?.({ files: [image] }) ? image : null;
+    // Con archivos, WhatsApp suele descartar `url`: el link va solo en `text`.
+    // Sin archivos, `url` alcanza; meterlo también en `text` lo duplica en el mensaje.
+    const data: ShareData = file
+      ? { title, text: `${title}\n${url}`, files: [file] }
+      : { title, text: title, url };
     try {
       await navigator.share(data);
     } catch (error) {

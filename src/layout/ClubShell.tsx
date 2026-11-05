@@ -110,6 +110,13 @@ const items: NavItem[] = [
   },
 ];
 
+/** Routes that live in the mobile "Más" sheet instead of the bottom bar. */
+const MORE_NAV_ROUTES = new Set<string>([
+  ROUTES.club.staff,
+  ROUTES.club.fixedReservations,
+  ROUTES.club.settings,
+]);
+
 const gridColsClass: Record<number, string> = {
   1: "grid-cols-1",
   2: "grid-cols-2",
@@ -135,15 +142,20 @@ export default function ClubShell() {
     }
     return !item.permission || can(item.permission);
   });
-  const bottomItems = visibleItems.filter(
-    (item) => item.to !== ROUTES.club.settings,
+  const moreNavItems = visibleItems.filter((item) =>
+    MORE_NAV_ROUTES.has(item.to),
   );
-  const showSettings = visibleItems.some(
-    (item) => item.to === ROUTES.club.settings,
+  const bottomItems = visibleItems.filter(
+    (item) => !MORE_NAV_ROUTES.has(item.to),
   );
   const bottomCount = bottomItems.length + 1;
   const colsClass = gridColsClass[bottomCount] ?? "grid-cols-5";
-  const moreActive = moreOpen || pathname === ROUTES.club.settings;
+  const moreActive =
+    moreOpen ||
+    moreNavItems.some(
+      (item) =>
+        pathname === item.to || pathname.startsWith(`${item.to}/`),
+    );
   const membership = findUserClub(clubs, selectedClubId);
 
   useEffect(() => {
@@ -177,16 +189,6 @@ export default function ClubShell() {
     ? `¡Hola, ${player.firstName.trim()}!`
     : "¡Hola!";
   const accountActions = (placement: "sidebar" | "sheet") => [
-    ...(placement === "sheet" && showSettings
-      ? [
-        {
-          label: "Configuración",
-          icon: Settings,
-          group: "account" as const,
-          onSelect: () => navigate(ROUTES.club.settings),
-        },
-      ]
-      : []),
     {
       label: "Ir a vista jugador",
       icon: User,
@@ -342,25 +344,54 @@ export default function ClubShell() {
           </ul>
         </nav>
         <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
-          <SheetContent side="bottom" className="rounded-t-2xl">
+          <SheetContent
+            side="bottom"
+            className="rounded-t-2xl border-sidebar-border bg-sidebar text-sidebar-foreground [&_[data-slot=sheet-close]]:text-sidebar-foreground [&_[data-slot=sheet-close]]:hover:bg-sidebar-foreground/10 [&_[data-slot=sheet-close]]:hover:text-sidebar-foreground"
+          >
             <SheetHeader>
-              <SheetTitle>Más</SheetTitle>
-              <SheetDescription>{greeting}</SheetDescription>
+              <SheetTitle className="text-sidebar-foreground">Más</SheetTitle>
+              <SheetDescription className="text-sidebar-foreground/55">
+                {greeting}
+              </SheetDescription>
             </SheetHeader>
             <div className="px-3 pb-6">
+              {moreNavItems.length > 0 ? (
+                <div className="mb-1">
+                  {moreNavItems.map(({ to, label, icon: Icon, end }) => (
+                    <NavLink
+                      key={to}
+                      to={to}
+                      end={end}
+                      className={({ isActive }) =>
+                        cn(
+                          "flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-sm hover:bg-sidebar-foreground/10",
+                          isActive &&
+                            "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
+                        )
+                      }
+                      onClick={() => setMoreOpen(false)}
+                    >
+                      <Icon className="size-4 text-sidebar-foreground/55" />
+                      {label}
+                    </NavLink>
+                  ))}
+                  <div className="my-1 h-px bg-sidebar-foreground/15" />
+                </div>
+              ) : null}
               <AccountActionSections
+                onClub
                 actions={accountActions("sheet")}
                 renderItem={(action) => (
                   <button
                     type="button"
-                    className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-sm hover:bg-muted"
+                    className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-sm hover:bg-sidebar-foreground/10"
                     data-testid={action.testId}
                     onClick={() => {
                       setMoreOpen(false);
                       action.onSelect();
                     }}
                   >
-                    <action.icon className="size-4 text-muted-foreground" />
+                    <action.icon className="size-4 text-sidebar-foreground/55" />
                     {action.label}
                   </button>
                 )}

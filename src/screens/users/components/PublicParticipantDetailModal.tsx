@@ -65,6 +65,9 @@ export default function PublicParticipantDetailModal({
         </DialogHeader>
         {row ? (
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4">
+            {row.statusNote ? (
+              <p className="mb-3 text-xs text-destructive/90">Nota: {row.statusNote}</p>
+            ) : null}
             {playersQuery.isLoading ? (
               <p className="flex items-center gap-2 text-sm text-muted-foreground">
                 <LoaderCircle className="size-4 animate-spin" />

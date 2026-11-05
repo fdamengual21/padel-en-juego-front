@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Api from "@/api/Api";
 import { useMockSession } from "@/app/MockSessionProvider";
 import RequirePlayerAuth from "@/components/auth/RequirePlayerAuth";
+import PhoneWhatsApp from "@/components/PhoneWhatsApp";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -20,10 +21,13 @@ import {
 import { Label } from "@/components/ui/label";
 import MessageAlert, { type MessageAlertType } from "@/components/ui/message-alert";
 import WarningDialog from "@/components/ui/warning-dialog";
-import type {
-  PairSidePreference,
-  RegisteredPlayerSearchItem,
-  TournamentStatus,
+import {
+  PLAYER_REGISTRATION_CLOSED_BY_CLUB_REASON,
+  playerSelfRegisterBlocked,
+  type PairSidePreference,
+  type RegisteredPlayerSearchItem,
+  type RegistrationStatus,
+  type TournamentStatus,
 } from "@/domain";
 import { formatTournamentDayEs } from "@/lib/dates";
 import { toastError, toastSuccess } from "@/lib/toast";
@@ -43,6 +47,8 @@ interface PlayerRegistrationPanelProps {
     rankingCircuitId?: string | null;
     registrationOpensAt?: string | null;
   };
+  /** Teléfono de contacto del club (WhatsApp). */
+  clubPhone?: string | null;
   categories: Array<{ id: string; name: string }>;
   categoryId: string;
   /** Lo calcula la API pública: no hay lugar para otra pareja. */
@@ -78,8 +84,9 @@ function sideFromPair(value: string | null | undefined): PairSidePreference {
 }
 
 function registrationNotice(
-  status: string,
+  status: RegistrationStatus | string,
   partnerName: string | null,
+  cancelledBy?: "player" | "club" | null,
 ): { message: string; type: MessageAlertType } {
   if (status === "PENDING") {
     return {
@@ -102,9 +109,15 @@ function registrationNotice(
   if (status === "WAITLIST") {
     return { type: "warning", message: "Estás en lista de espera." };
   }
+  if (status === "REJECTED") {
+    return { type: "red", message: PLAYER_REGISTRATION_CLOSED_BY_CLUB_REASON };
+  }
+  if (status === "CANCELLED" && cancelledBy === "club") {
+    return { type: "red", message: PLAYER_REGISTRATION_CLOSED_BY_CLUB_REASON };
+  }
   return {
     type: "info",
-    message: "El club no aceptó esta inscripción. Podés volver a anotarte.",
+    message: "Tu inscripción en esta categoría ya no está activa.",
   };
 }
 
@@ -115,6 +128,7 @@ function tournamentHasStarted(status: TournamentStatus): boolean {
 
 export default function PlayerRegistrationPanel({
   tournament,
+  clubPhone = null,
   categories,
   categoryId,
   quotaFull,
@@ -211,6 +225,9 @@ export default function PlayerRegistrationPanel({
     onSuccess: async () => {
       toastSuccess("Inscripción cancelada");
       setConfirmCancel(false);
+      setOpen(false);
+      setEditing(false);
+      setConfirmSave(false);
       await invalidateMine();
     },
     onError: (err: Error) => toastError("No se pudo cancelar", err.message),
@@ -218,6 +235,10 @@ export default function PlayerRegistrationPanel({
 
   const category = categories.find((item) => item.id === categoryId) ?? categories[0];
   const current = mine.data?.registration;
+  const closedByClub = playerSelfRegisterBlocked(
+    current?.status,
+    current?.cancelledBy,
+  );
   const holdsSpot =
     current != null &&
     current.status !== "REJECTED" &&
@@ -225,8 +246,17 @@ export default function PlayerRegistrationPanel({
   const started = tournamentHasStarted(tournament.status);
   const closed = tournament.status !== "registrationOpen";
   const notYetOpen =
-    !holdsSpot && tournament.status === "draft" && Boolean(tournament.rankingCircuitId);
-  const canRegister = Boolean(categoryId) && !holdsSpot && !started && !closed && !quotaFull;
+    !holdsSpot &&
+    !closedByClub &&
+    tournament.status === "draft" &&
+    Boolean(tournament.rankingCircuitId);
+  const canRegister =
+    Boolean(categoryId) &&
+    !holdsSpot &&
+    !closedByClub &&
+    !started &&
+    !closed &&
+    !quotaFull;
   const canCancel =
     holdsSpot &&
     current != null &&
@@ -280,8 +310,18 @@ export default function PlayerRegistrationPanel({
   };
 
   let blockedNotice: { message: string; type: MessageAlertType } | null = null;
-  if (holdsSpot && current) {
-    blockedNotice = registrationNotice(current.status, mine.data?.partnerName ?? null);
+  if (closedByClub && current) {
+    blockedNotice = registrationNotice(
+      current.status,
+      mine.data?.partnerName ?? null,
+      current.cancelledBy,
+    );
+  } else if (holdsSpot && current) {
+    blockedNotice = registrationNotice(
+      current.status,
+      mine.data?.partnerName ?? null,
+      current.cancelledBy,
+    );
   } else if (started) {
     blockedNotice = {
       type: "info",
@@ -300,12 +340,13 @@ export default function PlayerRegistrationPanel({
   }
 
   const waitingForMine = isAuthenticated && mine.isLoading && blockedNotice == null;
+  const showClubContact = closedByClub && Boolean(clubPhone?.trim());
 
   return (
     <>
       {waitingForMine ? (
         <p className="text-sm text-muted-foreground">Cargando tu inscripción…</p>
-      ) : canRegister || (quotaFull && !holdsSpot && !started && !closed) ? (
+      ) : canRegister || (quotaFull && !holdsSpot && !closedByClub && !started && !closed) ? (
         quotaFull ? (
           <TooltipProvider delay={200}>
             <Tooltip>
@@ -356,31 +397,29 @@ export default function PlayerRegistrationPanel({
           </Tooltip>
         </TooltipProvider>
       ) : blockedNotice ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <MessageAlert
-            className="w-fit whitespace-nowrap"
-            data-testid="tournament-subscribe-cta"
-            message={blockedNotice.message}
-            type={blockedNotice.type}
-          />
-          {canCancel ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => setConfirmCancel(true)}
-            >
-              Cancelar inscripción
-            </Button>
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <MessageAlert
+              className="w-fit max-w-full whitespace-normal"
+              data-testid="tournament-subscribe-cta"
+              message={blockedNotice.message}
+              type={blockedNotice.type}
+            />
+            {canEdit ? (
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => openEdit()}
+              >
+                Editar inscripción
+              </Button>
+            ) : null}
+          </div>
+          {closedByClub && current?.statusNote ? (
+            <p className="text-xs text-destructive/90">Nota: {current.statusNote}</p>
           ) : null}
-          {canEdit ? (
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => openEdit()}
-            >
-              Editar
-            </Button>
+          {showClubContact ? (
+            <PhoneWhatsApp phone={clubPhone} className="text-sm" />
           ) : null}
         </div>
       ) : null}
@@ -448,11 +487,6 @@ export default function PlayerRegistrationPanel({
                     ))}
                   </select>
                 </div>
-              ) : null}
-              {current && !holdsSpot ? (
-                <p className="text-sm text-muted-foreground">
-                  El club no aceptó esta inscripción. Podés volver a anotarte.
-                </p>
               ) : null}
               <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Cómo te anotás">
                 <button
@@ -551,18 +585,38 @@ export default function PlayerRegistrationPanel({
                   ))}
                 </div>
               ) : null}
-              <Button
-                type="submit"
-                disabled={
-                  register.isPending ||
-                  update.isPending ||
-                  !categoryId ||
-                  (!editing && quotaFull) ||
-                  (withPartner && !partner)
-                }
+              <div
+                className={cn(
+                  "flex flex-col gap-2 sm:flex-row",
+                  editing && canCancel ? "sm:justify-between" : "sm:justify-end",
+                )}
               >
-                {editing ? "Guardar" : "Inscribirme"}
-              </Button>
+                {editing && canCancel ? (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    disabled={cancel.isPending || update.isPending}
+                    onClick={() => {
+                      setOpen(false);
+                      setConfirmCancel(true);
+                    }}
+                  >
+                    Cancelar inscripción
+                  </Button>
+                ) : null}
+                <Button
+                  type="submit"
+                  disabled={
+                    register.isPending ||
+                    update.isPending ||
+                    !categoryId ||
+                    (!editing && quotaFull) ||
+                    (withPartner && !partner)
+                  }
+                >
+                  {editing ? "Guardar" : "Inscribirme"}
+                </Button>
+              </div>
             </form>
           )}
         </DialogContent>

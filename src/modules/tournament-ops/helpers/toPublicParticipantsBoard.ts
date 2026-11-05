@@ -1,8 +1,18 @@
 import type { PairSidePreference } from "@/domain";
-import type { PublicParticipantsBoard } from "../types/publicParticipantsBoard";
+import type {
+  PublicParticipantStatus,
+  PublicParticipantsBoard,
+} from "../types/publicParticipantsBoard";
 import type { PublicParticipantsBoardDto } from "../types/publicParticipantsBoardDto";
 
 const SIDES = new Set(["drive", "reves", "any"]);
+const PUBLIC_STATUSES = new Set<PublicParticipantStatus>([
+  "PENDING",
+  "ACCEPTED",
+  "WAITLIST",
+  "REJECTED",
+  "DISQUALIFIED",
+]);
 
 /** DTO del tab Participantes público → entidad de UI. */
 export function toPublicParticipantsBoard(
@@ -22,6 +32,7 @@ export function toPublicParticipantsBoard(
       sidePreference: asSide(row.sidePreference),
       registeredAt: row.registeredAt ?? null,
       status: asPublicStatus(row.status),
+      statusNote: row.statusNote?.trim() ? row.statusNote.trim() : null,
       disqualified: Boolean(row.disqualified),
     })),
   };
@@ -31,6 +42,8 @@ function asSide(value: string | null | undefined): PairSidePreference | null {
   return value && SIDES.has(value) ? (value as PairSidePreference) : null;
 }
 
-function asPublicStatus(value: string | null | undefined): "PENDING" | "ACCEPTED" | null {
-  return value === "PENDING" || value === "ACCEPTED" ? value : null;
+function asPublicStatus(value: string | null | undefined): PublicParticipantStatus | null {
+  return value && PUBLIC_STATUSES.has(value as PublicParticipantStatus)
+    ? (value as PublicParticipantStatus)
+    : null;
 }

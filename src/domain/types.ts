@@ -349,6 +349,20 @@ export {
   parseCategoryLevel,
 } from "./categories";
 
+/** Foto de la galería pública de un torneo. */
+export interface TournamentPhoto {
+  id: string;
+  url: string;
+  description: string | null;
+  sortOrder: number;
+}
+
+/** Máximo de fotos en la galería del torneo. */
+export const TOURNAMENT_GALLERY_MAX_PHOTOS = 5;
+
+/** Longitud máxima del pie de foto. */
+export const TOURNAMENT_PHOTO_DESCRIPTION_MAX = 50;
+
 export interface Tournament {
   id: string;
   clubId: string;
@@ -383,6 +397,8 @@ export interface Tournament {
   clubCoverUrl?: string | null;
   /** Flyer publico del torneo. Null si el club no cargo uno. */
   bannerUrl?: string | null;
+  /** Galería pública ordenada. */
+  photos?: TournamentPhoto[];
   /** Circuito Quality. Null si es un torneo suelto. */
   rankingCircuitId?: string | null;
   /** Número de fecha dentro del circuito. */
@@ -1549,6 +1565,6 @@ export interface AcceptRegistrationInput {
 /** Rechazar una inscripción pendiente. */
 export interface RejectRegistrationInput {
   registrationId: string;
-  /** Motivo opcional; queda en statusNote. */
-  note?: string | null;
+  /** Motivo obligatorio; queda en statusNote. */
+  note: string;
 }

@@ -3,6 +3,7 @@ import type {
   RulesetPreset,
   TournamentCircuitType,
   TournamentFormat,
+  TournamentPhoto,
   TournamentStatus,
 } from "@/domain";
 
@@ -23,6 +24,7 @@ export interface PublicTournamentPage {
     format: TournamentFormat;
     registrationFee: number;
     bannerUrl: string | null;
+    photos: TournamentPhoto[];
     rankingCircuitId: string | null;
     weekIndex: number | null;
     rankingWeekCount: number | null;

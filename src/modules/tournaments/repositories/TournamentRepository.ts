@@ -1,6 +1,6 @@
 import type { AxiosInstance } from "axios";
 import { readData } from "@/config/axiosInstance";
-import type { PaginatedResult, TournamentCard } from "@/domain";
+import type { PaginatedResult, TournamentCard, TournamentPhoto } from "@/domain";
 import { asTournamentFormat } from "@/domain";
 import type { ApiEnvelope } from "@/lib/apiClient";
 import { resolveClubHeaderId } from "@/modules/auth/clubContext";
@@ -38,6 +38,18 @@ export interface ITournamentRepository {
   ): Promise<Tournament>;
   uploadBanner(id: string, file: File): Promise<Tournament>;
   deleteBanner(id: string): Promise<Tournament>;
+  listPhotos(tournamentId: string): Promise<TournamentPhoto[]>;
+  uploadPhoto(
+    tournamentId: string,
+    file: File,
+    description?: string | null,
+  ): Promise<TournamentPhoto>;
+  updatePhotoDescription(
+    tournamentId: string,
+    photoId: string,
+    description: string | null,
+  ): Promise<TournamentPhoto>;
+  deletePhoto(tournamentId: string, photoId: string): Promise<TournamentPhoto[]>;
 }
 
 function asTournament(raw: Tournament): Tournament {
@@ -54,6 +66,7 @@ function asTournament(raw: Tournament): Tournament {
     clubAvatarUrl: raw.clubAvatarUrl ?? null,
     clubCoverUrl: raw.clubCoverUrl ?? null,
     bannerUrl: raw.bannerUrl ?? null,
+    photos: asPhotos(raw.photos),
     myRegistrationStatus: raw.myRegistrationStatus ?? null,
     rankingCircuitId: raw.rankingCircuitId ?? null,
     weekIndex: raw.weekIndex ?? null,
@@ -80,6 +93,23 @@ function normalizePublicTournamentPage(raw: Record<string, unknown>): PaginatedR
 function asPageNumber(value: unknown, fallback: number): number {
   const parsed = typeof value === "number" ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function asPhotos(raw: unknown): TournamentPhoto[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
+    .map((item) => ({
+      id: String(item.id ?? ""),
+      url: typeof item.url === "string" ? item.url : "",
+      description:
+        typeof item.description === "string" && item.description.trim()
+          ? item.description.trim()
+          : null,
+      sortOrder: Number(item.sortOrder ?? 0),
+    }))
+    .filter((item) => item.id && item.url)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
 export class TournamentRepository implements ITournamentRepository {
@@ -182,5 +212,56 @@ export class TournamentRepository implements ITournamentRepository {
       headers: { "Content-Type": false as unknown as string },
     });
     return asTournament(readData(response));
+  }
+
+  async listPhotos(tournamentId: string): Promise<TournamentPhoto[]> {
+    this.assertClubHeader();
+    const response = await this.http.get<ApiEnvelope<TournamentPhoto[]>>(
+      `/club/tournaments/${tournamentId}/photos`,
+    );
+    return asPhotos(readData(response));
+  }
+
+  async uploadPhoto(
+    tournamentId: string,
+    file: File,
+    description?: string | null,
+  ): Promise<TournamentPhoto> {
+    this.assertClubHeader();
+    const form = new FormData();
+    form.append("file", file);
+    const trimmed = description?.trim();
+    if (trimmed) form.append("description", trimmed);
+    const response = await this.http.post<ApiEnvelope<TournamentPhoto>>(
+      `/club/tournaments/${tournamentId}/photos`,
+      form,
+      { headers: { "Content-Type": false as unknown as string } },
+    );
+    const photo = asPhotos([readData(response)])[0];
+    if (!photo) throw new Error("No se pudo subir la foto");
+    return photo;
+  }
+
+  async updatePhotoDescription(
+    tournamentId: string,
+    photoId: string,
+    description: string | null,
+  ): Promise<TournamentPhoto> {
+    this.assertClubHeader();
+    const response = await this.http.patch<ApiEnvelope<TournamentPhoto>>(
+      `/club/tournaments/${tournamentId}/photos/${photoId}`,
+      { description },
+    );
+    const photo = asPhotos([readData(response)])[0];
+    if (!photo) throw new Error("No se pudo actualizar la foto");
+    return photo;
+  }
+
+  async deletePhoto(tournamentId: string, photoId: string): Promise<TournamentPhoto[]> {
+    this.assertClubHeader();
+    const response = await this.http.delete<ApiEnvelope<TournamentPhoto[]>>(
+      `/club/tournaments/${tournamentId}/photos/${photoId}`,
+    );
+    return asPhotos(readData(response));
   }
 }

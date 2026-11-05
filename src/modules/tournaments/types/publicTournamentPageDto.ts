@@ -15,6 +15,13 @@ export interface PublicTournamentPageDto {
   repechageCreated?: boolean;
 }
 
+export interface PublicTournamentPhotoDto {
+  id: string;
+  url: string;
+  description: string | null;
+  sortOrder: number;
+}
+
 export interface PublicTournamentDto {
   id: string;
   clubId: string;
@@ -30,6 +37,7 @@ export interface PublicTournamentDto {
   format: string;
   registrationFee: number;
   bannerUrl: string | null;
+  photos?: PublicTournamentPhotoDto[];
   rankingCircuitId?: string | null;
   weekIndex?: number | null;
   rankingWeekCount?: number | null;
