@@ -85,6 +85,7 @@ export default function CuadroBoard({
         courts={board.courts ?? []}
         onMatchClick={onOpenResult}
         canEditResult={!readOnly && !tournamentLocked}
+        showPairingManual={!readOnly}
         onOpenPair={onOpenPair}
         heightClassName="h-[720px]"
       />

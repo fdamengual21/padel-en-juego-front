@@ -50,6 +50,8 @@ interface BracketViewProps {
   onMatchClick?: (match: Match) => void;
   /** Si es false, la fila solo abre cuando el partido ya tiene resultado. */
   canEditResult?: boolean;
+  /** Chip “Manual” de cruce fijado por el club. Solo backoffice. */
+  showPairingManual?: boolean;
   onOpenPair?: (pairId: string) => void;
   heightClassName?: string;
 }
@@ -199,6 +201,7 @@ export default function BracketView({
   courts = [],
   onMatchClick,
   canEditResult = true,
+  showPairingManual = true,
   onOpenPair,
   heightClassName = "h-[560px]",
 }: BracketViewProps) {
@@ -272,8 +275,8 @@ export default function BracketView({
             playStatus: resolveMatchPlayStatus(match, matchRules),
             statusHint: matchPlayStatusHint(match, slots, pairLabels),
             canOpen: Boolean(onMatchClick && canOpenMatchResult(match, canEditResult)),
-            pairingManual: match.pairingManual,
-            pairingNote: match.pairingNote,
+            pairingManual: showPairingManual ? match.pairingManual : false,
+            pairingNote: showPairingManual ? match.pairingNote : null,
           };
         });
         const h = tableNodeHeight(rows.length, true);
@@ -340,8 +343,8 @@ export default function BracketView({
         playStatus: resolveMatchPlayStatus(match, matchRules),
         statusHint: matchPlayStatusHint(match, slots, pairLabels),
         canOpen: Boolean(onMatchClick && canOpenMatchResult(match, canEditResult)),
-        pairingManual: match.pairingManual,
-        pairingNote: match.pairingNote,
+        pairingManual: showPairingManual ? match.pairingManual : false,
+        pairingNote: showPairingManual ? match.pairingNote : null,
       }));
       const h = tableNodeHeight(rows.length);
       const y = HEADER_H + Math.max(0, (referenceHeight - h) / 2);
@@ -412,6 +415,7 @@ export default function BracketView({
     groupMatches,
     onMatchClick,
     canEditResult,
+    showPairingManual,
     onOpenPair,
     groupNames,
     courtNames,
