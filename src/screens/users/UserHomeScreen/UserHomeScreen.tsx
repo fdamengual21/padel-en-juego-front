@@ -118,8 +118,7 @@ export default function UserHomeScreen() {
             />
           ) : (
             <PlayerWeekBoard
-              reservations={weekQuery.data?.reservations ?? []}
-              events={weekQuery.data?.events ?? []}
+              items={weekQuery.data?.items ?? []}
               loading={weekQuery.isLoading}
               onOpenReservation={setSelected}
             />

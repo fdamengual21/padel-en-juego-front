@@ -56,10 +56,12 @@ export function defaultTournamentFormValues(
 ): TournamentFormValues {
   const today = toIsoDateOnly(new Date());
   const startDate = partial?.startDate ?? today;
-  const endDate = partial?.endDate ?? isoPlusDays(startDate, 2);
   const requestedFormat = asTournamentFormat(partial?.format);
   const { phaseDays, ...rest } = partial ?? {};
   const matchPlayType = rest.matchPlayType ?? "QUALITY";
+  const endDate =
+    partial?.endDate ??
+    (matchPlayType === "QUALITY" ? startDate : isoPlusDays(startDate, 2));
   const scoring = matchPlayType === "STANDARD";
   const format =
     scoring && !isScoringFormat(requestedFormat) ? "GROUPS_ELIMINATION" : requestedFormat;

@@ -2,15 +2,14 @@ import { Link } from "react-router-dom";
 import dayjs from "dayjs";
 import { Calendar, ChevronRight, LoaderCircle } from "lucide-react";
 import { useState } from "react";
-import { PlayerReservationStatusChip } from "@/components/reservations";
-import { Badge } from "@/components/ui/badge";
-import type { PlayerWeekEvent } from "@/domain";
+import { StatusChip } from "@/components/StatusChip";
+import type { PlayerWeekItem } from "@/domain";
 import { ROUTES } from "@/router/routes";
 import type { PlayerReservation } from "@/modules/reservations";
+import { toReservation, weekChip } from "../weekItemChip";
 
 interface PlayerWeekBoardProps {
-  reservations: PlayerReservation[];
-  events: PlayerWeekEvent[];
+  items: PlayerWeekItem[];
   loading: boolean;
   onOpenReservation: (reservation: PlayerReservation) => void;
 }
@@ -18,17 +17,8 @@ interface PlayerWeekBoardProps {
 /** Un ítem. Todas las columnas miden esto mientras están quietas. */
 const collapsedListClass = "max-h-[3.625rem]";
 
-type Slot =
-  | { kind: "reservation"; at: number; reservation: PlayerReservation }
-  | { kind: "event"; at: number; event: PlayerWeekEvent };
-
-export default function PlayerWeekBoard({
-  reservations,
-  events,
-  loading,
-  onOpenReservation,
-}: PlayerWeekBoardProps) {
-  const days = groupByDay(reservations, events);
+export default function PlayerWeekBoard({ items, loading, onOpenReservation }: PlayerWeekBoardProps) {
+  const days = groupByDay(items);
   const count = days.reduce((total, day) => total + day.slots.length, 0);
 
   return (
@@ -120,85 +110,85 @@ function DayColumn({
         <ul
           className={`flex flex-col gap-2 overflow-hidden overscroll-contain transition-[max-height] duration-500 ease-out ${collapsedListClass} group-hover/day:max-h-[calc(3.625rem*4+0.5rem*3)] group-hover/day:overflow-y-auto group-focus-within/day:max-h-[calc(3.625rem*4+0.5rem*3)] group-focus-within/day:overflow-y-auto group-data-[open=true]/day:max-h-[calc(3.625rem*4+0.5rem*3)] group-data-[open=true]/day:overflow-y-auto`}
         >
-          {day.slots.map((slot) =>
-            slot.kind === "reservation" ? (
-              <ReservationRow
-                key={`reservation-${slot.reservation.id}`}
-                reservation={slot.reservation}
-                onOpen={onOpenReservation}
-              />
-            ) : (
-              <EventRow key={`${slot.event.kind}-${slot.event.id}`} event={slot.event} />
-            ),
-          )}
+          {day.slots.map((slot) => (
+            <WeekItemRow
+              key={`${slot.item.type}-${slot.item.id}`}
+              item={slot.item}
+              onOpenReservation={onOpenReservation}
+            />
+          ))}
         </ul>
       )}
     </article>
   );
 }
 
-function ReservationRow({
-  reservation,
-  onOpen,
+function WeekItemRow({
+  item,
+  onOpenReservation,
 }: {
-  reservation: PlayerReservation;
-  onOpen: (reservation: PlayerReservation) => void;
+  item: PlayerWeekItem;
+  onOpenReservation: (reservation: PlayerReservation) => void;
 }) {
-  const image = reservation.courtImageUrl ?? reservation.club.avatarUrl ?? reservation.club.coverUrl;
-  const court = reservation.courtName || "Cancha";
-  return (
-    <li>
-      <button
-        type="button"
-        className="flex h-[3.625rem] w-full shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-border bg-card p-2 text-left"
-        onClick={() => onOpen(reservation)}
-      >
-        <Thumb src={image} label={reservation.club.name} />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <p className="text-xs font-semibold tabular-nums">{clock(reservation.startsAt)}</p>
-            <PlayerReservationStatusChip
-              status={reservation.status}
-              isFixed={reservation.isFixed}
-              withIcon={false}
+  const chip = weekChip(item);
+  const body = (
+    <>
+      <Thumb src={item.imageUrl} label={item.title} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5">
+          <p className="text-xs font-semibold tabular-nums">{clock(item.startsAt)}</p>
+          {chip ? (
+            <StatusChip
+              tone={chip.tone}
+              label={chip.label}
               className="h-4 px-1 py-0 text-[10px] leading-none"
             />
-          </div>
-          <p className="truncate text-xs text-muted-foreground">
-            {reservation.club.name} · {court}
-          </p>
+          ) : null}
         </div>
-      </button>
-    </li>
+        {item.type === "reservation" ? (
+          <p className="truncate text-xs text-muted-foreground">
+            {[item.title, item.subtitle].filter(Boolean).join(" · ")}
+          </p>
+        ) : (
+          <>
+            <p className="truncate text-xs font-medium">{item.title}</p>
+            {item.subtitle ? (
+              <p className="truncate text-xs text-muted-foreground">{item.subtitle}</p>
+            ) : null}
+          </>
+        )}
+      </div>
+      {item.type !== "reservation" ? (
+        <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+      ) : null}
+    </>
   );
-}
 
-function EventRow({ event }: { event: PlayerWeekEvent }) {
-  const title = event.kind === "match" ? (event.detail ?? "Partido") : event.tournamentName;
-  const place = [event.clubName, event.courtName].filter(Boolean).join(" · ");
+  if (item.type === "reservation") {
+    const reservation = toReservation(item);
+    if (!reservation) return null;
+    return (
+      <li>
+        <button
+          type="button"
+          className="flex h-[3.625rem] w-full shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-border bg-card p-2 text-left"
+          onClick={() => onOpenReservation(reservation)}
+        >
+          {body}
+        </button>
+      </li>
+    );
+  }
+
+  const tournamentId = item.tournamentId;
+  if (!tournamentId) return null;
   return (
     <li>
       <Link
-        to={ROUTES.player.tournamentDetail(event.tournamentId)}
+        to={ROUTES.player.tournamentDetail(tournamentId)}
         className="flex h-[3.625rem] shrink-0 items-center gap-2 rounded-lg border border-border bg-card p-2"
       >
-        <Thumb src={event.imageUrl} label={event.clubName} />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <p className="text-xs font-semibold tabular-nums">{clock(event.startsAt)}</p>
-            {event.phaseLabel ? (
-              <Badge
-                variant="secondary"
-                className="h-4 border-transparent! bg-muted! px-1 py-0 text-[10px] leading-none font-medium text-muted-foreground"
-              >
-                {event.phaseLabel}
-              </Badge>
-            ) : null}
-          </div>
-          <p className="truncate text-xs font-medium">{title}</p>
-          <p className="truncate text-xs text-muted-foreground">{place}</p>
-        </div>
-        <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+        {body}
       </Link>
     </li>
   );
@@ -227,10 +217,10 @@ function Thumb({ src, label }: { src: string | null; label: string }) {
 interface DayGroup {
   key: string;
   date: dayjs.Dayjs;
-  slots: Slot[];
+  slots: Array<{ at: number; item: PlayerWeekItem }>;
 }
 
-function groupByDay(reservations: PlayerReservation[], events: PlayerWeekEvent[]): DayGroup[] {
+function groupByDay(items: PlayerWeekItem[]): DayGroup[] {
   const start = dayjs().startOf("day");
   const days = new Map<string, DayGroup>();
   for (let offset = 0; offset < 7; offset += 1) {
@@ -239,27 +229,17 @@ function groupByDay(reservations: PlayerReservation[], events: PlayerWeekEvent[]
     days.set(key, { key, date, slots: [] });
   }
 
-  const place = (iso: string, slot: Slot) => {
-    const at = dayjs(iso);
-    if (!at.isValid()) return;
+  for (const item of items) {
+    const at = dayjs(item.startsAt);
+    if (!at.isValid()) continue;
     const key = at.format("YYYY-MM-DD");
+    const slot = { at: at.valueOf(), item };
     const existing = days.get(key);
     if (existing) {
       existing.slots.push(slot);
-      return;
+      continue;
     }
     days.set(key, { key, date: at.startOf("day"), slots: [slot] });
-  };
-
-  for (const reservation of reservations) {
-    place(reservation.startsAt, {
-      kind: "reservation",
-      at: dayjs(reservation.startsAt).valueOf(),
-      reservation,
-    });
-  }
-  for (const event of events) {
-    place(event.startsAt, { kind: "event", at: dayjs(event.startsAt).valueOf(), event });
   }
 
   return [...days.values()]

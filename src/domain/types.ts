@@ -417,20 +417,38 @@ export interface Tournament {
   phaseDays?: Array<{ phase: string; dayNumber: number }>;
 }
 
-/** Partido o torneo Quality dentro de la semana del jugador. */
-export interface PlayerWeekEvent {
-  kind: "match" | "quality";
+/** Tipo de ítem en la agenda semanal del jugador. */
+export type PlayerWeekItemType = "reservation" | "match" | "quality";
+
+/** Club embebido en un ítem de reserva de la semana. */
+export interface PlayerWeekItemClub {
   id: string;
-  tournamentId: string;
-  tournamentName: string;
-  categoryName: string;
-  clubName: string;
-  imageUrl: string | null;
-  phaseLabel: string | null;
-  courtName: string | null;
-  detail: string | null;
+  name: string;
+  avatarUrl: string | null;
+  coverUrl: string | null;
+  municipalityName: string | null;
+  provinceName: string | null;
+}
+
+/**
+ * Turno, partido o Quality en la semana del jugador.
+ * `status` es opaco: se interpreta según `type`.
+ */
+export interface PlayerWeekItem {
+  type: PlayerWeekItemType;
+  id: string;
   startsAt: string;
   endsAt: string | null;
+  title: string;
+  subtitle: string | null;
+  imageUrl: string | null;
+  status: string;
+  tournamentId: string | null;
+  club: PlayerWeekItemClub | null;
+  courtName: string | null;
+  price: number | null;
+  rejectedReason: string | null;
+  isFixed: boolean;
 }
 
 /** Circuito de ranking asociado a la categoría (MVP: snapshot manual). */

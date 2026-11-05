@@ -5,19 +5,15 @@ import dayjs from "dayjs";
 import { CalendarDays, ChevronRight, Loader2 } from "lucide-react";
 import Api from "@/api/Api";
 import { useMockSession } from "@/app/MockSessionProvider";
-import { PlayerReservationStatusChip } from "@/components/reservations";
 import { StatusChip } from "@/components/StatusChip";
-import type { PlayerWeekEvent } from "@/domain";
+import type { PlayerWeekItem } from "@/domain";
 import { cn } from "@/lib/utils";
 import type { PlayerReservation } from "@/modules/reservations";
 import { ROUTES } from "@/router/routes";
 import PlayerReservationDetailModal from "@/screens/users/components/PlayerReservationDetailModal";
+import { toReservation, weekChip } from "@/screens/users/UserHomeScreen/weekItemChip";
 
 const VISIBLE = 3;
-
-type AgendaItem =
-  | { kind: "reservation"; at: number; reservation: PlayerReservation }
-  | { kind: "event"; at: number; event: PlayerWeekEvent };
 
 export default function PlayerProfileAgenda() {
   const queryClient = useQueryClient();
@@ -29,7 +25,7 @@ export default function PlayerProfileAgenda() {
     staleTime: 0,
   });
 
-  const items = upcoming(week.data?.reservations ?? [], week.data?.events ?? []);
+  const items = upcoming(week.data?.items ?? []);
   const visible = items.slice(0, VISIBLE);
 
   return (
@@ -73,45 +69,32 @@ export default function PlayerProfileAgenda() {
         </div>
       ) : (
         <div className="grid gap-2 lg:grid-cols-3">
-          {visible.map((item) =>
-            item.kind === "reservation" ? (
+          {visible.map((item) => {
+            const chip = weekChip(item);
+            const reservation = item.type === "reservation" ? toReservation(item) : null;
+            return (
               <AgendaRow
-                key={`reservation-${item.reservation.id}`}
-                at={item.reservation.startsAt}
-                endsAt={item.reservation.endsAt}
-                title={item.reservation.club.name}
-                meta={item.reservation.courtName || "Cancha"}
+                key={`${item.type}-${item.id}`}
+                at={item.startsAt}
+                endsAt={item.endsAt}
+                title={item.title}
+                meta={item.subtitle ?? ""}
                 chip={
-                  <PlayerReservationStatusChip
-                    status={item.reservation.status}
-                    isFixed={item.reservation.isFixed}
-                    withIcon={false}
-                  />
+                  chip ? <StatusChip tone={chip.tone} label={chip.label} icon={null} /> : null
                 }
-                onClick={() => setSelected(item.reservation)}
+                to={
+                  item.tournamentId
+                    ? ROUTES.player.tournamentDetail(item.tournamentId)
+                    : undefined
+                }
+                onClick={
+                  reservation
+                    ? () => setSelected(reservation)
+                    : undefined
+                }
               />
-            ) : (
-              <AgendaRow
-                key={`${item.event.kind}-${item.event.id}`}
-                at={item.event.startsAt}
-                endsAt={item.event.endsAt}
-                title={
-                  item.event.kind === "match"
-                    ? (item.event.detail ?? "Partido")
-                    : item.event.tournamentName
-                }
-                meta={[item.event.kind === "match" ? item.event.tournamentName : null, item.event.courtName ?? item.event.clubName]
-                  .filter(Boolean)
-                  .join(" · ")}
-                chip={
-                  item.event.phaseLabel ? (
-                    <StatusChip tone="upcoming" label={item.event.phaseLabel} />
-                  ) : null
-                }
-                to={ROUTES.player.tournamentDetail(item.event.tournamentId)}
-              />
-            ),
-          )}
+            );
+          })}
         </div>
       )}
 
@@ -176,31 +159,33 @@ function AgendaRow({
     </>
   );
 
+  if (onClick) {
+    return (
+      <button type="button" className={className} onClick={onClick}>
+        {content}
+      </button>
+    );
+  }
   return to ? (
     <Link to={to} className={className}>
       {content}
     </Link>
   ) : (
-    <button type="button" className={className} onClick={onClick}>
+    <button type="button" className={className} disabled>
       {content}
     </button>
   );
 }
 
-function upcoming(reservations: PlayerReservation[], events: PlayerWeekEvent[]): AgendaItem[] {
+function upcoming(items: PlayerWeekItem[]): PlayerWeekItem[] {
   const now = Date.now();
-  const items: AgendaItem[] = [
-    ...reservations
-      .filter((reservation) => reservation.status === "pending" || reservation.status === "booked")
-      .filter((reservation) => dayjs(reservation.endsAt).valueOf() >= now)
-      .map((reservation) => ({
-        kind: "reservation" as const,
-        at: dayjs(reservation.startsAt).valueOf(),
-        reservation,
-      })),
-    ...events
-      .filter((event) => dayjs(event.endsAt ?? event.startsAt).valueOf() >= now)
-      .map((event) => ({ kind: "event" as const, at: dayjs(event.startsAt).valueOf(), event })),
-  ];
-  return items.filter((item) => Number.isFinite(item.at)).sort((left, right) => left.at - right.at);
+  return items
+    .filter((item) => {
+      if (item.type === "reservation" && item.status !== "pending" && item.status !== "booked") {
+        return false;
+      }
+      return dayjs(item.endsAt ?? item.startsAt).valueOf() >= now;
+    })
+    .filter((item) => Number.isFinite(dayjs(item.startsAt).valueOf()))
+    .sort((left, right) => dayjs(left.startsAt).valueOf() - dayjs(right.startsAt).valueOf());
 }

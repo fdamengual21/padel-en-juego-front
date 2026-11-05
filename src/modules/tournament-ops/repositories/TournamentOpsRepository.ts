@@ -2,8 +2,7 @@ import type { AxiosInstance } from "axios";
 import { readData } from "@/config/axiosInstance";
 import type { ApiEnvelope } from "@/lib/apiClient";
 import { asTournamentCard, normalizeTournamentCardPage } from "@/modules/tournaments";
-import type { PlayerReservation } from "@/modules/reservations";
-import { normalizeMine, normalizeReservation } from "@/modules/reservations/repositories/ReservationRepository";
+import { normalizeReservation } from "@/modules/reservations/repositories/ReservationRepository";
 import { toPlayerPlayedPage } from "../helpers/toPlayerPlayedPage";
 import { toPlayerMatchView } from "../helpers/toPlayerMatchView";
 import {
@@ -63,7 +62,8 @@ import {
   type PlayerMatchView,
   type TournamentCard,
   type PlayerFeed,
-  type PlayerWeekEvent,
+  type PlayerWeekItem,
+  type PlayerWeekItemClub,
   type RegisterAccountInput,
   type RegisterPairInput,
   type RegisterPairResult,
@@ -229,7 +229,7 @@ export interface ITournamentOpsRepository {
     provinceId?: number | null;
     municipalityId?: number | null;
   }): Promise<PlayerFeed>;
-  getMyWeek(): Promise<{ reservations: PlayerReservation[]; events: PlayerWeekEvent[] }>;
+  getMyWeek(): Promise<{ items: PlayerWeekItem[] }>;
   listProvinces(): Promise<Array<{ id: string; name: string }>>;
   listCities(
     provinceIdOrName: string,
@@ -736,19 +736,13 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
   }
 
   async getMyWeek() {
-    const response = await this.http.get<
-      ApiEnvelope<{ reservations?: unknown[]; events?: unknown[] }>
-    >("/users/me/week");
+    const response = await this.http.get<ApiEnvelope<{ items?: unknown[] }>>("/users/me/week");
     const data = readData(response);
-    const reservations = (data?.reservations ?? [])
+    const items = (data?.items ?? [])
       .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
-      .map(normalizeMine)
-      .filter((item): item is PlayerReservation => item !== null);
-    const events = (data?.events ?? [])
-      .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
-      .map(asWeekEvent)
-      .filter((item): item is PlayerWeekEvent => item !== null);
-    return { reservations, events };
+      .map(asWeekItem)
+      .filter((item): item is PlayerWeekItem => item !== null);
+    return { items };
   }
 
   async listProvinces() {
@@ -1070,26 +1064,52 @@ export class TournamentOpsRepository implements ITournamentOpsRepository {
   }
 }
 
-function asWeekEvent(raw: Record<string, unknown>): PlayerWeekEvent | null {
+function asWeekItem(raw: Record<string, unknown>): PlayerWeekItem | null {
   const id = typeof raw.id === "string" ? raw.id : "";
-  const tournamentId = typeof raw.tournamentId === "string" ? raw.tournamentId : "";
   const startsAt = typeof raw.startsAt === "string" ? raw.startsAt : "";
-  const kind = raw.kind === "quality" ? "quality" : raw.kind === "match" ? "match" : null;
-  if (!id || !tournamentId || !startsAt || !kind) return null;
+  const type =
+    raw.type === "reservation" || raw.type === "match" || raw.type === "quality" ? raw.type : null;
+  if (!id || !startsAt || !type) return null;
   const text = (value: unknown) => (typeof value === "string" && value.trim() ? value : null);
+  const tournamentId = text(raw.tournamentId);
+  if ((type === "match" || type === "quality") && !tournamentId) return null;
+  const price =
+    typeof raw.price === "number" && Number.isFinite(raw.price)
+      ? raw.price
+      : typeof raw.price === "string" && raw.price.trim() && Number.isFinite(Number(raw.price))
+        ? Number(raw.price)
+        : null;
   return {
-    kind,
+    type,
     id,
-    tournamentId,
-    tournamentName: text(raw.tournamentName) ?? "Torneo",
-    categoryName: text(raw.categoryName) ?? "",
-    clubName: text(raw.clubName) ?? "Club",
-    imageUrl: text(raw.imageUrl),
-    phaseLabel: text(raw.phaseLabel),
-    courtName: text(raw.courtName),
-    detail: text(raw.detail),
     startsAt,
     endsAt: text(raw.endsAt),
+    title: text(raw.title) ?? (type === "reservation" ? "Club" : "Torneo"),
+    subtitle: text(raw.subtitle),
+    imageUrl: text(raw.imageUrl),
+    status: text(raw.status) ?? "",
+    tournamentId,
+    club: asWeekClub(raw.club),
+    courtName: text(raw.courtName),
+    price,
+    rejectedReason: text(raw.rejectedReason),
+    isFixed: raw.isFixed === true,
+  };
+}
+
+function asWeekClub(raw: unknown): PlayerWeekItemClub | null {
+  if (!raw || typeof raw !== "object") return null;
+  const club = raw as Record<string, unknown>;
+  const id = typeof club.id === "string" ? club.id : "";
+  if (!id) return null;
+  const text = (value: unknown) => (typeof value === "string" && value.trim() ? value : null);
+  return {
+    id,
+    name: text(club.name) ?? "Club",
+    avatarUrl: text(club.avatarUrl),
+    coverUrl: text(club.coverUrl),
+    municipalityName: text(club.municipalityName),
+    provinceName: text(club.provinceName),
   };
 }
 
