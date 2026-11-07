@@ -225,3 +225,17 @@ html.dark {
   width: 0;
   height: 0;
 }
+
+/* Sonner: entrada más corta para que la cruz no pierda el click al animar. */
+[data-sonner-toast] {
+  transition:
+    transform 160ms ease,
+    opacity 160ms ease,
+    height 160ms ease,
+    box-shadow 200ms ease !important;
+}
+
+[data-sonner-toast][data-styled="true"] [data-close-button] {
+  pointer-events: auto;
+  touch-action: manipulation;
+}

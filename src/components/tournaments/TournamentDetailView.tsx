@@ -447,14 +447,24 @@ export default function TournamentDetailView({
     enabled: Boolean(categoryId) && repechagePairsOpen,
   });
 
-  const invalidateOps = async () => {
+  /** Tras armar/rearmar zonas: reset del cuadro y zonas (sin dato viejo en pantalla). */
+  const invalidateOps = async (options?: { resetStructureBoards?: boolean }) => {
+    const structureBoards = options?.resetStructureBoards
+      ? [
+          qc.resetQueries({ queryKey: ["zones-board", categoryId] }),
+          qc.resetQueries({ queryKey: ["cuadro", categoryId] }),
+        ]
+      : [
+          qc.invalidateQueries({ queryKey: ["zones-board", categoryId] }),
+          qc.invalidateQueries({ queryKey: ["cuadro", categoryId] }),
+        ];
+
     await Promise.all([
       qc.invalidateQueries({ queryKey: ["groups", categoryId] }),
       qc.invalidateQueries({ queryKey: ["matches", categoryId] }),
-      qc.invalidateQueries({ queryKey: ["zones-board", categoryId] }),
+      ...structureBoards,
       qc.invalidateQueries({ queryKey: ["participants-board", categoryId] }),
       qc.invalidateQueries({ queryKey: ["category-results", categoryId] }),
-      qc.invalidateQueries({ queryKey: ["cuadro", categoryId] }),
       qc.invalidateQueries({ queryKey: ["config-board", categoryId] }),
       qc.invalidateQueries({ queryKey: ["repechage-board", categoryId] }),
       qc.invalidateQueries({ queryKey: ["repechage-candidates", categoryId] }),
@@ -788,7 +798,7 @@ export default function TournamentDetailView({
       setZonesModalOpen(false);
       setZonesPreview(null);
       toastSuccess(result.message);
-      await invalidateOps();
+      await invalidateOps({ resetStructureBoards: true });
     },
     onError: (err: Error) => {
       const logic = err instanceof ApiHttpError && err.status === 422;

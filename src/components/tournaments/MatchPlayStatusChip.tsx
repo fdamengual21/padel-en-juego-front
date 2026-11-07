@@ -1,10 +1,10 @@
 import { StatusChip, type StatusTone } from "@/components/StatusChip";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   matchPlayStatusLabel,
   type MatchPlayStatus,
@@ -12,7 +12,7 @@ import {
 
 interface MatchPlayStatusChipProps {
   status: MatchPlayStatus;
-  /** Explicación corta (p. ej. por qué clasificó sin jugar). Se muestra como tooltip. */
+  /** Explicación corta (p. ej. por qué clasificó sin jugar). Se muestra al hacer click. */
   hint?: string | null;
   className?: string;
 }
@@ -39,13 +39,24 @@ export default function MatchPlayStatusChip({
   );
   if (!hint) return badge;
   return (
-    <TooltipProvider delay={200}>
-      <Tooltip>
-        <TooltipTrigger render={<span className="inline-flex pointer-events-auto" />}>
-          {badge}
-        </TooltipTrigger>
-        <TooltipContent className="max-w-sm">{hint}</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Popover>
+      <PopoverTrigger
+        render={
+          <button
+            type="button"
+            className="inline-flex cursor-pointer pointer-events-auto"
+            aria-label={hint}
+            onClick={(event) => event.stopPropagation()}
+          />
+        }
+      >
+        {badge}
+      </PopoverTrigger>
+      <PopoverContent side="top" className="w-auto max-w-sm p-2">
+        <PopoverDescription className="text-xs text-popover-foreground">
+          {hint}
+        </PopoverDescription>
+      </PopoverContent>
+    </Popover>
   );
 }

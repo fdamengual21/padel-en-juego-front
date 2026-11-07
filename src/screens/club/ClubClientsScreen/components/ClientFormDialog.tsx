@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { useQuery } from "@tanstack/react-query";
@@ -24,9 +24,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import WarningDialog from "@/components/ui/warning-dialog";
+import { ApiHttpError } from "@/lib/apiClient";
 import { combinePhone, isValidOptionalPhone, splitE164, DEFAULT_PHONE_DIAL } from "@/lib/phone";
 import { toastError, toastSuccess } from "@/lib/toast";
-import type { ClubClient } from "@/modules/clients";
+import type { ClubClient, SaveClubClientInput } from "@/modules/clients";
 
 interface ClientFormValues {
   firstName: string;
@@ -133,6 +135,20 @@ function ReadValue({ label, value }: { label: string; value?: string | null }) {
   );
 }
 
+function toInput(values: ClientFormValues, confirmReplaceWithAccount = false): SaveClubClientInput {
+  return {
+    firstName: values.firstName.trim(),
+    lastName: values.lastName.trim(),
+    email: values.email.trim(),
+    sexId: values.sexId ?? 0,
+    phone: combinePhone(values.phoneDialCode, values.phoneNational),
+    categoryLevel: values.categoryLevel ?? 0,
+    sidePreference: values.sidePreference,
+    note: values.note.trim() || null,
+    confirmReplaceWithAccount: confirmReplaceWithAccount || undefined,
+  };
+}
+
 export default function ClientFormDialog({
   open,
   clientId,
@@ -143,6 +159,10 @@ export default function ClientFormDialog({
   hasAccount: hasAccountProp,
 }: ClientFormDialogProps) {
   const editing = Boolean(clientId);
+  const [rebindMessage, setRebindMessage] = useState<string | null>(null);
+  const [pendingValues, setPendingValues] = useState<ClientFormValues | null>(null);
+  const [isRebinding, setIsRebinding] = useState(false);
+
   const sexesQuery = useQuery({
     queryKey: ["sexes"],
     queryFn: () => Api.SexService().list(),
@@ -171,7 +191,11 @@ export default function ClientFormDialog({
   });
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setRebindMessage(null);
+      setPendingValues(null);
+      return;
+    }
     if (!clientId) {
       form.reset(emptyValues);
       return;
@@ -192,30 +216,34 @@ export default function ClientFormDialog({
     });
   }, [open, clientId, detailQuery.data, form]);
 
+  const finishSave = (saved: ClubClient, isCreate: boolean) => {
+    toastSuccess(isCreate ? "Cliente añadido" : "Cliente actualizado");
+    onSaved(saved);
+    if (embedded) onCancel?.();
+    else onOpenChange(false);
+  };
+
   const onSubmit = form.handleSubmit(async (values) => {
-    const input = {
-      firstName: values.firstName.trim(),
-      lastName: values.lastName.trim(),
-      email: values.email.trim(),
-      sexId: values.sexId ?? 0,
-      phone: combinePhone(values.phoneDialCode, values.phoneNational),
-      categoryLevel: values.categoryLevel ?? 0,
-      sidePreference: values.sidePreference,
-      note: values.note.trim() || null,
-    };
+    const input = toInput(values);
     try {
       if (clientId) {
         const updated = await Api.ClientService().update(clientId, input);
-        toastSuccess("Cliente actualizado");
-        onSaved(updated);
+        finishSave(updated, false);
       } else {
         const created = await Api.ClientService().create(input);
-        toastSuccess("Cliente añadido");
-        onSaved(created);
+        finishSave(created, true);
       }
-      if (embedded) onCancel?.();
-      else onOpenChange(false);
     } catch (err) {
+      if (
+        clientId &&
+        !hasAccount &&
+        err instanceof ApiHttpError &&
+        err.status === 409
+      ) {
+        setPendingValues(values);
+        setRebindMessage(err.message);
+        return;
+      }
       const message = err instanceof Error ? err.message : "No se pudo guardar el cliente";
       const alreadyExists = /existe, buscalo con el nombre/i.test(message);
       toastError(
@@ -224,6 +252,31 @@ export default function ClientFormDialog({
       );
     }
   });
+
+  const confirmRebind = async () => {
+    if (!clientId || !pendingValues) return;
+    setIsRebinding(true);
+    try {
+      const updated = await Api.ClientService().update(
+        clientId,
+        toInput(pendingValues, true),
+      );
+      setRebindMessage(null);
+      setPendingValues(null);
+      finishSave(updated, false);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "No se pudo guardar el cliente";
+      const alreadyExists = /existe, buscalo con el nombre/i.test(message);
+      toastError(
+        alreadyExists ? message : "No se pudo guardar el cliente",
+        alreadyExists ? undefined : message,
+      );
+      setRebindMessage(null);
+      setPendingValues(null);
+    } finally {
+      setIsRebinding(false);
+    }
+  };
 
   const sexOptions = (sexesQuery.data ?? []).map((sex) => ({
     value: String(sex.id),
@@ -337,21 +390,49 @@ export default function ClientFormDialog({
     </FormProvider>
   );
 
-  if (embedded) return formBody;
+  const rebindDialog = (
+    <WarningDialog
+      open={Boolean(rebindMessage)}
+      onOpenChange={(next) => {
+        if (!next) {
+          setRebindMessage(null);
+          setPendingValues(null);
+        }
+      }}
+      title="Email con cuenta registrada"
+      description={rebindMessage ?? undefined}
+      confirmLabel="Confirmar"
+      cancelLabel="Cancelar"
+      isConfirming={isRebinding}
+      onConfirm={() => void confirmRebind()}
+    />
+  );
+
+  if (embedded) {
+    return (
+      <>
+        {formBody}
+        {rebindDialog}
+      </>
+    );
+  }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent data-testid="client-form-dialog">
-        <DialogHeader>
-          <DialogTitle>{editing ? "Editar cliente" : "Añadir cliente"}</DialogTitle>
-          <DialogDescription>
-            {hasAccount
-              ? accountCopy
-              : "Nombre, apellido, email, sexo, teléfono y categoría son obligatorios."}
-          </DialogDescription>
-        </DialogHeader>
-        {formBody}
-      </DialogContent>
-    </Dialog>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent data-testid="client-form-dialog">
+          <DialogHeader>
+            <DialogTitle>{editing ? "Editar cliente" : "Añadir cliente"}</DialogTitle>
+            <DialogDescription>
+              {hasAccount
+                ? accountCopy
+                : "Nombre, apellido, email, sexo, teléfono y categoría son obligatorios."}
+            </DialogDescription>
+          </DialogHeader>
+          {formBody}
+        </DialogContent>
+      </Dialog>
+      {rebindDialog}
+    </>
   );
 }

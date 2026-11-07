@@ -31,9 +31,8 @@ const ZONE_W = 576;
 const ROUND_W = 576;
 const COL_GAP = 64;
 const ROW_GAP = 28;
-const HEADER_H = 44;
 const TABLE_HEADER_H = 36;
-/** Fila de título de zona (Zona A) encima de las columnas. */
+/** Fila de título (Zona A / Octavos…) encima de las columnas. */
 const TABLE_TITLE_H = 28;
 /** Fila con PairVsBlock (2 líneas) + cuadrados de resultado. */
 const TABLE_ROW_H = 56;
@@ -124,22 +123,14 @@ function MatchesTableNode({ data }: NodeProps) {
   );
 }
 
-function RoundHeaderNode({ data }: NodeProps) {
-  const d = data as { label: string; width?: number };
-  return (
-    <div
-      style={{ width: d.width ?? ROUND_W }}
-      className="flex items-center justify-center rounded-md bg-sky-100 px-3 py-2 text-center text-xs font-bold uppercase tracking-wide text-sky-950"
-    >
-      {d.label}
-    </div>
-  );
-}
-
 const nodeTypes = {
   matchesTable: MatchesTableNode,
-  roundHeader: RoundHeaderNode,
 };
+
+/** Sin pareja real: entre comillas = provisional (aún no se pueden cargar puntos). */
+function provisionalLabel(text: string): string {
+  return `"${text}"`;
+}
 
 function resolvePairLabel(
   match: Match,
@@ -149,17 +140,17 @@ function resolvePairLabel(
   groupNames: Record<string, string>,
 ): string {
   const pairId = side === "A" ? match.pairAId : match.pairBId;
-  if (pairId && pairLabels[pairId]) return pairLabels[pairId];
+  if (pairId) return pairLabels[pairId] ?? "Pareja";
   const slot = slots.find((s) => s.matchId === match.id && s.side === side);
-  if (!slot) return "Por definir";
+  if (!slot) return provisionalLabel("Por definir");
   if (slot.sourceType === "GROUP_POSITION" && slot.groupId && slot.groupPosition != null) {
     const zone = groupNames[slot.groupId] ?? "Zona";
-    return `${slot.groupPosition}° ${zone}`;
+    return provisionalLabel(`${slot.groupPosition}° ${zone}`);
   }
-  if (slot.sourceType === "MATCH_WINNER") return "Ganador";
-  if (slot.sourceType === "MATCH_LOSER") return "Perdedor";
-  if (slot.sourceType === "BYE") return "Sin rival";
-  return "Por definir";
+  if (slot.sourceType === "MATCH_WINNER") return provisionalLabel("Ganador");
+  if (slot.sourceType === "MATCH_LOSER") return provisionalLabel("Perdedor");
+  if (slot.sourceType === "BYE") return provisionalLabel("Sin rival");
+  return provisionalLabel("Por definir");
 }
 
 const FALLBACK_RULES: MatchRules = {
@@ -241,20 +232,11 @@ export default function BracketView({
       });
     };
 
-    let zonesContentTop = HEADER_H;
-    let zonesContentBottom = HEADER_H + TABLE_ROW_H * 4;
+    let zonesContentTop = 0;
+    let zonesContentBottom = TABLE_ROW_H * 4;
 
     if (hasZones) {
-      nodesOut.push({
-        id: "header-zones",
-        type: "roundHeader",
-        position: { x: 0, y: 0 },
-        data: { label: "Zonas", width: ZONE_W },
-        draggable: false,
-        selectable: false,
-      });
-
-      let zoneY = HEADER_H;
+      let zoneY = 0;
       for (const group of sortedGroups) {
         const zoneMatches = groupMatches
           .filter((m) => m.groupId === group.id && m.phase === "GROUP")
@@ -303,7 +285,7 @@ export default function BracketView({
         });
         zoneY += h + ROW_GAP;
       }
-      zonesContentTop = HEADER_H;
+      zonesContentTop = 0;
       zonesContentBottom = Math.max(zonesContentTop + TABLE_ROW_H, zoneY - ROW_GAP);
     }
 
@@ -318,7 +300,7 @@ export default function BracketView({
     }
 
     const roundHeights = sortedRounds.map((round) =>
-      tableNodeHeight((matchesByRound.get(round.id) ?? []).length),
+      tableNodeHeight((matchesByRound.get(round.id) ?? []).length, true),
     );
     const referenceHeight = hasZones
       ? zonesContentBottom - zonesContentTop
@@ -346,17 +328,8 @@ export default function BracketView({
         pairingManual: showPairingManual ? match.pairingManual : false,
         pairingNote: showPairingManual ? match.pairingNote : null,
       }));
-      const h = tableNodeHeight(rows.length);
-      const y = HEADER_H + Math.max(0, (referenceHeight - h) / 2);
-
-      nodesOut.push({
-        id: `header-${round.id}`,
-        type: "roundHeader",
-        position: { x: elimX, y: 0 },
-        data: { label: roundLabel, width: ROUND_W },
-        draggable: false,
-        selectable: false,
-      });
+      const h = tableNodeHeight(rows.length, true);
+      const y = Math.max(0, (referenceHeight - h) / 2);
 
       nodesOut.push({
         id: `round-${round.id}`,
@@ -365,6 +338,7 @@ export default function BracketView({
         className: "nopan nodrag nowheel !overflow-visible",
         style: { width: ROUND_W, height: h, pointerEvents: "all", zIndex: 10 },
         data: {
+          title: roundLabel,
           rows,
           slotCount,
           decidingSlotIndex,

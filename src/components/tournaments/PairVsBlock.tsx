@@ -46,10 +46,12 @@ function PairSide({
   onOpenPair?: (pairId: string) => void;
 }) {
   const [first, second] = names;
+  const provisional = first.startsWith('"');
+  const nameClass = provisional ? "truncate" : "truncate capitalize";
   const content = (
     <>
-      <p className="truncate capitalize">{first}</p>
-      {second ? <p className="truncate capitalize">{second}</p> : null}
+      <p className={nameClass}>{first}</p>
+      {second ? <p className={nameClass}>{second}</p> : null}
     </>
   );
   if (!onOpenPair || !pairId) {

@@ -42,4 +42,6 @@ export interface SaveClubClientInput {
   categoryLevel: number;
   sidePreference?: string | null;
   note?: string | null;
+  /** Confirma rebind: baja ClubPlayer de la ficha y asegura el de la cuenta. */
+  confirmReplaceWithAccount?: boolean;
 }

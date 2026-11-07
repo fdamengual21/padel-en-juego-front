@@ -28,7 +28,7 @@ export interface MatchTableRow {
   sets: Match["sets"];
   winnerSide?: "A" | "B" | null;
   playStatus: MatchPlayStatus;
-  /** Tooltip del estado (p. ej. por qué clasificó sin jugar). */
+  /** Explicación del estado (p. ej. por qué clasificó sin jugar). */
   statusHint?: string | null;
   /** La fila abre el marcador, para cargarlo o solo verlo. */
   canOpen: boolean;
@@ -38,7 +38,7 @@ export interface MatchTableRow {
 }
 
 interface RoundMatchesTableProps {
-  /** Encabezado de zona, encima de las columnas. En knockout no se usa. */
+  /** Encabezado de zona o fase, encima de las columnas. */
   title?: string | null;
   rows: MatchTableRow[];
   slotCount: number;

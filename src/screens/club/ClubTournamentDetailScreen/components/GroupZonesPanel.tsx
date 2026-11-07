@@ -47,6 +47,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -175,6 +181,20 @@ function pendingSide(source: string | undefined): string | null {
   return null;
 }
 
+/** Placeholder sin pareja real: entre comillas = provisional (aún no se pueden cargar puntos). */
+function provisionalLabel(text: string): string {
+  return `"${text}"`;
+}
+
+function resolvedOrProvisionalLabel(
+  pairId: string | null,
+  pairLabels: Record<string, string>,
+  pending: string | null,
+): string {
+  if (pairId) return pairLabels[pairId] ?? "Pareja";
+  return provisionalLabel(pending ?? "Por definir");
+}
+
 function pairNamesFromLabel(
   pairId: string,
   pairLabels: Record<string, string>,
@@ -288,32 +308,11 @@ function qualifyHeadline(count: number): string | null {
   return null;
 }
 
-function matchClosed(match: Match): boolean {
-  return (
-    match.status === "finished" ||
-    match.status === "walkover" ||
-    match.status === "cancelled"
-  );
-}
-
-/** La fase siguiente aparece cuando la anterior ya no tiene partidos abiertos. */
+/** Como el cuadro: todas las fases de llave presentes, aunque la zona siga abierta. */
 function visibleKnockoutPhases(matches: Match[]): MatchPhase[] {
-  const present = KNOCKOUT_PHASES.filter((phase) =>
+  return KNOCKOUT_PHASES.filter((phase) =>
     matches.some((match) => match.phase === phase),
   );
-  const groupsDone = matches
-    .filter((match) => match.phase === "GROUP")
-    .every(matchClosed);
-  const visible: MatchPhase[] = [];
-  let unlocked = groupsDone;
-  for (const phase of present) {
-    if (!unlocked) break;
-    visible.push(phase);
-    unlocked = matches
-      .filter((match) => match.phase === phase)
-      .every(matchClosed);
-  }
-  return visible;
 }
 
 function sideLabel(
@@ -324,7 +323,7 @@ function sideLabel(
   groupNames: Record<string, string>,
 ): string {
   const pairId = side === "A" ? match.pairAId : match.pairBId;
-  if (pairId && pairLabels[pairId]) return pairLabels[pairId];
+  if (pairId) return pairLabels[pairId] ?? "Pareja";
   const slot = slots.find((item) => item.matchId === match.id && item.side === side);
   if (
     slot?.sourceType === "GROUP_POSITION" &&
@@ -332,9 +331,9 @@ function sideLabel(
     slot.groupPosition != null
   ) {
     const zone = groupNames[slot.groupId] ?? "Zona";
-    return `${slot.groupPosition}° ${zone}`;
+    return provisionalLabel(`${slot.groupPosition}° ${zone}`);
   }
-  return pendingSide(slot?.sourceType) ?? "Por definir";
+  return provisionalLabel(pendingSide(slot?.sourceType) ?? "Por definir");
 }
 
 function pairsLabel(count: number): string {
@@ -383,68 +382,74 @@ function ZoneSectionFrame({
           className={cn("size-4 transition-transform", open && "rotate-180")}
         />
       </button>
-      <div className="overflow-x-auto">
-        <Table className={cn("table-fixed text-xs", showActions ? "min-w-[41.3rem]" : "min-w-[35.3rem]")}>
-          <colgroup>
-            <col className="w-[2.5rem]" />
-            <col className="w-[4rem]" />
-            <col className="w-[7.25rem]" />
-            <col className="w-[6.25rem]" />
-            <col className="w-[17rem]" />
-            <col className="w-[6.3rem]" />
-            {showActions ? <col className="w-[5.5rem]" /> : null}
-            {showAgenda ? <col className="w-[7.5rem]" /> : null}
-          </colgroup>
-          <TableHeader>
-            <TableRow className="border-0 hover:bg-transparent">
-              <TableHead colSpan={2} className={cn(headClass, "whitespace-nowrap")}>
-                <span className="inline-flex items-center gap-1.5">
-                  {title}
-                  {pairCount != null ? (
-                    <TooltipProvider delay={200}>
-                      <Tooltip>
-                        <TooltipTrigger
-                          className="cursor-help"
-                          render={<span />}
+      <Table
+        className={cn(
+          "table-fixed text-xs",
+          showActions && showAgenda && "min-w-[56.3rem]",
+          showActions && !showAgenda && "min-w-[48.8rem]",
+          !showActions && showAgenda && "min-w-[50.8rem]",
+          !showActions && !showAgenda && "min-w-[43.3rem]",
+        )}
+      >
+        <colgroup>
+          <col className="w-[2.5rem]" />
+          <col className="w-[4rem]" />
+          <col className="w-[7.25rem]" />
+          <col className="w-[6.25rem]" />
+          <col className="w-[17rem]" />
+          <col className="w-[6.3rem]" />
+          {showActions ? <col className="w-[5.5rem]" /> : null}
+          {showAgenda ? <col className="w-[7.5rem]" /> : null}
+        </colgroup>
+        <TableHeader>
+          <TableRow className="border-0 bg-primary/90 hover:bg-primary/90">
+            <TableHead colSpan={2} className={cn(headClass, "whitespace-nowrap")}>
+              <span className="inline-flex items-center gap-1.5">
+                {title}
+                {pairCount != null ? (
+                  <TooltipProvider delay={200}>
+                    <Tooltip>
+                      <TooltipTrigger
+                        className="cursor-help"
+                        render={<span />}
+                      >
+                        <span
+                          className="inline-flex h-5 items-center rounded-md bg-primary-foreground/20 px-1.5 text-[10px] font-semibold tabular-nums"
+                          data-testid={`zone-pair-count-${sectionId}`}
                         >
-                          <span
-                            className="inline-flex h-5 items-center rounded-md bg-primary-foreground/20 px-1.5 text-[10px] font-semibold tabular-nums"
-                            data-testid={`zone-pair-count-${sectionId}`}
-                          >
-                            {pairCount}
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent>{pairsLabel(pairCount)}</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  ) : null}
-                </span>
+                          {pairCount}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>{pairsLabel(pairCount)}</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                ) : null}
+              </span>
+            </TableHead>
+            <TableHead className={headClass}>Horarios</TableHead>
+            <TableHead className={headClass}>Estado</TableHead>
+            <TableHead className={headClass}>Partidos</TableHead>
+            <TableHead
+              className={cn(
+                headClass,
+                "text-left",
+                !showAgenda && !showActions && "pr-8",
+              )}
+            >
+              Resultado
+            </TableHead>
+            {showActions ? (
+              <TableHead className={cn(headClass, !showAgenda && "pr-8")}>
+                Acciones
               </TableHead>
-              <TableHead className={headClass}>Horarios</TableHead>
-              <TableHead className={headClass}>Estado</TableHead>
-              <TableHead className={headClass}>Partidos</TableHead>
-              <TableHead
-                className={cn(
-                  headClass,
-                  "text-left",
-                  !showAgenda && !showActions && "pr-8",
-                )}
-              >
-                Resultado
-              </TableHead>
-              {showActions ? (
-                <TableHead className={cn(headClass, !showAgenda && "pr-8")}>
-                  Acciones
-                </TableHead>
-              ) : null}
-              {showAgenda ? (
-                <TableHead className={cn(headClass, "pr-8")}>Cancha</TableHead>
-              ) : null}
-            </TableRow>
-          </TableHeader>
-          {open ? <TableBody>{children}</TableBody> : null}
-        </Table>
-      </div>
+            ) : null}
+            {showAgenda ? (
+              <TableHead className={cn(headClass, "pr-8")}>Cancha</TableHead>
+            ) : null}
+          </TableRow>
+        </TableHeader>
+        {open ? <TableBody>{children}</TableBody> : null}
+      </Table>
       {open ? footer : null}
     </section>
   );
@@ -627,6 +632,10 @@ export default function GroupZonesPanel({
                       <span className="rounded-md bg-primary/20 px-2 py-0.5 text-[11px] font-medium text-foreground">
                         Zona finalizada · {passedLabel}
                       </span>
+                    ) : !zoneFinished && (group.qualifies ?? 0) > 0 && passedLabel ? (
+                      <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                        Avance provisional · {passedLabel}
+                      </span>
                     ) : null}
                   </div>
                   {unresolvedTie ? (
@@ -688,10 +697,14 @@ export default function GroupZonesPanel({
                             label="Desempate"
                             fullName="Criterio que definió el puesto"
                           />
-                          {zoneFinished && (group.qualifies ?? 0) > 0 ? (
+                          {(group.qualifies ?? 0) > 0 ? (
                             <StandingColumnHead
                               label="Avance"
-                              fullName="Clasificación al cuadro"
+                              fullName={
+                                zoneFinished
+                                  ? "Clasificación al cuadro"
+                                  : "Clasificación provisional al cuadro. Puede cambiar hasta que termine la zona. Con las dos parejas del versus ya se pueden cargar los puntos."
+                              }
                             />
                           ) : zoneFinished ? (
                             <StandingColumnHead
@@ -703,21 +716,25 @@ export default function GroupZonesPanel({
                       </TableHeader>
                       <TableBody>
                         {groupStandings.map((row) => {
-                          const qualifies =
-                            zoneFinished &&
+                          const tied = tiedSet.has(row.pairId);
+                          const inQualifyBand =
                             (group.qualifies ?? 0) > 0 &&
+                            !tied &&
                             row.position > 0 &&
                             row.position <= (group.qualifies ?? 0);
+                          const qualifiesConfirmed = zoneFinished && inQualifyBand;
+                          const qualifiesProvisional =
+                            !zoneFinished && inQualifyBand;
                           const champion =
                             zoneFinished &&
                             (group.qualifies ?? 0) === 0 &&
                             row.position === 1;
-                          const tied = tiedSet.has(row.pairId);
                           return (
                             <TableRow
                               key={row.id}
                               className={cn(
-                                (qualifies || champion) && "bg-primary/10",
+                                (qualifiesConfirmed || champion) && "bg-primary/10",
+                                qualifiesProvisional && "bg-primary/5",
                                 tied && "bg-amber-50",
                               )}
                             >
@@ -750,38 +767,54 @@ export default function GroupZonesPanel({
                               </TableCell>
                               <TableCell className="px-2 py-1">
                                 {row.tieBreak ? (
-                                  <Tooltip>
-                                    <TooltipTrigger
-                                      className="cursor-help"
-                                      render={<span />}
+                                  <Popover>
+                                    <PopoverTrigger
+                                      render={
+                                        <button
+                                          type="button"
+                                          className={cn(
+                                            "inline-flex cursor-pointer rounded-md border px-1.5 py-px text-[10px] font-medium",
+                                            row.tieBreak === "UNRESOLVED"
+                                              ? "border-amber-300 bg-amber-100 text-amber-900"
+                                              : row.tieBreak === "MANUAL"
+                                                ? "border-sky-300 bg-sky-50 text-sky-900"
+                                                : "border-border bg-muted/40 text-muted-foreground",
+                                          )}
+                                          data-testid={`tiebreak-${row.pairId}`}
+                                          aria-label={tieBreakHint(
+                                            row.tieBreak,
+                                            row.tieBreakNote,
+                                          )}
+                                        />
+                                      }
                                     >
-                                      <span
-                                        className={cn(
-                                          "inline-flex rounded-md border px-1.5 py-px text-[10px] font-medium",
-                                          row.tieBreak === "UNRESOLVED"
-                                            ? "border-amber-300 bg-amber-100 text-amber-900"
-                                            : row.tieBreak === "MANUAL"
-                                              ? "border-sky-300 bg-sky-50 text-sky-900"
-                                              : "border-border bg-muted/40 text-muted-foreground",
-                                        )}
-                                        data-testid={`tiebreak-${row.pairId}`}
-                                      >
-                                        {tieBreakLabel(row.tieBreak)}
-                                      </span>
-                                    </TooltipTrigger>
-                                    <TooltipContent className="max-w-xs">
-                                      {tieBreakHint(row.tieBreak, row.tieBreakNote)}
-                                    </TooltipContent>
-                                  </Tooltip>
+                                      {tieBreakLabel(row.tieBreak)}
+                                    </PopoverTrigger>
+                                    <PopoverContent
+                                      side="top"
+                                      className="w-auto max-w-xs p-2"
+                                    >
+                                      <PopoverDescription className="text-xs text-popover-foreground">
+                                        {tieBreakHint(row.tieBreak, row.tieBreakNote)}
+                                      </PopoverDescription>
+                                    </PopoverContent>
+                                  </Popover>
                                 ) : (
                                   <span className="text-[11px] text-muted-foreground">—</span>
                                 )}
                               </TableCell>
-                              {zoneFinished && (group.qualifies ?? 0) > 0 ? (
+                              {(group.qualifies ?? 0) > 0 ? (
                                 <TableCell className="px-2 py-1">
-                                  {qualifies ? (
+                                  {qualifiesConfirmed ? (
                                     <span className="inline-flex rounded-md bg-primary px-2 py-0.5 text-[11px] font-medium text-primary-foreground">
                                       Clasifica
+                                    </span>
+                                  ) : qualifiesProvisional ? (
+                                    <span
+                                      className="inline-flex rounded-md border border-border bg-muted/50 px-2 py-0.5 text-[11px] font-medium text-muted-foreground"
+                                      title="Provisional: puede cambiar hasta que termine la zona"
+                                    >
+                                      {provisionalLabel("Clasifica")}
                                     </span>
                                   ) : (
                                     <span className="text-[11px] text-muted-foreground">
@@ -875,12 +908,16 @@ export default function GroupZonesPanel({
                       className="text-xs"
                       pairAId={match.pairAId}
                       pairBId={match.pairBId}
-                      pairALabel={
-                        pairLabels[match.pairAId ?? ""] ?? pendingA ?? "Por definir"
-                      }
-                      pairBLabel={
-                        pairLabels[match.pairBId ?? ""] ?? pendingB ?? "Por definir"
-                      }
+                      pairALabel={resolvedOrProvisionalLabel(
+                        match.pairAId,
+                        pairLabels,
+                        pendingA,
+                      )}
+                      pairBLabel={resolvedOrProvisionalLabel(
+                        match.pairBId,
+                        pairLabels,
+                        pendingB,
+                      )}
                       winnerSide={winnerSide}
                       onOpenPair={onOpenPair}
                     />

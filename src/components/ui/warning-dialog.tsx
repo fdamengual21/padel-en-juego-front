@@ -29,6 +29,14 @@ export interface WarningDialogProps {
 /** Bloquea solo el click fantasma al cerrar, sin dejar el body inutilizable. */
 function suppressGhostClick() {
   const stop = (event: Event) => {
+    const target = event.target as Element | null
+    // No bloquear la cruz / interacción de toasts Sonner.
+    if (
+      typeof target?.closest === "function" &&
+      target.closest("[data-sonner-toaster]")
+    ) {
+      return
+    }
     event.preventDefault()
     event.stopPropagation()
   }
