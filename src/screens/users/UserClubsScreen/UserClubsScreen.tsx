@@ -101,7 +101,7 @@ export default function UserClubsScreen() {
                 onProvinceChange={setProvinceId}
                 onMunicipalityChange={setMunicipalityId}
                 municipalityHint={null}
-                className="grid-cols-1 sm:grid-cols-1 xl:grid-cols-2"
+                className="grid-cols-2"
               />
             </div>
             <Button
