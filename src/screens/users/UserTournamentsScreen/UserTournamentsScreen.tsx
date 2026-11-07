@@ -2,79 +2,75 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CircleAlert, LoaderCircle, Search, Trophy } from "lucide-react";
 import Api from "@/api/Api";
-import { useUser } from "@/app/UserProvider";
 import { EmptyState } from "@/components/EmptyState";
+import FilterChip, { toggleFilterValue } from "@/components/FilterChip";
 import GeographySelectFields from "@/components/GeographySelectFields";
+import { SexIcon, sexChipClassName } from "@/components/sexes";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useDebounce } from "@/hooks/useDebounce";
-import type { TournamentCard } from "@/domain";
-import { ROUTES } from "@/router/routes";
-import { useAuthStore } from "@/stores/authStore";
+import { Label } from "@/components/ui/label";
 import HomeTournamentCard from "@/components/tournaments/HomeTournamentCard";
+import {
+  CATEGORY_GENDERS,
+  CATEGORY_LEVELS,
+  categoryGenderSexCode,
+  formatCategoryGender,
+  formatCategoryLevel,
+  type TournamentCard,
+} from "@/domain";
+import { usePublicGeoListUrlState } from "@/hooks/usePublicGeoListUrlState";
+import { ROUTES } from "@/router/routes";
 import TournamentsPagination from "./components/TournamentsPagination";
 
 const PAGE_SIZE = 12;
 
 export default function UserTournamentsScreen() {
-  const { isResolvingUser } = useUser();
-  const token = useAuthStore((state) => state.token);
-  const user = useAuthStore((state) => state.user);
-  const sessionReady = !isResolvingUser;
-  const identityKey = !sessionReady
-    ? "pending"
-    : token?.trim()
-      ? (user?.id ?? "pending")
-      : "guest";
+  const {
+    state,
+    searchInput,
+    setSearchInput,
+    ready,
+    hasActiveFilters,
+    canClearFilters,
+    clearFilters,
+    setProvinceId,
+    setMunicipalityId,
+    setCategoryLevels,
+    setGenders,
+    setPage,
+  } = usePublicGeoListUrlState();
 
-  const [search, setSearch] = useState("");
-  const [provinceId, setProvinceId] = useState<number | null>(null);
-  const [municipalityId, setMunicipalityId] = useState<number | null>(null);
-  const [geoSeeded, setGeoSeeded] = useState(false);
-  const [page, setPage] = useState(1);
   const [items, setItems] = useState<TournamentCard[]>([]);
   const appendRef = useRef(false);
-  const debouncedSearch = useDebounce(search, 350);
-
-  useEffect(() => {
-    setGeoSeeded(false);
-    setProvinceId(null);
-    setMunicipalityId(null);
-    setPage(1);
-    setItems([]);
-    appendRef.current = false;
-  }, [identityKey]);
-
-  useEffect(() => {
-    if (identityKey === "pending" || geoSeeded) return;
-    setProvinceId(user?.provinceId ?? null);
-    setMunicipalityId(user?.municipalityId ?? null);
-    setGeoSeeded(true);
-  }, [identityKey, geoSeeded, user?.provinceId, user?.municipalityId]);
+  const { q, provinceId, municipalityId, categoryLevels, genders, page } = state;
 
   useEffect(() => {
     appendRef.current = false;
-    setPage(1);
     setItems([]);
-  }, [debouncedSearch, provinceId, municipalityId]);
+  }, [q, provinceId, municipalityId, categoryLevels, genders]);
 
   const { data, isLoading, isFetching, isError } = useQuery({
     queryKey: [
       "public-tournaments",
-      debouncedSearch,
+      q,
       provinceId,
       municipalityId,
+      categoryLevels,
+      genders,
       page,
       PAGE_SIZE,
     ],
     queryFn: () =>
       Api.TournamentService().listPublic({
-        q: debouncedSearch,
+        q,
         provinceId,
         municipalityId,
+        levels: categoryLevels,
+        genders,
         page,
         pageSize: PAGE_SIZE,
       }),
-    enabled: geoSeeded,
+    enabled: ready,
   });
 
   useEffect(() => {
@@ -87,10 +83,9 @@ export default function UserTournamentsScreen() {
 
   const totalPages = data?.totalPages ?? 1;
   const totalItems = data?.totalItems ?? 0;
-  const showLoading = (!geoSeeded || isLoading) && items.length === 0;
+  const showLoading = (!ready || isLoading) && items.length === 0;
   const showLoadError = isError && items.length === 0 && !showLoading;
   const showEmpty = !showLoading && !isError && items.length === 0 && !isFetching;
-  const hasActiveFilters = Boolean(debouncedSearch.trim()) || provinceId != null;
 
   return (
     <div className="space-y-5 p-4 md:p-0" data-testid="player-tournaments">
@@ -101,30 +96,119 @@ export default function UserTournamentsScreen() {
         </p>
       </div>
 
-      <div className="space-y-3">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <label htmlFor="tournaments-search" className="sr-only">
-            Buscar por nombre de club
-          </label>
-          <Input
-            id="tournaments-search"
-            type="search"
-            placeholder="Buscar por nombre de club…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            data-testid="public-tournaments-search"
-            className="h-9 pl-8"
-          />
+      <div className="space-y-3 rounded-xl border border-border bg-card p-3 shadow-sm sm:p-4">
+        <div className="flex flex-col gap-4 md:grid md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] md:items-start md:gap-0">
+          <div className="min-w-0 md:pr-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-3">
+              <div className="min-w-0 w-full space-y-1.5 sm:flex-1">
+                <Label htmlFor="tournaments-search">Buscar</Label>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="tournaments-search"
+                    type="search"
+                    placeholder="Torneo o club…"
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    data-testid="public-tournaments-search"
+                    className="pl-8"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-sm font-medium leading-none text-foreground">
+                  Sexo
+                </p>
+                <div
+                  className="flex shrink-0 flex-wrap gap-2"
+                  data-testid="public-tournaments-gender"
+                  role="group"
+                  aria-label="Sexo de la categoría"
+                >
+                  {CATEGORY_GENDERS.map((gender) => {
+                    const pressed = genders.includes(gender);
+                    const sexCode = categoryGenderSexCode(gender);
+                    return (
+                      <FilterChip
+                        key={gender}
+                        pressed={pressed}
+                        className={sexChipClassName(sexCode, pressed)}
+                        onClick={() =>
+                          setGenders(
+                            toggleFilterValue(
+                              genders,
+                              gender,
+                              CATEGORY_GENDERS.length,
+                            ),
+                          )
+                        }
+                        testId={`public-tournaments-gender-${gender}`}
+                      >
+                        <SexIcon code={sexCode} inheritColor />
+                        {formatCategoryGender(gender)}
+                      </FilterChip>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-border pt-4 md:border-l md:border-t-0 md:pl-4 md:pt-0">
+            <GeographySelectFields
+              idPrefix="tournaments-geo"
+              provinceId={provinceId}
+              municipalityId={municipalityId}
+              onProvinceChange={setProvinceId}
+              onMunicipalityChange={setMunicipalityId}
+              municipalityHint={null}
+              className="grid-cols-1 sm:grid-cols-1 xl:grid-cols-2"
+            />
+          </div>
         </div>
-        <GeographySelectFields
-          idPrefix="tournaments-geo"
-          provinceId={provinceId}
-          municipalityId={municipalityId}
-          onProvinceChange={setProvinceId}
-          onMunicipalityChange={setMunicipalityId}
-          municipalityHint={null}
-        />
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0 flex-1">
+            <p className="mb-1.5 text-sm font-medium leading-none text-foreground">
+              Categorías
+            </p>
+            <div
+              className="flex flex-wrap gap-2"
+              data-testid="public-tournaments-category"
+              role="group"
+              aria-label="Categorías"
+            >
+              {CATEGORY_LEVELS.map((level) => (
+                <FilterChip
+                  key={level}
+                  pressed={categoryLevels.includes(level)}
+                  onClick={() =>
+                    setCategoryLevels(
+                      toggleFilterValue(
+                        categoryLevels,
+                        level,
+                        CATEGORY_LEVELS.length,
+                      ),
+                    )
+                  }
+                  testId={`public-tournaments-category-${level}`}
+                >
+                  {formatCategoryLevel(level)}
+                </FilterChip>
+              ))}
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-8 w-full shrink-0 sm:w-auto"
+            disabled={!canClearFilters}
+            onClick={clearFilters}
+            data-testid="public-tournaments-clear-filters"
+          >
+            Limpiar filtros
+          </Button>
+        </div>
       </div>
 
       {isFetching && items.length > 0 ? (
@@ -192,7 +276,7 @@ export default function UserTournamentsScreen() {
         }}
         onLoadMore={() => {
           appendRef.current = true;
-          setPage((current) => current + 1);
+          setPage(page + 1);
         }}
       />
     </div>

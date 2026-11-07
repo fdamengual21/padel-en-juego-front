@@ -74,7 +74,7 @@ const KNOCKOUT_PHASES: MatchPhase[] = [
 ];
 
 const headClass =
-  "h-7 bg-primary/90 px-2 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground";
+  "h-7 bg-muted/60 px-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground";
 
 interface StandingColumnHeadProps {
   label: string;
@@ -166,12 +166,6 @@ interface GroupZonesPanelProps {
 
 function signed(value: number): string {
   return `${value > 0 ? "+" : ""}${value}`;
-}
-
-function pairIndexInGroup(group: TournamentGroup, pairId: string | null): number | null {
-  if (!pairId) return null;
-  const idx = group.pairIds.indexOf(pairId);
-  return idx >= 0 ? idx + 1 : null;
 }
 
 function pendingSide(source: string | undefined): string | null {
@@ -365,6 +359,15 @@ function ZoneSectionFrame({
   footer,
   pairCount,
 }: ZoneSectionFrameProps) {
+  const colCount = 4 + (showActions ? 1 : 0) + (showAgenda ? 1 : 0);
+  const contentMinWidth =
+    showActions && showAgenda
+      ? "min-w-[51.8rem]"
+      : showActions
+        ? "min-w-[44.3rem]"
+        : showAgenda
+          ? "min-w-[46.3rem]"
+          : "min-w-[36.8rem]";
   return (
     <section
       className="relative overflow-hidden rounded-xl border border-border bg-card"
@@ -375,82 +378,83 @@ function ZoneSectionFrame({
         aria-expanded={open}
         aria-label={open ? `Minimizar ${title}` : `Expandir ${title}`}
         data-testid={`zone-toggle-${sectionId}`}
-        className="absolute top-0 right-1 z-10 flex h-7 w-7 items-center justify-center rounded-md text-primary-foreground hover:bg-primary-foreground/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="absolute top-0 right-1 z-10 flex h-8 w-7 items-center justify-center rounded-md text-sidebar-foreground hover:bg-sidebar-foreground/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         onClick={onToggle}
       >
         <ChevronDown
           className={cn("size-4 transition-transform", open && "rotate-180")}
         />
       </button>
-      <Table
-        className={cn(
-          "table-fixed text-xs",
-          showActions && showAgenda && "min-w-[56.3rem]",
-          showActions && !showAgenda && "min-w-[48.8rem]",
-          !showActions && showAgenda && "min-w-[50.8rem]",
-          !showActions && !showAgenda && "min-w-[43.3rem]",
-        )}
-      >
-        <colgroup>
-          <col className="w-[2.5rem]" />
-          <col className="w-[4rem]" />
-          <col className="w-[7.25rem]" />
-          <col className="w-[6.25rem]" />
-          <col className="w-[17rem]" />
-          <col className="w-[6.3rem]" />
-          {showActions ? <col className="w-[5.5rem]" /> : null}
-          {showAgenda ? <col className="w-[7.5rem]" /> : null}
-        </colgroup>
-        <TableHeader>
-          <TableRow className="border-0 bg-primary/90 hover:bg-primary/90">
-            <TableHead colSpan={2} className={cn(headClass, "whitespace-nowrap")}>
-              <span className="inline-flex items-center gap-1.5">
-                {title}
-                {pairCount != null ? (
-                  <TooltipProvider delay={200}>
-                    <Tooltip>
-                      <TooltipTrigger
-                        className="cursor-help"
-                        render={<span />}
-                      >
-                        <span
-                          className="inline-flex h-5 items-center rounded-md bg-primary-foreground/20 px-1.5 text-[10px] font-semibold tabular-nums"
-                          data-testid={`zone-pair-count-${sectionId}`}
-                        >
-                          {pairCount}
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>{pairsLabel(pairCount)}</TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+      <div className="overflow-x-auto">
+        <div className={cn("w-full", contentMinWidth)}>
+          <Table container={false} className="w-full table-fixed text-xs">
+            <colgroup>
+              <col className="w-[7.25rem]" />
+              <col className="w-[6.25rem]" />
+              <col className="w-[17rem]" />
+              <col className="w-[6.3rem]" />
+              {showActions ? (
+                <col className={showAgenda ? "w-[5.5rem]" : "w-[7.5rem]"} />
+              ) : null}
+              {showAgenda ? <col className="w-[9.5rem]" /> : null}
+            </colgroup>
+            <TableHeader>
+              <TableRow className="border-0 bg-sidebar hover:bg-sidebar">
+                <TableHead
+                  colSpan={colCount}
+                  className="h-8 px-2 pr-8 text-center text-xs font-bold uppercase tracking-wide text-sidebar-foreground"
+                >
+                  <span className="inline-flex items-center justify-center gap-1.5">
+                    {title}
+                    {pairCount != null ? (
+                      <TooltipProvider delay={200}>
+                        <Tooltip>
+                          <TooltipTrigger
+                            className="cursor-help"
+                            render={<span />}
+                          >
+                            <span
+                              className="inline-flex h-5 items-center rounded-md bg-sidebar-foreground/15 px-1.5 text-[10px] font-semibold tabular-nums text-sidebar-foreground/90"
+                              data-testid={`zone-pair-count-${sectionId}`}
+                            >
+                              {pairCount}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>{pairsLabel(pairCount)}</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    ) : null}
+                  </span>
+                </TableHead>
+              </TableRow>
+              <TableRow className="border-0 bg-muted/60 hover:bg-muted/60">
+                <TableHead className={headClass}>Horarios</TableHead>
+                <TableHead className={headClass}>Estado</TableHead>
+                <TableHead className={headClass}>Partidos</TableHead>
+                <TableHead
+                  className={cn(
+                    headClass,
+                    "text-left",
+                    !showAgenda && !showActions && "pr-8",
+                  )}
+                >
+                  Resultado
+                </TableHead>
+                {showActions ? (
+                  <TableHead className={cn(headClass, !showAgenda && "pr-8")}>
+                    Acciones
+                  </TableHead>
                 ) : null}
-              </span>
-            </TableHead>
-            <TableHead className={headClass}>Horarios</TableHead>
-            <TableHead className={headClass}>Estado</TableHead>
-            <TableHead className={headClass}>Partidos</TableHead>
-            <TableHead
-              className={cn(
-                headClass,
-                "text-left",
-                !showAgenda && !showActions && "pr-8",
-              )}
-            >
-              Resultado
-            </TableHead>
-            {showActions ? (
-              <TableHead className={cn(headClass, !showAgenda && "pr-8")}>
-                Acciones
-              </TableHead>
-            ) : null}
-            {showAgenda ? (
-              <TableHead className={cn(headClass, "pr-8")}>Cancha</TableHead>
-            ) : null}
-          </TableRow>
-        </TableHeader>
-        {open ? <TableBody>{children}</TableBody> : null}
-      </Table>
-      {open ? footer : null}
+                {showAgenda ? (
+                  <TableHead className={cn(headClass, "pr-8")}>Cancha</TableHead>
+                ) : null}
+              </TableRow>
+            </TableHeader>
+            {open ? <TableBody>{children}</TableBody> : null}
+          </Table>
+          {open ? footer : null}
+        </div>
+      </div>
     </section>
   );
 }
@@ -532,7 +536,7 @@ export default function GroupZonesPanel({
   const decidingSlotIndex =
     matchRules.superTiebreakEnabled && matchRules.setsToWin >= 2 ? slotCount - 1 : null;
   const showAgenda = Boolean(onSaveSchedule) && !compact;
-  const matchColCount = 6 + (showAgenda ? 1 : 0) + (showMatchActions ? 1 : 0);
+  const matchColCount = 4 + (showAgenda ? 1 : 0) + (showMatchActions ? 1 : 0);
   const sectionOpen = (id: string) => collapsed[id] !== true;
   const toggleSection = (id: string) =>
     setCollapsed((current) => ({ ...current, [id]: !current[id] }));
@@ -611,8 +615,8 @@ export default function GroupZonesPanel({
             onToggle={() => toggleSection(group.id)}
             footer={
               !compact ? (
-                <div className="border-t border-border px-3 py-2">
-                  <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+                <div className="border-t border-border py-2">
+                  <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2 px-3">
                     <TooltipProvider delay={200}>
                       <p className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
                         Posiciones
@@ -640,7 +644,7 @@ export default function GroupZonesPanel({
                   </div>
                   {unresolvedTie ? (
                     <div
-                      className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+                      className="mx-3 mb-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900"
                       data-testid={`unresolved-tie-${group.id}`}
                     >
                       <span>
@@ -666,7 +670,7 @@ export default function GroupZonesPanel({
                     </div>
                   ) : null}
                   <TooltipProvider delay={200}>
-                    <Table className="text-xs">
+                    <Table container={false} className="w-full text-xs">
                       <TableHeader>
                         <TableRow>
                           <StandingColumnHead label="Pos" fullName="Posición" />
@@ -848,19 +852,9 @@ export default function GroupZonesPanel({
               ) : null
             }
           >
-            {groupMatches.map((match, index) => {
-              const seedA = pairIndexInGroup(group, match.pairAId);
-              const seedB = pairIndexInGroup(group, match.pairBId);
+            {groupMatches.map((match) => {
               const pendingA = pendingSide(slotSource(slots, match.id, "A"));
               const pendingB = pendingSide(slotSource(slots, match.id, "B"));
-              const cruce =
-                seedA && seedB
-                  ? `${seedA} vs ${seedB}`
-                  : pendingA && pendingB
-                    ? pendingA === "Ganador"
-                      ? "G vs G"
-                      : "P vs P"
-                    : "—";
               const playStatus = resolveMatchPlayStatus(match, matchRules);
               const hasPairs = Boolean(match.pairAId && match.pairBId);
               const matchCancelled = match.status === "cancelled";
@@ -877,12 +871,6 @@ export default function GroupZonesPanel({
               const live = canSetLive ? matchLiveAction(match, tournamentStarted) : null;
               return (
                 <TableRow key={match.id}>
-                  <TableCell className="px-2 py-1 text-xs text-muted-foreground tabular-nums whitespace-nowrap">
-                    N°{index + 1}
-                  </TableCell>
-                  <TableCell className="px-2 py-1 text-xs font-medium whitespace-nowrap">
-                    {cruce}
-                  </TableCell>
                   <TableCell className="px-2 py-1">
                     {showAgenda && onSaveSchedule ? (
                       <MatchHorarioButton
@@ -922,7 +910,12 @@ export default function GroupZonesPanel({
                       onOpenPair={onOpenPair}
                     />
                   </TableCell>
-                  <TableCell className="px-2 py-1 text-left whitespace-normal">
+                  <TableCell
+                    className={cn(
+                      "px-2 py-1 text-left whitespace-normal",
+                      !showAgenda && !showMatchActions && "pr-8",
+                    )}
+                  >
                     <button
                       type="button"
                       data-testid={`match-result-cell-${match.id}`}
@@ -947,7 +940,12 @@ export default function GroupZonesPanel({
                     </button>
                   </TableCell>
                   {showMatchActions ? (
-                    <TableCell className="px-2 py-1 align-middle">
+                    <TableCell
+                      className={cn(
+                        "px-2 py-1 align-middle",
+                        !showAgenda && "pr-8",
+                      )}
+                    >
                       <MatchRowActions
                         matchId={match.id}
                         pairingBlockedReason={
@@ -982,7 +980,7 @@ export default function GroupZonesPanel({
                     </TableCell>
                   ) : null}
                   {showAgenda && onSaveSchedule ? (
-                    <TableCell className="px-2 py-1 align-middle">
+                    <TableCell className="py-1 pl-2 pr-8 align-middle">
                       <MatchCourtSelect
                         match={match}
                         courts={courts}
@@ -1032,7 +1030,7 @@ export default function GroupZonesPanel({
             showActions={showMatchActions}
             onToggle={() => toggleSection(phase)}
           >
-            {phaseMatches.map((match, index) => {
+            {phaseMatches.map((match) => {
               const labelA = sideLabel(match, "A", slots, pairLabels, groupNames);
               const labelB = sideLabel(match, "B", slots, pairLabels, groupNames);
               const playStatus = resolveMatchPlayStatus(match, matchRules);
@@ -1050,12 +1048,6 @@ export default function GroupZonesPanel({
               const live = canSetLive ? matchLiveAction(match, tournamentStarted) : null;
               return (
                 <TableRow key={match.id}>
-                  <TableCell className="px-2 py-1 text-xs text-muted-foreground tabular-nums whitespace-nowrap">
-                    N°{index + 1}
-                  </TableCell>
-                  <TableCell className="px-2 py-1 text-xs font-medium whitespace-nowrap">
-                    —
-                  </TableCell>
                   <TableCell className="px-2 py-1">
                     {showAgenda && onSaveSchedule ? (
                       <MatchHorarioButton
@@ -1087,7 +1079,12 @@ export default function GroupZonesPanel({
                       onOpenPair={onOpenPair}
                     />
                   </TableCell>
-                  <TableCell className="px-2 py-1 text-left whitespace-normal">
+                  <TableCell
+                    className={cn(
+                      "px-2 py-1 text-left whitespace-normal",
+                      !showAgenda && !showMatchActions && "pr-8",
+                    )}
+                  >
                     <button
                       type="button"
                       data-testid={`match-result-cell-${match.id}`}
@@ -1112,7 +1109,12 @@ export default function GroupZonesPanel({
                     </button>
                   </TableCell>
                   {showMatchActions ? (
-                    <TableCell className="px-2 py-1 align-middle">
+                    <TableCell
+                      className={cn(
+                        "px-2 py-1 align-middle",
+                        !showAgenda && "pr-8",
+                      )}
+                    >
                       <MatchRowActions
                         matchId={match.id}
                         pairingBlockedReason={
@@ -1147,7 +1149,7 @@ export default function GroupZonesPanel({
                     </TableCell>
                   ) : null}
                   {showAgenda && onSaveSchedule ? (
-                    <TableCell className="px-2 py-1 align-middle">
+                    <TableCell className="py-1 pl-2 pr-8 align-middle">
                       <MatchCourtSelect
                         match={match}
                         courts={courts}

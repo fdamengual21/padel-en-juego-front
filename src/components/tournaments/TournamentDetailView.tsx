@@ -1814,8 +1814,8 @@ export default function TournamentDetailView({
         onValueChange={(value) => setActiveTab(String(value))}
       >
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <div className="min-w-0 overflow-x-auto">
-            <TabsList className="h-8 w-max min-w-full">
+          <div className="min-w-0 overflow-x-auto overflow-y-hidden">
+            <TabsList className="h-9 w-max min-w-full">
               <TabsTrigger value="grupos" className="flex-none">
                 Zonas
               </TabsTrigger>

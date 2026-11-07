@@ -342,9 +342,13 @@ export type {
   PlayerCategoryHistoryEntry,
 } from "./categories";
 export {
+  CATEGORY_GENDERS,
   CATEGORY_LEVELS,
   CATEGORY_LEVEL_SUFFIX,
+  categoryGenderSexCode,
+  formatCategoryGender,
   formatCategoryLevel,
+  isCategoryGender,
   isCategoryLevel,
   parseCategoryLevel,
 } from "./categories";

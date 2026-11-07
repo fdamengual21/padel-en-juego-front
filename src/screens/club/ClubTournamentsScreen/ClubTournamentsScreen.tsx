@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { PermissionsGuard } from "@/components/guards";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useDebounce } from "@/hooks/useDebounce";
 import type { Tournament } from "@/domain";
 import { ROUTES } from "@/router/routes";
@@ -76,38 +77,46 @@ export default function ClubTournamentsScreen() {
         </PermissionsGuard>
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="relative min-w-0 flex-1">
-          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-          <label htmlFor="club-tournaments-search" className="sr-only">
-            Buscar por nombre
-          </label>
-          <Input
-            id="club-tournaments-search"
-            type="search"
-            placeholder="Buscar por nombre"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            className="h-9 pl-8"
-          />
-        </div>
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant={scope === "open" ? "default" : "outline"}
-            onClick={() => setScope("open")}
-          >
-            Abiertos y en juego
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant={scope === "all" ? "default" : "outline"}
-            onClick={() => setScope("all")}
-          >
-            Todos
-          </Button>
+      <div className="rounded-xl border border-border bg-card p-3 shadow-sm sm:p-4">
+        <div className="flex flex-col gap-4 md:grid md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] md:items-start md:gap-0">
+          <div className="min-w-0 space-y-1.5 md:pr-4">
+            <Label htmlFor="club-tournaments-search">Buscar</Label>
+            <div className="relative min-w-0 w-full">
+              <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                id="club-tournaments-search"
+                type="search"
+                placeholder="Buscar por nombre"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                className="pl-8"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5 border-t border-border pt-4 md:border-l md:border-t-0 md:pl-4 md:pt-0">
+            <p className="text-sm font-medium leading-none text-foreground">
+              Estado
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={scope === "open" ? "default" : "outline"}
+                onClick={() => setScope("open")}
+              >
+                Abiertos y en juego
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={scope === "all" ? "default" : "outline"}
+                onClick={() => setScope("all")}
+              >
+                Todos
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
 

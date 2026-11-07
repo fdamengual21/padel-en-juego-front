@@ -324,6 +324,12 @@ export default function RegisterScreen() {
                   shouldValidate: true,
                   shouldDirty: true,
                 });
+                if (id !== provinceId) {
+                  setValue("municipalityId", null, {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                  });
+                }
               }}
               onMunicipalityChange={(id) => {
                 setValue("municipalityId", id, {

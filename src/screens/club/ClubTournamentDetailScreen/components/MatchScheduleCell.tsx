@@ -325,7 +325,7 @@ export default function MatchCourtSelect({
     <>
       <div
         className={cn(
-          "flex min-w-[7.5rem] flex-col gap-0.5",
+          "flex min-w-0 w-full flex-col gap-0.5",
           disabled && "opacity-60",
         )}
         data-testid={`match-court-cell-${match.id}`}

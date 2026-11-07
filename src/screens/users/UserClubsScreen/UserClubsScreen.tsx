@@ -2,78 +2,52 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Building2, CircleAlert, Search } from "lucide-react";
 import Api from "@/api/Api";
-import { useUser } from "@/app/UserProvider";
 import { EmptyState } from "@/components/EmptyState";
 import GeographySelectFields from "@/components/GeographySelectFields";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useDebounce } from "@/hooks/useDebounce";
+import { Label } from "@/components/ui/label";
+import { usePublicGeoListUrlState } from "@/hooks/usePublicGeoListUrlState";
 import type { PublicClubListItem } from "@/modules/clubs";
-import { useAuthStore } from "@/stores/authStore";
 import ClubListCard from "./components/ClubListCard";
 import ClubsPagination from "./components/ClubsPagination";
 
 const PAGE_SIZE = 12;
 
 export default function UserClubsScreen() {
-  const { isResolvingUser } = useUser();
-  const token = useAuthStore((state) => state.token);
-  const user = useAuthStore((state) => state.user);
-  const sessionReady = !isResolvingUser;
-  const identityKey = !sessionReady
-    ? "pending"
-    : token?.trim()
-      ? (user?.id ?? "pending")
-      : "guest";
+  const {
+    state,
+    searchInput,
+    setSearchInput,
+    ready,
+    hasActiveFilters,
+    canClearFilters,
+    clearFilters,
+    setProvinceId,
+    setMunicipalityId,
+    setPage,
+  } = usePublicGeoListUrlState();
 
-  const [search, setSearch] = useState("");
-  const [provinceId, setProvinceId] = useState<number | null>(null);
-  const [municipalityId, setMunicipalityId] = useState<number | null>(null);
-  const [geoSeeded, setGeoSeeded] = useState(false);
-  const [page, setPage] = useState(1);
   const [items, setItems] = useState<PublicClubListItem[]>([]);
   const appendRef = useRef(false);
-  const debouncedSearch = useDebounce(search, 350);
-
-  useEffect(() => {
-    setGeoSeeded(false);
-    setProvinceId(null);
-    setMunicipalityId(null);
-    setPage(1);
-    setItems([]);
-    appendRef.current = false;
-  }, [identityKey]);
-
-  useEffect(() => {
-    if (identityKey === "pending" || geoSeeded) return;
-    setProvinceId(user?.provinceId ?? null);
-    setMunicipalityId(user?.municipalityId ?? null);
-    setGeoSeeded(true);
-  }, [identityKey, geoSeeded, user?.provinceId, user?.municipalityId]);
+  const { q, provinceId, municipalityId, page } = state;
 
   useEffect(() => {
     appendRef.current = false;
-    setPage(1);
     setItems([]);
-  }, [debouncedSearch, provinceId, municipalityId]);
+  }, [q, provinceId, municipalityId]);
 
   const { data, isLoading, isFetching, isError } = useQuery({
-    queryKey: [
-      "public-clubs",
-      debouncedSearch,
-      provinceId,
-      municipalityId,
-      page,
-      PAGE_SIZE,
-    ],
+    queryKey: ["public-clubs", q, provinceId, municipalityId, page, PAGE_SIZE],
     queryFn: () =>
       Api.ClubService().listPublic({
-        q: debouncedSearch,
+        q,
         provinceId,
         municipalityId,
         page,
         pageSize: PAGE_SIZE,
       }),
-    enabled: geoSeeded,
+    enabled: ready,
   });
 
   useEffect(() => {
@@ -86,11 +60,10 @@ export default function UserClubsScreen() {
 
   const totalPages = data?.totalPages ?? 1;
   const totalItems = data?.totalItems ?? 0;
-  const showSkeletons = (!geoSeeded || isLoading) && items.length === 0;
+  const showSkeletons = (!ready || isLoading) && items.length === 0;
   const showLoadError = isError && items.length === 0 && !showSkeletons;
   const showEmpty =
     !showSkeletons && !isError && items.length === 0 && !isFetching;
-  const hasActiveFilters = Boolean(debouncedSearch.trim()) || provinceId != null;
 
   return (
     <div className="space-y-5 p-4 md:p-0" data-testid="player-clubs">
@@ -101,30 +74,48 @@ export default function UserClubsScreen() {
         </p>
       </div>
 
-      <div className="space-y-3">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <label htmlFor="clubs-search" className="sr-only">
-            Buscar clubes
-          </label>
-          <Input
-            id="clubs-search"
-            type="search"
-            placeholder="Buscar por nombre o localidad…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            data-testid="public-clubs-search"
-            className="h-9 pl-8"
-          />
+      <div className="rounded-xl border border-border bg-card p-3 shadow-sm sm:p-4">
+        <div className="flex flex-col gap-4 md:grid md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] md:items-start md:gap-0">
+          <div className="min-w-0 space-y-1.5 md:pr-4">
+            <Label htmlFor="clubs-search">Buscar</Label>
+            <div className="relative min-w-0 w-full">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                id="clubs-search"
+                type="search"
+                placeholder="Buscar por nombre o localidad…"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                data-testid="public-clubs-search"
+                className="pl-8"
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-end sm:justify-between md:border-l md:border-t-0 md:pl-4 md:pt-0">
+            <div className="min-w-0 flex-1">
+              <GeographySelectFields
+                idPrefix="clubs-geo"
+                provinceId={provinceId}
+                municipalityId={municipalityId}
+                onProvinceChange={setProvinceId}
+                onMunicipalityChange={setMunicipalityId}
+                municipalityHint={null}
+                className="grid-cols-1 sm:grid-cols-1 xl:grid-cols-2"
+              />
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-8 w-full shrink-0 sm:w-auto"
+              disabled={!canClearFilters}
+              onClick={clearFilters}
+              data-testid="public-clubs-clear-filters"
+            >
+              Limpiar filtros
+            </Button>
+          </div>
         </div>
-        <GeographySelectFields
-          idPrefix="clubs-geo"
-          provinceId={provinceId}
-          municipalityId={municipalityId}
-          onProvinceChange={setProvinceId}
-          onMunicipalityChange={setMunicipalityId}
-          municipalityHint={null}
-        />
       </div>
 
       {isFetching && items.length > 0 ? (
@@ -181,7 +172,7 @@ export default function UserClubsScreen() {
         }}
         onLoadMore={() => {
           appendRef.current = true;
-          setPage((current) => current + 1);
+          setPage(page + 1);
         }}
       />
     </div>

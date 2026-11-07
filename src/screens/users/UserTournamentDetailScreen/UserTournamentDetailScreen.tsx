@@ -305,8 +305,8 @@ export default function UserTournamentDetailScreen() {
       />
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(String(value))}>
-        <div className="min-w-0 overflow-x-auto">
-          <TabsList className="h-8 w-max min-w-full">
+        <div className="min-w-0 overflow-x-auto overflow-y-hidden">
+          <TabsList className="h-9 w-max min-w-full">
             {galleryFirst ? (
               <TabsTrigger value="galeria" className="flex-none">
                 Galería

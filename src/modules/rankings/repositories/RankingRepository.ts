@@ -1,5 +1,11 @@
 import type { AxiosInstance } from "axios";
 import { readData } from "@/config/axiosInstance";
+import {
+  CATEGORY_GENDERS,
+  CATEGORY_LEVELS,
+  isCategoryGender,
+  isCategoryLevel,
+} from "@/domain";
 import type { ApiEnvelope } from "@/lib/apiClient";
 import { resolveClubHeaderId } from "@/modules/auth/clubContext";
 import { useAuthStore } from "@/stores/authStore";
@@ -11,17 +17,35 @@ import type {
   UpdateClubRankingRequest,
 } from "../types";
 
+function uniqueSortedLevels(values: number[] | null | undefined): number[] {
+  const levels = [...new Set((values ?? []).filter(isCategoryLevel))].sort(
+    (a, b) => a - b,
+  );
+  if (levels.length === 0 || levels.length === CATEGORY_LEVELS.length) return [];
+  return levels;
+}
+
+function uniqueSortedGenders(values: string[] | null | undefined): string[] {
+  const order = CATEGORY_GENDERS;
+  const selected = new Set((values ?? []).filter(isCategoryGender));
+  const genders = order.filter((gender) => selected.has(gender));
+  if (genders.length === 0 || genders.length === order.length) return [];
+  return genders;
+}
+
 export interface PublicRankingListQuery {
   /** `all` trae en curso, programados y finalizados (primero los no terminados). Default `live`. */
   scope?: "live" | "finished" | "all";
   clubId?: string | null;
-  /** Nombre del club, búsqueda parcial. */
+  /** Nombre del circuito o club, búsqueda parcial. */
   q?: string | null;
   provinceId?: number | null;
   municipalityId?: number | null;
-  gender?: string | null;
+  /** Niveles 1–8. Vacío o los 8 = sin filtro. */
+  levels?: number[] | null;
+  /** male / female / mixed. Vacío o los 3 = sin filtro. */
+  genders?: string[] | null;
   kind?: string | null;
-  level?: number | null;
   sumaTarget?: number | null;
 }
 
@@ -148,6 +172,8 @@ export class RankingRepository implements IRankingRepository {
   }
 
   async listPublic(query: PublicRankingListQuery = {}): Promise<ClubRankingCircuit[]> {
+    const levels = uniqueSortedLevels(query.levels);
+    const genders = uniqueSortedGenders(query.genders);
     const response = await this.http.get<ApiEnvelope<ClubRankingCircuit[]>>("/public/rankings", {
       params: {
         scope: query.scope ?? undefined,
@@ -155,11 +181,12 @@ export class RankingRepository implements IRankingRepository {
         q: query.q?.trim() || undefined,
         provinceId: query.provinceId ?? undefined,
         municipalityId: query.municipalityId ?? undefined,
-        gender: query.gender || undefined,
+        levels: levels.length ? levels : undefined,
+        genders: genders.length ? genders : undefined,
         kind: query.kind || undefined,
-        level: query.level ?? undefined,
         sumaTarget: query.sumaTarget ?? undefined,
       },
+      paramsSerializer: { indexes: null },
     });
     return asList(readData(response));
   }

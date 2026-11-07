@@ -1,18 +1,44 @@
 import type { AxiosInstance } from "axios";
 import { readData } from "@/config/axiosInstance";
 import type { PaginatedResult, TournamentCard, TournamentPhoto } from "@/domain";
-import { asTournamentFormat } from "@/domain";
+import {
+  asTournamentFormat,
+  CATEGORY_GENDERS,
+  CATEGORY_LEVELS,
+  isCategoryGender,
+  isCategoryLevel,
+} from "@/domain";
 import type { ApiEnvelope } from "@/lib/apiClient";
 import { resolveClubHeaderId } from "@/modules/auth/clubContext";
 import { useAuthStore } from "@/stores/authStore";
 import { normalizeTournamentCardPage } from "../mapTournamentCard";
 import type { CreateTournamentRequest, PublicTournamentPageDto, Tournament } from "../types";
 
+function uniqueSortedLevels(values: number[] | null | undefined): number[] {
+  const levels = [...new Set((values ?? []).filter(isCategoryLevel))].sort(
+    (a, b) => a - b,
+  );
+  if (levels.length === 0 || levels.length === CATEGORY_LEVELS.length) return [];
+  return levels;
+}
+
+function uniqueSortedGenders(values: string[] | null | undefined): string[] {
+  const order = CATEGORY_GENDERS;
+  const selected = new Set((values ?? []).filter(isCategoryGender));
+  const genders = order.filter((gender) => selected.has(gender));
+  if (genders.length === 0 || genders.length === order.length) return [];
+  return genders;
+}
+
 export interface PublicTournamentListQuery {
   q?: string | null;
   provinceId?: number | null;
   municipalityId?: number | null;
   clubId?: string | null;
+  /** Niveles 1–8. Vacío o los 8 = sin filtro. */
+  levels?: number[] | null;
+  /** male / female / mixed. Vacío o los 3 = sin filtro. */
+  genders?: string[] | null;
   page?: number;
   pageSize?: number;
 }
@@ -134,6 +160,8 @@ export class TournamentRepository implements ITournamentRepository {
   async listPublic(query: PublicTournamentListQuery = {}): Promise<PaginatedResult<TournamentCard>> {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 12;
+    const levels = uniqueSortedLevels(query.levels);
+    const genders = uniqueSortedGenders(query.genders);
     const response = await this.http.get<ApiEnvelope<Record<string, unknown>>>(
       "/public/tournaments",
       {
@@ -142,9 +170,12 @@ export class TournamentRepository implements ITournamentRepository {
           provinceId: query.provinceId ?? undefined,
           municipalityId: query.municipalityId ?? undefined,
           clubId: query.clubId?.trim() || undefined,
+          levels: levels.length ? levels : undefined,
+          genders: genders.length ? genders : undefined,
           page,
           pageSize,
         },
+        paramsSerializer: { indexes: null },
       },
     );
     return normalizeTournamentCardPage(readData(response), { page, pageSize });

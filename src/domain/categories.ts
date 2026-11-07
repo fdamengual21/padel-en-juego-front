@@ -1,5 +1,29 @@
 export type CategoryGender = "male" | "female" | "mixed";
 
+export const CATEGORY_GENDERS: CategoryGender[] = ["male", "female", "mixed"];
+
+const CATEGORY_GENDER_LABELS: Record<CategoryGender, string> = {
+  male: "Masculino",
+  female: "Femenino",
+  mixed: "Mixto",
+};
+
+/** Etiqueta de UI: male → "Masculino". */
+export function formatCategoryGender(gender: CategoryGender): string {
+  return CATEGORY_GENDER_LABELS[gender];
+}
+
+export function isCategoryGender(value: unknown): value is CategoryGender {
+  return value === "male" || value === "female" || value === "mixed";
+}
+
+/** Código de ícono/estilo de sexo: mixed usa la variante `x`. */
+export function categoryGenderSexCode(
+  gender: CategoryGender,
+): "male" | "female" | "x" {
+  return gender === "mixed" ? "x" : gender;
+}
+
 /** Nivel de categoría (1 … 8). La etiqueta visible se arma con el sufijo. */
 export type CategoryLevel = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 

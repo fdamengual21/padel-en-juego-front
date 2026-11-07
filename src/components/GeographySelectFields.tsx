@@ -1,10 +1,12 @@
 import AutocompleteField from "@/components/AutocompleteField";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import { useMunicipalities, useProvinces } from "@/modules/geography";
 
 interface GeographySelectFieldsProps {
   provinceId: number | null;
   municipalityId: number | null;
+  /** Al cambiar provincia, el padre debe limpiar `municipalityId` en el mismo handler. */
   onProvinceChange: (provinceId: number | null) => void;
   onMunicipalityChange: (municipalityId: number | null) => void;
   provinceError?: string;
@@ -14,6 +16,7 @@ interface GeographySelectFieldsProps {
   idPrefix?: string;
   /** Texto bajo localidad. Null oculta el hint. */
   municipalityHint?: string | null;
+  className?: string;
 }
 
 /** Provincia + municipio desde la API (ids). Ambos opcionales. */
@@ -28,6 +31,7 @@ export default function GeographySelectFields({
   required = false,
   idPrefix = "geo",
   municipalityHint = "Si no aparece tu localidad, dejá estos campos vacíos.",
+  className,
 }: GeographySelectFieldsProps) {
   const { provinces, isLoading: loadingProvinces } = useProvinces();
   const { municipalities, isLoading: loadingMunicipalities } = useMunicipalities(
@@ -40,7 +44,7 @@ export default function GeographySelectFields({
     municipalities.find((item) => item.id === municipalityId) ?? null;
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
+    <div className={cn("grid gap-3 sm:grid-cols-2", className)}>
       <div className="space-y-1.5">
         <Label htmlFor={`${idPrefix}-province`}>
           {required ? "Provincia" : "Provincia (opcional)"}
@@ -64,8 +68,10 @@ export default function GeographySelectFields({
           aria-invalid={Boolean(provinceError)}
           onChange={(name) => {
             const next = provinces.find((item) => item.name === name) ?? null;
-            onProvinceChange(next?.id ?? null);
-            if (next?.id !== provinceId) onMunicipalityChange(null);
+            const nextId = next?.id ?? null;
+            // Un solo callback: el padre debe limpiar localidad al cambiar provincia.
+            // Un segundo setSearchParams en el mismo tick pisa el clear y restaura provinceId.
+            onProvinceChange(nextId);
           }}
         />
         {provinceError ? (
